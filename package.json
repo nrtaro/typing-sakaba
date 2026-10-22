@@ -1,0 +1,27 @@
+{
+  "name": "last-order",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LAST ORDER（仮題）— タイピングで食材を集める文明崩壊後の酒場経営スコアアタック",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "sim": "vitest run tests/balance.sim.test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nrtaro/Last-Order.git"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@fontsource/dotgothic16": "^5.3.1"
+  }
+}
