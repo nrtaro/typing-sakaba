@@ -48,14 +48,19 @@ function safe<T>(fn: () => T, fallback: T): T {
 }
 
 export class SaveStore {
-  constructor(private store: KeyValueStore | null) {}
+  private keys: typeof KEYS;
+  /** slot を指定すると別の保存枠を使う（動作確認用） */
+  constructor(private store: KeyValueStore | null, slot = '') {
+    const suffix = slot ? `.${slot.replace(/[^a-z0-9_-]/gi, '')}` : '';
+    this.keys = { run: KEYS.run + suffix, settings: KEYS.settings + suffix, best: KEYS.best + suffix, last: KEYS.last + suffix };
+  }
 
   saveRun(s: GameState, playSeconds: number) {
-    safe(() => this.store?.setItem(KEYS.run, JSON.stringify({ state: s, playSeconds })), undefined);
+    safe(() => this.store?.setItem(this.keys.run, JSON.stringify({ state: s, playSeconds })), undefined);
   }
 
   loadRun(): { state: GameState; playSeconds: number } | null {
-    const raw = safe(() => this.store?.getItem(KEYS.run) ?? null, null);
+    const raw = safe(() => this.store?.getItem(this.keys.run) ?? null, null);
     if (!raw) return null;
     const data = safe(() => JSON.parse(raw), null);
     if (!data || !isValidState(data.state)) return null;
@@ -63,33 +68,33 @@ export class SaveStore {
   }
 
   clearRun() {
-    safe(() => this.store?.removeItem(KEYS.run), undefined);
+    safe(() => this.store?.removeItem(this.keys.run), undefined);
   }
 
   loadSettings(): Settings {
-    const raw = safe(() => this.store?.getItem(KEYS.settings) ?? null, null);
+    const raw = safe(() => this.store?.getItem(this.keys.settings) ?? null, null);
     const data = raw ? safe(() => JSON.parse(raw), null) : null;
     return { ...DEFAULT_SETTINGS, ...(data && typeof data === 'object' ? data : {}) };
   }
 
   saveSettings(s: Settings) {
-    safe(() => this.store?.setItem(KEYS.settings, JSON.stringify(s)), undefined);
+    safe(() => this.store?.setItem(this.keys.settings, JSON.stringify(s)), undefined);
   }
 
   loadBest(): RunRecord | null {
-    return this.loadRecord(KEYS.best);
+    return this.loadRecord(this.keys.best);
   }
 
   loadLast(): RunRecord | null {
-    return this.loadRecord(KEYS.last);
+    return this.loadRecord(this.keys.last);
   }
 
   /** 直近の結果を保存し、自己ベストなら更新する。自己ベスト更新なら true */
   recordResult(r: RunRecord): boolean {
-    safe(() => this.store?.setItem(KEYS.last, JSON.stringify(r)), undefined);
+    safe(() => this.store?.setItem(this.keys.last, JSON.stringify(r)), undefined);
     const best = this.loadBest();
     if (!best || r.score.total > best.score.total) {
-      safe(() => this.store?.setItem(KEYS.best, JSON.stringify(r)), undefined);
+      safe(() => this.store?.setItem(this.keys.best, JSON.stringify(r)), undefined);
       return true;
     }
     return false;

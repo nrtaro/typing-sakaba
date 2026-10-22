@@ -55,9 +55,9 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
-  seats: { name: '客席', costs: [90, 240, 520], desc: '一晩に受け入れられる客数が増える' },
-  kitchen: { name: '厨房', costs: [80, 220, 480], desc: '1日に作れる料理の数が増える' },
-  sign: { name: '看板・内装', costs: [70, 200, 450], desc: '来客が増え、メニューに載せられる品数も増える' },
+  seats: { name: '客席', costs: [120, 320, 640], desc: '一晩に受け入れられる客数が増える' },
+  kitchen: { name: '厨房', costs: [100, 280, 560], desc: '1日に作れる料理の数が増える' },
+  sign: { name: '看板・内装', costs: [90, 260, 520], desc: '来客が増え、メニューに載せられる品数も増える' },
 };
 
 export const UPGRADE_ORDER: UpgradeId[] = ['seats', 'kitchen', 'sign'];
@@ -96,8 +96,8 @@ export const TREND_ORDER: TrendId[] = ['fish', 'meat', 'crowd', 'quiet'];
 
 export const FISHING = {
   duration: 40,
-  biteWait: [0.5, 1.0] as [number, number],
-  landTime: 0.6,
+  biteWait: [0.3, 0.6] as [number, number],
+  landTime: 0.45,
   /** 「水面の静けさ」がこの値に達すると大物が掛かる */
   calmToBig: 3,
   /** 語句を打ち切ったときの静けさの増減（ミス0回 / 1回 / 2回以上） */
@@ -111,9 +111,9 @@ export const FISHING = {
 
 export const HUNTING = {
   duration: 40,
-  rabbit: { hp: 2, crossTime: 7.5, yield: 1 },
+  rabbit: { hp: 2, crossTime: 9, yield: 1 },
   deer: { hp: 5, crossTime: 11, yield: 2 },
-  rabbitInterval: [2.2, 3.2] as [number, number],
+  rabbitInterval: [2.4, 3.4] as [number, number],
   maxRabbits: 3,
   deerAt: [7, 22],
   /** ミスで獲物が驚いたときの速度倍率（上限あり） */
