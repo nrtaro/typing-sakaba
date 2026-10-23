@@ -42,8 +42,9 @@ export class Screen {
     const dpr = window.devicePixelRatio || 1;
     const cw = Math.max(1, Math.round(window.innerWidth * dpr));
     const ch = Math.max(1, Math.round(window.innerHeight * dpr));
-    this.canvas.width = cw;
-    this.canvas.height = ch;
+    // 同じサイズの通知でも代入すると、文字を含む描画状態が消去される。
+    if (this.canvas.width !== cw) this.canvas.width = cw;
+    if (this.canvas.height !== ch) this.canvas.height = ch;
     const aspect = cw / ch;
     // 横長なら横に、縦長なら縦に描く範囲を広げる
     const vw = Math.min(MAX_W, Math.max(LW, Math.round(LH * aspect)));

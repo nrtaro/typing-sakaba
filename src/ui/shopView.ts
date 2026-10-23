@@ -33,7 +33,7 @@ interface Server {
 }
 interface Exit { look: number; x: number; y: number; start: number; distance: number; path: { x: number; y: number }[] }
 interface Fx { anim: string; x: number; y: number; h: number; start: number }
-interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean }
+interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean; slot?: string }
 interface Spark { x: number; y: number; vx: number; vy: number; t: number; col: Color }
 
 /** 営業画面の見た目の状態（演出用。ゲームの計算には影響しない） */
@@ -56,10 +56,16 @@ export class ShopView {
   pops: Pop[] = [];
   sparks: Spark[] = [];
   missFlash = 0;
+  comboBurst = 0;
   lackTrip: { id: TripId; t: number } | null = null;
   gotTrip: { id: TripId; t: number; gains: Partial<Record<IngredientId, number>> } | null = null;
   /** 出かけている／帰ってきた家族のひとこと */
   banner: { text: string; t: number; col: Color } | null = null;
+
+  private pop(slot: string, p: Pop) {
+    this.pops = this.pops.filter(old => old.slot !== slot);
+    this.pops.push({ ...p, slot });
+  }
 
   handle(ev: ShopEvent, shop: Shop) {
     switch (ev.type) {
@@ -83,21 +89,25 @@ export class ShopView {
             s.serveStart = null;
           }
         }
+        if (ev.combo >= 3) {
+          this.comboBurst = ev.combo % 10 === 0 ? 1.2 : 0.7;
+          const milestone = ev.combo % 10 === 0;
+          this.sparkAt({ x: 76, y: 166 }, C.gold3, milestone ? 55 : Math.min(24, ev.combo), milestone ? 135 : 70);
+          this.pop('combo', { x: 76, y: 145, t: 0, text: milestone ? `${ev.combo} COMBO!!` : `${ev.combo} COMBO`, col: milestone ? C.pink : C.gold3 });
+        }
         this.stirUntil = this.time + 2.4;
         this.fxs.push({ anim: 'きらめき', x: seat.x, y: seat.ty - 8, h: 22, start: this.time });
-        this.pops.push({ x: seat.x, y: seat.ty - 60, t: 0, text: `+${ev.gain}`, col: C.gold });
+        this.pop('income', { x: 78, y: 180, t: 0, text: `+${ev.gain}円`, col: C.gold });
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, C.gold, 10, 80);
         break;
       }
       case 'lack': {
-        const seat = SEATS[ev.seat];
-        this.pops.push({ x: seat.x, y: seat.ty - 56, t: 0, text: '素材が足りない！', col: C.red3 });
+        this.pop('warning', { x: 78, y: 115, t: 0, text: '素材が足りない！', col: C.red3 });
         this.lackTrip = { id: SOURCE[ev.missing[0]], t: 1.4 };
         break;
       }
       case 'angry': {
-        const seat = SEATS[ev.seat];
-        this.pops.push({ x: seat.x, y: seat.ty - 40, t: 0, text: 'プンプン！', col: C.red3 });
+        this.pop('warning', { x: 78, y: 115, t: 0, text: 'プンプン！', col: C.red3 });
         break;
       }
       case 'tripStart':
@@ -116,7 +126,7 @@ export class ShopView {
         this.gotTrip = { id: ev.trip.id, t: 1.4, gains: ev.gains };
         break;
       case 'phase':
-        this.pops.push({ x: LW / 2, y: 70, t: 0, text: `― ${PHASES[ev.index].name}の部 ―`, col: C.gold3, big: true });
+        this.banner = { text: `― ${PHASES[ev.index].name}の部 ―`, t: 1.6, col: C.gold3 };
         break;
       default:
         break;
@@ -160,6 +170,7 @@ export class ShopView {
   update(dt: number, shop?: Shop) {
     this.time += dt;
     this.missFlash = Math.max(0, this.missFlash - dt);
+    this.comboBurst = shop && shop.combo < 3 ? 0 : Math.max(0, this.comboBurst - dt);
     for (const p of this.pops) p.t += dt;
     this.pops = this.pops.filter((p) => p.t < 1.3);
     for (const p of this.sparks) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 140 * dt; }
@@ -347,10 +358,13 @@ export class ShopView {
     const left = shop.timeLeft;
     sc.TB(`残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 184, 6, 12, left < 20 ? C.red3 : C.w, 'left');
     sc.T('売上', 262, 9, 9, C.cream, 'left', 0.85);
-    sc.TB(shop.score.toLocaleString(), 288, 4, 15, C.gold, 'left');
+    const sales = `${shop.score.toLocaleString()}円`;
+    sc.TB(sales, 288, 5, sc.fitSize(sales, 14, 82), C.gold, 'left');
     if (shop.combo > 1) {
       const mult = shop.multiplier;
-      sc.TB(`${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : ''), 476, 5, 13, mult > 1 ? C.pink : C.w, 'right');
+      const label = `${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : '');
+      if (this.comboBurst > 0) sc.panel(374, 3, 102, 21, 'rgba(85,45,31,0.4)', C.gold3, Math.min(1, this.comboBurst));
+      sc.TB(label, 476, 5, sc.fitSize(label, 13, 100), this.comboBurst > 0 ? C.gold3 : mult > 1 ? C.pink : C.w, 'right');
     }
   }
 
@@ -563,7 +577,16 @@ export class ShopView {
 
   private drawFx(sc: Screen, shop: Shop) {
     for (const p of this.sparks) sc.PR(p.x, p.y, 1.5, 1.5, p.col, 1 - p.t / 0.7);
-    for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 16, p.big ? 18 : 11, p.col, 'center', C.ink, Math.min(1, (1.3 - p.t) * 3));
+    if (this.comboBurst > 0) {
+      const a = Math.min(1, this.comboBurst);
+      for (let i = 0; i < 3; i++) {
+        const r = (1.2 - this.comboBurst) * 20 + i * 5;
+        sc.PR(76 - r, 141 - r, r * 2, 1, C.gold3, a * (1 - i / 3));
+        sc.PR(76 - r, 185 + r, r * 2, 1, C.gold3, a * (1 - i / 3));
+      }
+
+    }
+    for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 16, p.slot === 'combo' ? sc.fitSize(p.text, 15, 134) : p.big ? 12 : 11, p.col, 'center', C.ink, Math.min(1, (1.3 - p.t) * 3));
     if (this.banner) {
       const tw = sc.W(this.banner.text, 11) + 24;
       sc.panel(LW / 2 - tw / 2, 30, tw, 20, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));

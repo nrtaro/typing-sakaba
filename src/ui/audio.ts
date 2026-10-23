@@ -101,6 +101,15 @@ export class Sound {
     this.noise(t, 0.05, 0.06, this.sfx);
   }
 
+  /** 節目は上昇するファンファーレ。重ねても音量を急増させない。 */
+  combo(count: number) {
+    if (!this.ac || !this.sfx) return;
+    const t = this.ac.currentTime, milestone = count % 10 === 0;
+    const notes = milestone ? [0, 2, 4, 5, 7, 9] : [Math.min(8, Math.floor(count / 3)) + 3];
+    notes.forEach((n, i) => this.tone(this.note(n), t + i * 0.055, milestone ? 0.3 : 0.13, 'triangle', 0.06, this.sfx!));
+    if (milestone) this.noise(t, 0.08, 0.04, this.sfx);
+  }
+
   coin() {
     if (!this.ac || !this.sfx) return;
     const t = this.ac.currentTime;
