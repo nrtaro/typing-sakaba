@@ -19,13 +19,28 @@ export interface Dish {
   from: number;
 }
 
+export const GAME_TITLE = 'タイピング酒場';
+export const GAME_SUBTITLE = '～おやじと女将と看板娘～';
+
 export const DISHES: Dish[] = [
+  // 朝：素材1つの軽い料理
   { id: 'grilledFish', text: '焼き魚', kana: 'やきざかな', need: { fish: 1 }, price: 120, from: 0 },
   { id: 'vegSoup', text: '野菜スープ', kana: 'やさいすーぷ', need: { veg: 1 }, price: 100, from: 0 },
   { id: 'ale', text: 'エール', kana: 'えーる', need: { ale: 1 }, price: 80, from: 0 },
+  { id: 'mushSaute', text: 'きのこソテー', kana: 'きのこそてー', need: { mush: 1 }, price: 110, from: 0 },
+  { id: 'jerky', text: '干し肉', kana: 'ほしにく', need: { meat: 1 }, price: 120, from: 0 },
+  // 昼：素材2つ
   { id: 'stirFry', text: '肉野菜炒め', kana: 'にくやさいいため', need: { meat: 1, veg: 1 }, price: 260, from: 1 },
   { id: 'mushStew', text: 'きのこ煮込み', kana: 'きのこにこみ', need: { mush: 1, veg: 1 }, price: 240, from: 1 },
-  { id: 'karaage', text: '唐揚げ', kana: 'からあげ', need: { meat: 1, spice: 1 }, price: 220, from: 1 },
+  { id: 'karaage', text: '唐揚げ', kana: 'からあげ', need: { meat: 1, spice: 1 }, price: 230, from: 1 },
+  { id: 'fishFry', text: '魚フライ', kana: 'さかなふらい', need: { fish: 1, spice: 1 }, price: 230, from: 1 },
+  { id: 'herbFish', text: '香草焼き', kana: 'こうそうやき', need: { fish: 1, veg: 1 }, price: 250, from: 1 },
+  // 夜：素材3つ以上や酒を使う料理
+  { id: 'hunterStew', text: 'ハンターシチュー', kana: 'はんたーしちゅー', need: { meat: 1, veg: 1, mush: 1 }, price: 400, from: 2 },
+  { id: 'spicyPot', text: 'ピリ辛鍋', kana: 'ぴりからなべ', need: { fish: 1, mush: 1, spice: 1 }, price: 400, from: 2 },
+  { id: 'sakeFish', text: '魚の酒蒸し', kana: 'さかなのさかむし', need: { fish: 1, ale: 1 }, price: 260, from: 2 },
+  { id: 'aleBeef', text: '肉の黒エール煮', kana: 'にくのくろえーるに', need: { meat: 1, ale: 1 }, price: 280, from: 2 },
+  { id: 'spiceAle', text: 'スパイスエール', kana: 'すぱいすえーる', need: { ale: 1, spice: 1 }, price: 200, from: 2 },
   { id: 'feast', text: '荒野の大皿', kana: 'こうやのおおざら', need: { meat: 1, fish: 1, veg: 1, spice: 1 }, price: 620, from: 2 },
 ];
 
@@ -43,7 +58,7 @@ export interface Trip {
 
 export const TRIPS: Trip[] = [
   { id: 'fishing', text: 'つり', kana: 'つり', who: 'wife', act: '釣り', place: '貯水池', gives: ['fish'], minimum: { fish: 4 } },
-  { id: 'hunting', text: 'かり', kana: 'かり', who: 'master', act: '狩り', place: '荒野', gives: ['meat'], minimum: { meat: 4 } },
+  { id: 'hunting', text: 'かり', kana: 'かり', who: 'master', act: '狩り', place: '荒野', gives: ['meat'], minimum: { meat: 5 } },
   { id: 'gathering', text: 'さいしゅ', kana: 'さいしゅ', who: 'daughter', act: '採取', place: '温室', gives: ['veg', 'mush'], minimum: { veg: 4, mush: 3 } },
   { id: 'trading', text: 'しいれ', kana: 'しいれ', who: 'master', act: '仕入れ', place: '隊商', gives: ['ale', 'spice'], minimum: { ale: 4, spice: 3 } },
 ];
@@ -53,7 +68,7 @@ export const SOURCE: Record<IngredientId, TripId> = {
   fish: 'fishing', meat: 'hunting', veg: 'gathering', mush: 'gathering', ale: 'trading', spice: 'trading',
 };
 
-export const FAMILY_NAME: Record<FamilyId, string> = { master: 'マスター', wife: 'おかみ', daughter: '看板娘' };
+export const FAMILY_NAME: Record<FamilyId, string> = { master: 'おやじ', wife: '女将', daughter: '看板娘' };
 
 export interface Phase {
   name: string;
