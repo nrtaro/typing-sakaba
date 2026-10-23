@@ -1,39 +1,42 @@
 // A案素材の配置。座標は基準の 480x270。背景画像（1672x941）の家具や地面に合わせて調整した値。
 import type { IngredientId } from '../../core/shopConfig';
 
+export { TAVERN_SEATS, entryPosition } from '../../core/tavernNavigation';
+export const ORDER_CARD = { height: 34, offset: 58 };
+
 export const AMBER = {
   tavern: {
     /** かまどの口（背景の石窯）に置く炎、鍋の湯気 */
     fire: { x: 38, y: 93, h: 11 },
     steam: { x: 76, y: 86, h: 16 },
-    /** おやじ：カウンターの奥。y は足元（カウンターの前板で隠れる位置） */
-    master: { x: 66, y: 138, h: 44, hStir: 46 },
-    /** カウンターの前板（おやじの下半身を隠すため、背景から切り出して上に描き直す） */
-    counterFront: { x: 6, y: 127, w: 137, h: 26 },
+    /** 足元は奥の作業通路。頭は y=88、腰より下は手前の天板に隠れる。 */
+    master: { x: 66, y: 132, h: 44, hStir: 46 },
+    /** 原画の天板奥端 y=393/941*270。前板だけでなく天板も人物より手前に置く。 */
+    counterFront: { x: 6, y: 113, w: 137, h: 40 },
     /** 女将・看板娘の身長 */
     family: { wife: 38, daughter: 33 } as Record<'wife' | 'daughter', number>,
     /** テーブル・椅子・座った客。foot は席の基準（ty）からの足元のずれ */
-    table: { h: 22, foot: 15 },
-    chair: { h: 27, foot: 10 },
+    table: { h: 25, foot: 20 },
+    chair: { h: 30, foot: 11 },
     guest: { h: 25, foot: 0 },
-    dish: { y: -13 },
+    dish: { y: -10 },
     /** 歩く客の身長 */
     walker: { h: 34 },
     /** 入り口で待つ客の位置 */
     queue: { x: 452, y: 200 },
   },
   fishing: {
-    /** 桟橋の上の女将（足元）。竿の先から下がる仕掛けの位置は wife-fishing のコマごとの値 */
-    wife: { x: 104, y: 156, h: 60 },
+    /** 足元を桟橋の板面の内側へ置く。手前の支柱・側面には乗せない。 */
+    wife: { x: 90, y: 144, h: 60 },
     /** wife-fishing の各コマで、竿から下がる仕掛けの下端（セル内の座標） */
-    lure: [[507, 420], [506, 387], [513, 441], [513, 398]] as [number, number][],
+    lure: [[501, 244], [501, 234], [504, 284], [504, 244]] as [number, number][],
     /** 水面の浮き（足元＝水面） */
     bobber: { x: 372, y: 186, h: 11 },
     splash: { h: 22 },
   },
   hunting: {
     /** 左の柵の手前で構えるおやじ */
-    master: { x: 28, y: 182, h: 54 },
+    master: { x: 49, y: 207, h: 48 },
     rabbit: { h: 22 },
     deer: { h: 48 },
   },

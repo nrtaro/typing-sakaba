@@ -92,3 +92,8 @@ export function animDone(anim: ManifestAnimation, elapsed: number) {
 export function animLength(anim: ManifestAnimation) {
   return anim.frames.length / anim.fps;
 }
+
+/** 歩いた距離でコマを選ぶ。止まると足も止まり、移動速度を変えても足滑りしない。 */
+export function walkFrame(anim: ManifestAnimation, distance: number, stride: number) {
+  return anim.frames[Math.floor(Math.max(0, distance) / stride * anim.frames.length + 1e-9) % anim.frames.length];
+}

@@ -244,8 +244,8 @@ export const HUNTING_WORDS: Word[] = [
 ];
 
 export const HUNTING = {
-  rabbit: { hp: 2, crossTime: 6.0, yield: 3 },
-  deer: { hp: 4, crossTime: 9.0, yield: 12 },
+  rabbit: { hp: 1, crossTime: 6.0, yield: 2 },
+  deer: { hp: 3, crossTime: 9.0, yield: 12 },
   /** 狩り：獲物の通り道（0=奥、1=手前）。大物は専用の通り道 */
   rabbitLanes: [0, 0.45],
   deerLane: 0.95,

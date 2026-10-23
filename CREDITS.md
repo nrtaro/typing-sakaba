@@ -7,9 +7,10 @@
 
 ## 画像素材（A案「琥珀の酒場」）
 
-- 背景6枚、家族3人・客7種類・動物・商人の動き、家具・道具、食材と料理のアイコン、炎・湯気・水しぶき・きらめきの演出: `assets/amber-v2/` の画像を使っています。
+- 背景6枚、家族3人・客7種類・動物・商人の動き、家具・道具、食材と料理のアイコン、炎・湯気・水しぶき・きらめきの演出: 原画像は `assets/amber-v2/`、ゲーム配信用のロスレスWebPと修正した切り出しは `assets/amber-v3/` にあります。
 - これらは画像生成AI（Codex の built-in image_gen）で作成した生成画像です。生成の指示文は `assets/amber-v2/revisions.json` と `assets/amber-v1/prompts.json` に記録しています。
-- 切り出し位置・足元の位置・再生の順番と速さは `assets/amber-v2/manifest.json` に従います。不採用のコマ（`deprecatedFrames`）は使っていません。
+- 釣りの人物から浮きを除いた修正版も同じ内蔵image_genで作成しました。指示文は `assets/amber-v3/fishing-source.json` に保存しています。
+- ゲームでは `assets/amber-v3/manifest.json` の切り出し・足元・再生設定を使用します。不採用のコマ（`deprecatedFrames`）は使っていません。
 
 ## コードで描く絵・生成した音
 

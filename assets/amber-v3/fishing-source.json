@@ -1,0 +1,5 @@
+{
+  "source": "C:\\Users\\khrrn\\.codex\\generated_images\\01a1663a-687e-76e2-a7ae-448d16feff6a\\exec-ef64dd90-d015-49bf-8165-7f96075e9445.png",
+  "prompt": "Edit this exact transparent 4 frame horizontal sprite strip. Preserve canvas dimensions 2172x724, all four equal columns, same pixel art woman, poses, body, feet and fishing rod. ONLY REMOVE the dangling thin vertical fishing line and red-white bobber below the fishing rod tip in EACH of four frames. Keep the wooden rod all the way to its upper tip completely unchanged. Leave transparent empty space where the thin line and bobber were. No other modifications. The game will draw a single continuous fishing line from rod tip to a distant water bobber. Maintain alpha transparency.",
+  "generator": "built-in image_gen"
+}

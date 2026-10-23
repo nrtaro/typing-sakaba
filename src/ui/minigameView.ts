@@ -61,7 +61,7 @@ export class MinigameView {
     if (ev.type === 'word' && game instanceof GatheringGame) this.pickStart = this.time;
     if (ev.type === 'gain' && game instanceof HuntingGame) {
       const p = this.anchor(game, ev);
-      this.fxs.push({ anim: 'きらめき', x: p.x, y: p.y + 40, h: 30, start: this.time });
+      this.fxs.push({ anim: 'きらめき', x: p.x, y: p.y + 24, h: 30, start: this.time });
     }
     if (ev.type === 'gain' || ev.type === 'loss') {
       const p = this.anchor(game, ev);
@@ -79,7 +79,7 @@ export class MinigameView {
   }
 
   private anchor(game: Minigame<unknown>, ev: { x: number; y: number }) {
-    if (game instanceof HuntingGame) return { x: 74 + ev.x * 396, y: 80 + ev.y * 106 };
+    if (game instanceof HuntingGame) return { x: 74 + ev.x * 396, y: 118 + ev.y * 106 - 24 };
     if (game instanceof GatheringGame) return { x: this.slots[ev.x]?.x ?? 240, y: (this.slots[ev.x]?.y ?? 150) - (this.art ? 68 : 40) };
     if (game instanceof TradingGame) return this.art ? { x: AMBER.trading.master.x - 54, y: AMBER.trading.master.y - 64 } : { x: 100, y: 150 };
     return { x: 120, y: 120 };
@@ -104,10 +104,12 @@ export class MinigameView {
       art.drawBackground(sc, `bg-${game.kind}`);
       // 外の背景は昼の絵しかないので、夜の部は少し暗くする
       if (shop.phaseIndex === 2) sc.PR(e.x0, e.y0, e.w, e.h, '#141032', 0.32);
-      if (game instanceof FishingGame) this.drawFishingArt(sc, art, game);
-      else if (game instanceof HuntingGame) this.drawHuntingArt(sc, art, game);
-      else if (game instanceof GatheringGame) this.drawGatheringArt(sc, art, game);
-      else if (game instanceof TradingGame) this.drawTradingArt(sc, art, game);
+      sc.clip(0, 0, 480, 270, () => {
+        if (game instanceof FishingGame) this.drawFishingArt(sc, art, game);
+        else if (game instanceof HuntingGame) this.drawHuntingArt(sc, art, game);
+        else if (game instanceof GatheringGame) this.drawGatheringArt(sc, art, game);
+        else if (game instanceof TradingGame) this.drawTradingArt(sc, art, game);
+      });
       for (const f of this.fxs) art.drawAnim(sc, 'fx', f.anim, this.time - f.start, f.x, f.y, art.scaleFor('fx', f.anim === '水しぶき' ? 8 : 14, f.h));
     } else {
       sc.begin();
@@ -143,7 +145,7 @@ export class MinigameView {
     const tl = game.timeLeft;
     sc.PR(150, 11, 110, 8, C.ink);
     sc.PR(150, 11, 110 * (tl / game.duration), 8, tl < 3 ? C.red : col.main);
-    sc.TB(tl > 0 ? `残り ${tl.toFixed(1)}秒` : '延長戦！', 266, 7, 11, tl > 0 ? C.w : C.gold3, 'left');
+    sc.TB(tl > 0 ? `残り ${tl.toFixed(1)}秒` : game.finished ? '終了' : '延長戦！', 266, 7, 11, tl > 0 ? C.w : C.gold3, 'left');
     let x = 360;
     for (const id of trip.gives) {
       if (this.art) this.art.drawIcon(sc, 'icons-dishes', ICON_INDEX[id], x, 6, 16);
@@ -233,7 +235,7 @@ export class MinigameView {
     } else if (game.phase === 'wait') {
       sc.TB('浮きを見つめている…', LW / 2, 196, 13, C.cream, 'center');
     }
-    if (game.phase !== 'reel') sc.TB('浮きが沈んだら「あわせ」を素早く打つ。巻き上げ中のミスは糸のテンションに', LW / 2, 236, 9, C.cream, 'center');
+    if (game.phase !== 'reel') sc.TB('浮きが沈んだら、表示された言葉を素早く打つ。巻き上げ中のミスで糸が傷む', LW / 2, 236, 9, C.cream, 'center');
   }
 
   // ---------- かり ----------
@@ -272,8 +274,7 @@ export class MinigameView {
 
   private drawHuntingUi(sc: Screen, game: HuntingGame) {
     const active = game.input.active;
-    // ラベルが重ならないよう、重なる分だけ上にずらす
-    const placed: { x: number; y: number; w: number; h: number }[] = [];
+    // 他の獲物との重なりで上へ積み上げない。小物は頭上、大物は頭の横へ追従する。
     const preys = [...game.prey].sort((a, b) => a.x - b.x);
     for (const p of preys) {
       const pos = preyPos(p);
@@ -283,18 +284,17 @@ export class MinigameView {
       const h = 32;
       const w = Math.max(60, sc.W(m.typed + m.remaining, 10) + 14, sc.W(p.word.text, 12) + 14);
       const spriteH = p.kind === 'deer' ? 48 : 24;
-      const box = { x: pos.x - w / 2, y: pos.y - spriteH - h - 8, w, h };
-      for (let k = 0; k < 4; k++) {
-        const hit = placed.find((r) => box.x < r.x + r.w + 2 && r.x < box.x + box.w + 2 && box.y < r.y + r.h + 2 && r.y < box.y + box.h + 2);
-        if (!hit) break;
-        box.y = hit.y - h - 4;
-      }
-      placed.push(box);
+      const deer = p.kind === 'deer';
+      // 大物の頭上は中段の小物の走路。横に寄せて、その小物を枠で隠さない。
+      const sideX = pos.x - 34 - w >= 4 ? pos.x - 34 - w : pos.x + 34;
+      const box = { x: Math.max(4, Math.min(LW - w - 4, deer ? sideX : pos.x - w / 2)),
+        y: deer ? pos.y - spriteH + 8 : pos.y - spriteH - h - 8, w, h };
+      const cx = box.x + w / 2;
       sc.panel(box.x, box.y, w, h, live ? '#4a2c3c' : 'rgba(42,27,38,0.92)', live ? C.gold : p.kind === 'deer' ? C.gold2 : C.wood4, dim ? 0.55 : 1);
-      sc.T(p.word.text, pos.x, box.y + 2, 12, dim ? C.gray : C.w, 'center');
-      sc.roma(m.typed, m.remaining, pos.x, box.y + 18, 10, live ? 'active' : dim ? 'dim' : 'idle');
-      for (let i = 0; i < p.maxHp; i++) sc.PR(pos.x - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
-      if (p.kind === 'deer') sc.TB('大物 肉×12', pos.x, box.y - 16, 9, C.gold3, 'center');
+      sc.T(p.word.text, cx, box.y + 2, 12, dim ? C.gray : C.w, 'center');
+      sc.roma(m.typed, m.remaining, cx, box.y + 18, 10, live ? 'active' : dim ? 'dim' : 'idle');
+      for (let i = 0; i < p.maxHp; i++) sc.PR(cx - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
+      if (p.kind === 'deer') sc.TB('大物 肉×12', cx, box.y - 16, 9, C.gold3, 'center');
     }
     sc.TB('最初の文字で狙いが決まる。左の柵を越えられると逃げられる', LW / 2, 240, 9, C.ink, 'center', C.sand3);
   }
@@ -340,8 +340,9 @@ export class MinigameView {
       sc.roma(m.typed, m.remaining, pos.x, top + 17, 10, live ? 'active' : dim ? 'dim' : 'idle');
       sc.PR(pos.x - w / 2 + 4, top + 28, (w - 8) * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
     }
-    sc.panel(100, 240, 370, 18, 'rgba(42,27,38,0.88)', C.green);
-    sc.T(`食べられるものだけ打って摘む（1回で${GATHER.perPick}つ）。☠ 毒きのこを打つと${GATHER.poisonLoss}つこぼれる`, 285, 243, 9, C.cream, 'center');
+    sc.panel(100, 234, 370, 26, 'rgba(42,27,38,0.88)', C.green);
+    sc.T(`食べられるものだけ打つ（1回で${GATHER.perPick}つ）。☠ は${GATHER.poisonLoss}つ失う`, 285, 238, 8, C.cream, 'center');
+    sc.T('絵は食材の種類（野菜／きのこ）を表します', 285, 250, 7, C.cream2, 'center');
   }
 
   // ---------- しいれ：早い者勝ちの競り ----------
@@ -421,7 +422,9 @@ export class MinigameView {
       sc.PR(b.x - w / 2 + 8, b.y + 10, w, game.big ? 12 : 6, '#0e2236', 0.45);
       sc.PR(b.x + w / 2 + 8, b.y + 11, game.big ? 10 : 5, game.big ? 10 : 4, '#0e2236', 0.45);
     }
-    // 女将（竿と仕掛けはコマに描かれている）
+    // 板面への接地影。足元より下の桟橋側面や支柱には落とさない。
+    sc.PR(L.wife.x - 8, L.wife.y - 1, 16, 2, '#332313', 0.28);
+    // 女将（竿までが画像。糸と浮きは別描画）
     const anim = art.anim('wife-fishing', '釣り・待機');
     const idx = frameAt(anim, t) ?? anim.frames[0];
     const k = art.scaleFor('wife-fishing', anim.frames[0], L.wife.h);
@@ -445,6 +448,7 @@ export class MinigameView {
     const L = AMBER.hunting;
     const t = this.time;
     const kMaster = art.scaleFor('props-actions', 4, L.master.h);
+    sc.PR(L.master.x - 13, L.master.y - 1, 26, 3, '#2a1520', 0.28);
     // 撃つたびに一回再生して最後のコマ（構え）で止まる。撃っていない間は構えのコマ
     if (this.shotStart !== null) art.drawAnim(sc, 'props-actions', 'マスター・狩り', t - this.shotStart, L.master.x, L.master.y, kMaster);
     else art.drawFrame(sc, 'props-actions', 4, L.master.x, L.master.y, kMaster);

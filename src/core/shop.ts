@@ -1,5 +1,6 @@
 import { CandidateInput, type Target } from './candidates';
 import { Rng } from './rng';
+import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
 import {
   DAY_LENGTH, DIFFICULTIES, DISHES, INGREDIENT_ORDER, PHASES, SHOP, TRIPS,
   type Difficulty, type Dish, type IngredientId, type Trip,
@@ -16,6 +17,10 @@ export interface Guest {
   state: 'walk' | 'wait' | 'eat';
   /** walk/eat の残り時間 */
   t: number;
+  /** 席までの経路長から決まる入店時間。描画も同じ時間を使う。 */
+  walkDuration?: number;
+  /** 画像演出の配膳待ち。判定と売上は注文成立時、食事時間は受渡し後から。 */
+  awaitingDelivery?: boolean;
   /** 素材が足りないと言われた演出の残り時間 */
   lack: number;
 }
@@ -57,6 +62,7 @@ export class Shop {
   stats: ShopStats = { served: 0, angry: 0, maxCombo: 0, correctKeys: 0, missKeys: 0, trips: 0, sales: 0, tips: 0 };
   readonly input: CandidateInput<TargetData>;
   private spawnTimer = 1;
+  private entryTimer = 0;
   private nextId = 1;
   private events: ShopEvent[] = [];
   private lastPhase = 0;
@@ -205,15 +211,19 @@ export class Shop {
       this.spawnTimer = PHASES[ph].every * this.difficulty.everyMult * this.rng.range(0.75, 1.25);
       if (this.queue.length < SHOP.queueMax) this.queue.push(this.makeGuest());
     }
-    // 調達中は入り口で待ってもらう。戻ったら空いた席へ一気に入る
-    if (!this.away) {
+    // 同じ入口へ重ねて出さず、歩幅ぶんの間隔を空けて案内する。
+    this.entryTimer = Math.max(0, this.entryTimer - dt);
+    if (!this.away && this.entryTimer <= 0) {
       for (let i = 0; i < this.seats.length && this.queue.length; i++) {
         if (this.seats[i]) continue;
         const g = this.queue.shift()!;
         g.state = 'walk';
-        g.t = SHOP.walkTime;
+        g.walkDuration = entryDistance(TAVERN_SEATS[i]) / WALK_SPEED;
+        g.t = g.walkDuration;
         this.seats[i] = g;
         this.events.push({ type: 'arrive', seat: i });
+        this.entryTimer = 0.45;
+        break;
       }
     }
 
@@ -234,6 +244,7 @@ export class Shop {
           this.events.push({ type: 'angry', seat: i });
         }
       } else if (g.state === 'eat') {
+        if (g.awaitingDelivery) return;
         g.t -= dt;
         if (g.t <= 0) this.seats[i] = null;
       }

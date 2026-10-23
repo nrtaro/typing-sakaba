@@ -1,14 +1,14 @@
 // A案「琥珀の酒場」の画像素材を読み込み、manifest どおりに切り出して描く。
 // 絵は低解像度の画面ではなく、拡大後の画面へ直接描く（高解像度素材の細部を残すため）。
 // 平滑化はしない。配置はすべて基準の 480x270 座標で指定する。
-import manifestJson from '../../../assets/amber-v2/manifest.json';
+import manifestJson from '../../../assets/amber-v3/manifest.json';
 import { destRect, frameAt, sourceRect, standingHeight, type Manifest, type ManifestAnimation, type ManifestAsset, type ManifestFrame } from './manifest';
 import type { Screen } from '../screen';
 
 const manifest = manifestJson as unknown as Manifest;
 
 // 本番ビルドでも配信されるよう、画像は Vite に URL を解決させる
-const URLS = import.meta.glob('../../../assets/amber-v2/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const URLS = import.meta.glob('../../../assets/amber-v3/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
 function urlFor(file: string) {
   const key = Object.keys(URLS).find((k) => k.endsWith(`/${file}`));
@@ -26,15 +26,6 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/**
- * 鏡に映して補った部分を、継ぎ目から外側へ徐々に暗くする（家具が二重に見えないように）。
- * w / h が負なら、起点から逆向き（左・上）へ広がる。
- */
-function shade(sc: Screen, x: number, y: number, w: number, h: number, axis: 'x' | 'y') {
-  if ((axis === 'x' ? w : h) === 0) return;
-  sc.fade(x, y, w, h, '#120a10', 0.72, 0.96, axis);
-}
-
 export interface Sheet {
   asset: ManifestAsset;
   img: HTMLImageElement;
@@ -42,16 +33,34 @@ export interface Sheet {
 
 export class Art {
   private sheets = new Map<string, Sheet>();
+  private pending = new Map<string, Promise<void>>();
+
+  has(id: string) { return this.sheets.has(id); }
+
+  /** 調達背景は出発時に読み込む。失敗時は次の出発で再試行できる。 */
+  ensure(id: string): Promise<void> {
+    if (this.has(id)) return Promise.resolve();
+    const waiting = this.pending.get(id);
+    if (waiting) return waiting;
+    const asset = manifest.assets.find((a) => a.id === id);
+    if (!asset) return Promise.reject(new Error(`素材がありません: ${id}`));
+    const task = loadImage(urlFor(asset.file)).then((img) => {
+      this.sheets.set(id, { asset, img });
+    }).finally(() => this.pending.delete(id));
+    this.pending.set(id, task);
+    return task;
+  }
 
   private constructor() {}
 
-  /** すべての画像を読み込む。1枚でも失敗したら失敗にする */
+  /** 初期画面の画像を読み込む。調達先の背景は出発時に取得する。 */
   static async load(onProgress?: (done: number, total: number) => void): Promise<Art> {
     const art = new Art();
-    const total = manifest.assets.length;
+    const initial = manifest.assets.filter((a) => !a.id.startsWith('bg-') || a.id.startsWith('bg-tavern'));
+    const total = initial.length;
     let done = 0;
     await Promise.all(
-      manifest.assets.map(async (asset) => {
+      initial.map(async (asset) => {
         const img = await loadImage(urlFor(asset.file));
         // 裏に回ったタブでは decode が終わらないことがあるため、待つのは少しだけにする（onload 済みなので描ける）
         if (img.decode) await Promise.race([img.decode().catch(() => {}), new Promise((r) => setTimeout(r, 1000))]);
@@ -137,32 +146,21 @@ export class Art {
 
   /**
    * 16:9 の背景を基準の範囲（0..480, 0..270）に描き、
-   * 画面が横長・縦長で広がった部分は端を鏡に映したように補って少し暗くする（引き伸ばさない）。
+   * 外周は無地の陰影で補う。家具や窓を複製・反転しない。
    */
   drawBackground(sc: Screen, id: string) {
     const { img } = this.sheet(id);
     const W = 480;
     const H = 270;
-    const kx = img.naturalWidth / W;
-    const ky = img.naturalHeight / H;
-    sc.blit(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, W, H);
     const e = sc.ext;
-    const dx = -e.x0;
-    const dy = -e.y0;
-    if (dx > 0) {
-      const sw = Math.min(img.naturalWidth, dx * kx);
-      sc.blit(img, 0, 0, sw, img.naturalHeight, -sw / kx, 0, sw / kx, H, true);
-      sc.blit(img, img.naturalWidth - sw, 0, sw, img.naturalHeight, W, 0, sw / kx, H, true);
-      shade(sc, 0, 0, -dx, H, 'x');
-      shade(sc, W, 0, e.x1 - W, H, 'x');
-    }
-    if (dy > 0) {
-      const sh = Math.min(img.naturalHeight, dy * ky);
-      sc.blit(img, 0, 0, img.naturalWidth, sh, 0, -sh / ky, W, sh / ky, false, 1, true);
-      sc.blit(img, 0, img.naturalHeight - sh, img.naturalWidth, sh, 0, H, W, sh / ky, false, 1, true);
-      shade(sc, 0, 0, W, -dy, 'y');
-      shade(sc, 0, H, W, e.y1 - H, 'y');
-    }
+    sc.PR(e.x0, e.y0, e.w, e.h, '#211713');
+    sc.blit(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, W, H);
+  }
+
+  drawMenuBackground(sc: Screen) {
+    const { img } = this.sheet('bg-tavern'), e = sc.ext;
+    const k = Math.max(e.w / 1672, e.h / 740);
+    sc.blit(img, 0, 63, 1672, 740, e.x0 + (e.w - 1672 * k) / 2, e.y0 + (e.h - 740 * k) / 2, 1672 * k, 740 * k);
   }
 }
 

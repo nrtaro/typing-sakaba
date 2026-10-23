@@ -1,0 +1,939 @@
+[
+  {
+    "id": "guests-walk",
+    "file": "guests-walk-v4.webp",
+    "width": 948,
+    "height": 1659,
+    "mode": "RGBA",
+    "columns": 4,
+    "rows": 7,
+    "frames": [
+      {
+        "index": 0,
+        "rect": [
+          0,
+          0,
+          249,
+          261
+        ],
+        "visibleBounds": [
+          47,
+          12,
+          223,
+          251
+        ],
+        "registration": [
+          137,
+          251
+        ]
+      },
+      {
+        "index": 1,
+        "rect": [
+          225,
+          0,
+          261,
+          261
+        ],
+        "visibleBounds": [
+          59,
+          11,
+          217,
+          249
+        ],
+        "registration": [
+          140,
+          249
+        ]
+      },
+      {
+        "index": 2,
+        "rect": [
+          462,
+          0,
+          261,
+          261
+        ],
+        "visibleBounds": [
+          54,
+          12,
+          229,
+          248
+        ],
+        "registration": [
+          141,
+          248
+        ]
+      },
+      {
+        "index": 3,
+        "rect": [
+          699,
+          0,
+          249,
+          261
+        ],
+        "visibleBounds": [
+          56,
+          12,
+          214,
+          251
+        ],
+        "registration": [
+          137,
+          251
+        ]
+      },
+      {
+        "index": 4,
+        "rect": [
+          0,
+          213,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          54,
+          42,
+          231,
+          255
+        ],
+        "registration": [
+          142,
+          255
+        ]
+      },
+      {
+        "index": 5,
+        "rect": [
+          225,
+          213,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          67,
+          42,
+          233,
+          253
+        ],
+        "registration": [
+          150,
+          253
+        ]
+      },
+      {
+        "index": 6,
+        "rect": [
+          462,
+          213,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          58,
+          42,
+          234,
+          255
+        ],
+        "registration": [
+          147,
+          255
+        ]
+      },
+      {
+        "index": 7,
+        "rect": [
+          699,
+          213,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          59,
+          42,
+          228,
+          253
+        ],
+        "registration": [
+          143,
+          253
+        ]
+      },
+      {
+        "index": 8,
+        "rect": [
+          0,
+          450,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          57,
+          21,
+          211,
+          248
+        ],
+        "registration": [
+          136,
+          248
+        ]
+      },
+      {
+        "index": 9,
+        "rect": [
+          225,
+          450,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          74,
+          21,
+          210,
+          247
+        ],
+        "registration": [
+          144,
+          247
+        ]
+      },
+      {
+        "index": 10,
+        "rect": [
+          462,
+          450,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          62,
+          21,
+          216,
+          246
+        ],
+        "registration": [
+          140,
+          246
+        ]
+      },
+      {
+        "index": 11,
+        "rect": [
+          699,
+          450,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          70,
+          21,
+          200,
+          247
+        ],
+        "registration": [
+          137,
+          247
+        ]
+      },
+      {
+        "index": 12,
+        "rect": [
+          0,
+          687,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          35,
+          18,
+          234,
+          255
+        ],
+        "registration": [
+          140,
+          255
+        ]
+      },
+      {
+        "index": 13,
+        "rect": [
+          225,
+          687,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          50,
+          19,
+          247,
+          253
+        ],
+        "registration": [
+          160,
+          253
+        ]
+      },
+      {
+        "index": 14,
+        "rect": [
+          462,
+          687,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          49,
+          19,
+          248,
+          255
+        ],
+        "registration": [
+          157,
+          255
+        ]
+      },
+      {
+        "index": 15,
+        "rect": [
+          699,
+          687,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          44,
+          18,
+          227,
+          255
+        ],
+        "registration": [
+          151,
+          255
+        ]
+      },
+      {
+        "index": 16,
+        "rect": [
+          0,
+          924,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          51,
+          21,
+          234,
+          242
+        ],
+        "registration": [
+          148,
+          242
+        ]
+      },
+      {
+        "index": 17,
+        "rect": [
+          225,
+          924,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          66,
+          21,
+          238,
+          241
+        ],
+        "registration": [
+          159,
+          241
+        ]
+      },
+      {
+        "index": 18,
+        "rect": [
+          462,
+          924,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          65,
+          24,
+          247,
+          241
+        ],
+        "registration": [
+          163,
+          241
+        ]
+      },
+      {
+        "index": 19,
+        "rect": [
+          699,
+          924,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          63,
+          24,
+          228,
+          240
+        ],
+        "registration": [
+          150,
+          240
+        ]
+      },
+      {
+        "index": 20,
+        "rect": [
+          0,
+          1161,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          48,
+          14,
+          226,
+          236
+        ],
+        "registration": [
+          141,
+          236
+        ]
+      },
+      {
+        "index": 21,
+        "rect": [
+          225,
+          1161,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          74,
+          14,
+          242,
+          235
+        ],
+        "registration": [
+          159,
+          235
+        ]
+      },
+      {
+        "index": 22,
+        "rect": [
+          462,
+          1161,
+          261,
+          285
+        ],
+        "visibleBounds": [
+          58,
+          14,
+          240,
+          236
+        ],
+        "registration": [
+          157,
+          236
+        ]
+      },
+      {
+        "index": 23,
+        "rect": [
+          699,
+          1161,
+          249,
+          285
+        ],
+        "visibleBounds": [
+          66,
+          14,
+          227,
+          236
+        ],
+        "registration": [
+          147,
+          236
+        ]
+      },
+      {
+        "index": 24,
+        "rect": [
+          0,
+          1398,
+          249,
+          261
+        ],
+        "visibleBounds": [
+          46,
+          4,
+          226,
+          235
+        ],
+        "registration": [
+          130,
+          235
+        ]
+      },
+      {
+        "index": 25,
+        "rect": [
+          225,
+          1398,
+          261,
+          261
+        ],
+        "visibleBounds": [
+          69,
+          4,
+          242,
+          233
+        ],
+        "registration": [
+          155,
+          233
+        ]
+      },
+      {
+        "index": 26,
+        "rect": [
+          462,
+          1398,
+          261,
+          261
+        ],
+        "visibleBounds": [
+          68,
+          4,
+          239,
+          235
+        ],
+        "registration": [
+          148,
+          235
+        ]
+      },
+      {
+        "index": 27,
+        "rect": [
+          699,
+          1398,
+          249,
+          261
+        ],
+        "visibleBounds": [
+          63,
+          4,
+          225,
+          234
+        ],
+        "registration": [
+          145,
+          234
+        ]
+      }
+    ],
+    "animations": [
+      {
+        "name": "青の騎士",
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop",
+        "scale": 0.8296943231441049
+      },
+      {
+        "name": "緑のレンジャー",
+        "frames": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop",
+        "scale": 0.9178743961352657
+      },
+      {
+        "name": "ロボット",
+        "frames": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop",
+        "scale": 0.8636363636363636
+      },
+      {
+        "name": "紫の魔女",
+        "frames": [
+          12,
+          13,
+          14,
+          15
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop",
+        "scale": 0.811965811965812
+      },
+      {
+        "name": "赤の旅人",
+        "frames": [
+          16,
+          17,
+          18,
+          19
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop",
+        "scale": 0.867579908675799
+      },
+      {
+        "name": "青緑の旅人",
+        "frames": [
+          20,
+          21,
+          22,
+          23
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop",
+        "scale": 0.9047619047619048
+      },
+      {
+        "name": "黄の冒険者",
+        "frames": [
+          24,
+          25,
+          26,
+          27
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop",
+        "scale": 0.852017937219731
+      }
+    ],
+    "alphaRange": [
+      0,
+      255
+    ],
+    "transparentFraction": 0.496,
+    "deprecatedFrames": [],
+    "allFramesNonempty": true
+  },
+  {
+    "id": "family-master-walk",
+    "file": "family-walk.webp",
+    "width": 1448,
+    "height": 1086,
+    "frames": [
+      {
+        "index": 0,
+        "rect": [
+          0,
+          0,
+          374,
+          386
+        ],
+        "visibleBounds": [
+          69,
+          26,
+          347,
+          378
+        ],
+        "registration": [
+          196,
+          378
+        ]
+      },
+      {
+        "index": 1,
+        "rect": [
+          350,
+          0,
+          386,
+          386
+        ],
+        "visibleBounds": [
+          105,
+          26,
+          329,
+          377
+        ],
+        "registration": [
+          216,
+          377
+        ]
+      },
+      {
+        "index": 2,
+        "rect": [
+          712,
+          0,
+          386,
+          386
+        ],
+        "visibleBounds": [
+          79,
+          26,
+          366,
+          378
+        ],
+        "registration": [
+          211,
+          378
+        ]
+      },
+      {
+        "index": 3,
+        "rect": [
+          1074,
+          0,
+          374,
+          386
+        ],
+        "visibleBounds": [
+          111,
+          26,
+          325,
+          378
+        ],
+        "registration": [
+          217,
+          378
+        ]
+      }
+    ],
+    "animations": [
+      {
+        "name": "歩行",
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop"
+      }
+    ]
+  },
+  {
+    "id": "family-wife-walk",
+    "file": "family-walk.webp",
+    "width": 1448,
+    "height": 1086,
+    "frames": [
+      {
+        "index": 0,
+        "rect": [
+          0,
+          338,
+          374,
+          410
+        ],
+        "visibleBounds": [
+          69,
+          60,
+          313,
+          397
+        ],
+        "registration": [
+          199,
+          397
+        ]
+      },
+      {
+        "index": 1,
+        "rect": [
+          350,
+          338,
+          386,
+          410
+        ],
+        "visibleBounds": [
+          85,
+          60,
+          325,
+          398
+        ],
+        "registration": [
+          222,
+          398
+        ]
+      },
+      {
+        "index": 2,
+        "rect": [
+          712,
+          338,
+          386,
+          410
+        ],
+        "visibleBounds": [
+          89,
+          60,
+          333,
+          398
+        ],
+        "registration": [
+          216,
+          398
+        ]
+      },
+      {
+        "index": 3,
+        "rect": [
+          1074,
+          338,
+          374,
+          410
+        ],
+        "visibleBounds": [
+          83,
+          61,
+          324,
+          398
+        ],
+        "registration": [
+          220,
+          398
+        ]
+      }
+    ],
+    "animations": [
+      {
+        "name": "歩行",
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop"
+      }
+    ]
+  },
+  {
+    "id": "family-daughter-walk",
+    "file": "family-walk.webp",
+    "width": 1448,
+    "height": 1086,
+    "frames": [
+      {
+        "index": 0,
+        "rect": [
+          0,
+          700,
+          374,
+          386
+        ],
+        "visibleBounds": [
+          76,
+          58,
+          341,
+          371
+        ],
+        "registration": [
+          193,
+          371
+        ]
+      },
+      {
+        "index": 1,
+        "rect": [
+          350,
+          700,
+          386,
+          386
+        ],
+        "visibleBounds": [
+          79,
+          58,
+          340,
+          371
+        ],
+        "registration": [
+          201,
+          371
+        ]
+      },
+      {
+        "index": 2,
+        "rect": [
+          712,
+          700,
+          386,
+          386
+        ],
+        "visibleBounds": [
+          84,
+          58,
+          355,
+          371
+        ],
+        "registration": [
+          206,
+          371
+        ]
+      },
+      {
+        "index": 3,
+        "rect": [
+          1074,
+          700,
+          374,
+          386
+        ],
+        "visibleBounds": [
+          83,
+          62,
+          338,
+          371
+        ],
+        "registration": [
+          211,
+          371
+        ]
+      }
+    ],
+    "animations": [
+      {
+        "name": "歩行",
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "fps": 6,
+        "loop": true,
+        "playback": "loop"
+      }
+    ]
+  }
+]

@@ -155,6 +155,15 @@ export class Screen {
     ctx.globalAlpha = 1;
   }
 
+  /** 背景の外側へ動くスプライトを描かない（横長・縦長画面の余白へ飛び出させない）。 */
+  clip(x: number, y: number, w: number, h: number, draw: () => void) {
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(this.px(x), this.py(y), w * this.S, h * this.S);
+    this.ctx.clip();
+    try { draw(); } finally { this.ctx.restore(); }
+  }
+
   /** 色の濃さを徐々に変えて塗る（a0 が始点側、a1 が終点側）。端の暗がりなどに使う */
   fade(x: number, y: number, w: number, h: number, col: Color, a0: number, a1: number, axis: 'x' | 'y') {
     const { ctx } = this;
@@ -234,7 +243,7 @@ export class Screen {
   }
 
   /** ローマ字：打った部分・次の1文字・残りを色分け */
-  roma(typed: string, rest: string, x: number, y: number, size: number, state: 'active' | 'idle' | 'dim', alpha = 1) {
+  roma(typed: string, rest: string, x: number, y: number, size: number, state: 'active' | 'idle' | 'dim', alpha = 1, dark = false) {
     const w = this.W(typed + rest, size);
     let cx = x - w / 2;
     const seg = (s: string, col: Color, a: number) => {
@@ -242,8 +251,8 @@ export class Screen {
       this.T(s, cx, y, size, col, 'left', a * alpha);
       cx += this.W(s, size);
     };
-    seg(typed, C.teal3, 1);
-    seg(rest.slice(0, 1), state === 'active' ? C.gold : C.cream, state === 'dim' ? 0.4 : 1);
-    seg(rest.slice(1), C.cream, state === 'dim' ? 0.35 : 0.8);
+    seg(typed, dark ? '#215a4a' : C.teal3, 1);
+    seg(rest.slice(0, 1), dark ? '#382215' : state === 'active' ? C.gold : C.cream, state === 'dim' ? 0.4 : 1);
+    seg(rest.slice(1), dark ? '#674526' : C.cream, state === 'dim' ? 0.35 : 0.8);
   }
 }

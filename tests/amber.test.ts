@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import manifestJson from '../assets/amber-v2/manifest.json';
-import { animDone, destRect, frameAt, sourceRect, standingHeight, type Manifest, type ManifestAnimation, type ManifestFrame } from '../src/ui/amber/manifest';
+import manifestJson from '../assets/amber-v3/manifest.json';
+import { animDone, destRect, frameAt, sourceRect, standingHeight, walkFrame, type Manifest, type ManifestAnimation, type ManifestFrame } from '../src/ui/amber/manifest';
+import { AMBER } from '../src/ui/amber/layout';
 import { LOOK_COUNT } from '../src/core/shop';
 
 const manifest = manifestJson as unknown as Manifest;
@@ -41,6 +42,38 @@ describe('A案素材の切り出し', () => {
   it('足元から頭までの高さが正になる', () => {
     for (const a of manifest.assets) for (const fr of a.frames ?? []) expect(standingHeight(fr)).toBeGreaterThan(0);
   });
+
+  it('家具の切り出しに前の行の狩りの断片を含めない', () => {
+    const furniture = asset('props-actions');
+    for (const index of [8, 9]) expect(furniture.frames![index].visibleBounds[1]).toBeGreaterThan(40);
+  });
+
+  it('大物の伸ばした脚を欠けさせず、次のコマにその脚を混入させない', () => {
+    const frames = asset('wildlife').frames!;
+    const extended = sourceRect(frames[4]);
+    const next = sourceRect(frames[5]);
+    expect(extended.x + extended.w).toBeGreaterThan(444);
+    expect(next.x).toBeGreaterThan(extended.x + extended.w);
+    for (const f of frames) {
+      const [left, , right] = f.visibleBounds;
+      const bodyX = (f.registration[0] - left) / (right - left);
+      expect(bodyX).toBeGreaterThan(0.4);
+      expect(bodyX).toBeLessThan(0.65);
+    }
+  });
+
+  it('狩りのマスターは全コマで銃と靴が画面内に収まる', () => {
+    const frames = asset('props-actions').frames!;
+    const p = AMBER.hunting.master;
+    const k = p.h / standingHeight(frames[4]);
+    for (const f of frames.slice(4, 8)) {
+      const src = sourceRect(f), dst = destRect(f, p.x, p.y, k);
+      expect(src.y + src.h).toBeGreaterThan(640); // 元のセル下端628で靴を切らない。
+      expect(dst.x).toBeGreaterThan(8);
+      expect(dst.x + dst.w).toBeLessThan(100);
+      expect(dst.y + dst.h).toBeLessThan(235);
+    }
+  });
 });
 
 describe('A案素材の再生', () => {
@@ -50,6 +83,11 @@ describe('A案素材の再生', () => {
 
   it('ループは配列順に繰り返し、同じコマが続く分だけ長く表示する', () => {
     expect([0, 0.25, 0.5, 0.75, 1.0, 1.25].map((t) => frameAt(loop, t))).toEqual([0, 0, 0, 2, 0, 0]);
+  });
+
+  it('歩行は時間ではなく実際の距離に同期し、立ち止まるとコマも止まる', () => {
+    const walk = asset('guests-walk').animations![0];
+    expect([0, 8.5, 17, 25.5, 34].map((d) => walkFrame(walk, d, 34))).toEqual([0, 1, 2, 3, 0]);
   });
 
   it('一回再生して最後のコマで止まる', () => {

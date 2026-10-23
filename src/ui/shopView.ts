@@ -4,16 +4,17 @@ import { FAM, guestSprite, ICON, PORTRAIT, WALKERS } from './sprites';
 import { drawChair, drawLights, drawRoomLive, drawTable, pen, roomLayer, shadow } from './room';
 import { Shop, type Guest, type ShopEvent } from '../core/shop';
 import type { Art } from './amber/art';
-import { animLength } from './amber/manifest';
-import { AMBER, ICON_INDEX, dishIcon } from './amber/layout';
+import { animLength, walkFrame } from './amber/manifest';
+import { entryPose, WALK_SPEED, SERVER_WALK_SPEED } from '../core/tavernNavigation';
+import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/layout';
 import { RomajiMatcher } from '../core/romaji';
 import {
   DAY_LENGTH, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type FamilyId, type IngredientId, type TripId,
 } from '../core/shopConfig';
 
 /** 席の位置（斜め上視点：2列×4席）。ty はテーブルの高さ */
-export const SEATS = [118, 190].flatMap((ty) => [196, 260, 324, 388].map((x) => ({ x, ty })));
-const DOOR = { x: 452, y: 150 };
+export const SEATS = TAVERN_SEATS;
+const DOOR = { x: 452, y: 202 };
 const HOME: Record<'wife' | 'daughter', { x: number; y: number }> = { wife: { x: 158, y: 152 }, daughter: { x: 158, y: 182 } };
 
 interface Server {
@@ -22,13 +23,15 @@ interface Server {
   flip: boolean;
   /** 動きが始まった時刻（この画面の時計）。一回再生の動きは開始からの経過で再生する */
   walkStart: number;
+  distance: number;
   /** 配膳に向かっている／配膳中 */
   serving: boolean;
   serveStart: number | null;
   /** 通り道（席の列を横切らないよう、列の間の通路を通る） */
   path: { x: number; y: number }[];
+  jobs: { seat: number; guest: Guest }[];
 }
-interface Exit { look: number; x: number; y: number; start: number }
+interface Exit { look: number; x: number; y: number; start: number; distance: number; path: { x: number; y: number }[] }
 interface Fx { anim: string; x: number; y: number; h: number; start: number }
 interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean }
 interface Spark { x: number; y: number; vx: number; vy: number; t: number; col: Color }
@@ -36,8 +39,8 @@ interface Spark { x: number; y: number; vx: number; vy: number; t: number; col: 
 /** 営業画面の見た目の状態（演出用。ゲームの計算には影響しない） */
 export class ShopView {
   servers: Record<'wife' | 'daughter', Server> = {
-    wife: { ...HOME.wife, tx: HOME.wife.x, ty: HOME.wife.y, carry: 0, moving: false, flip: false, walkStart: 0, serving: false, serveStart: null, path: [] },
-    daughter: { ...HOME.daughter, tx: HOME.daughter.x, ty: HOME.daughter.y, carry: 0, moving: false, flip: false, walkStart: 0, serving: false, serveStart: null, path: [] },
+    wife: { ...HOME.wife, tx: HOME.wife.x, ty: HOME.wife.y, carry: 0, moving: false, flip: false, walkStart: 0, distance: 0, serving: false, serveStart: null, path: [], jobs: [] },
+    daughter: { ...HOME.daughter, tx: HOME.daughter.x, ty: HOME.daughter.y, carry: 0, moving: false, flip: false, walkStart: 0, distance: 0, serving: false, serveStart: null, path: [], jobs: [] },
   };
   /** 画像素材（読み込めなかったときは null で、コードで描く絵を使う） */
   art: Art | null = null;
@@ -69,10 +72,16 @@ export class ShopView {
         const who = this.pickServer(shop, ev.seat);
         if (who) {
           const s = this.servers[who];
-          this.go(s, seat.x - 18, seat.ty + 6);
-          s.carry = 1.1;
-          s.serving = true;
-          s.serveStart = null;
+          const guest = shop.seats[ev.seat]!;
+          if (this.art) {
+            guest.awaitingDelivery = true;
+            s.jobs.push({ seat: ev.seat, guest });
+          } else {
+            this.go(s, seat.x - 18, seat.ty + 6);
+            s.carry = 1.1;
+            s.serving = true;
+            s.serveStart = null;
+          }
         }
         this.stirUntil = this.time + 2.4;
         this.fxs.push({ anim: 'きらめき', x: seat.x, y: seat.ty - 8, h: 22, start: this.time });
@@ -92,6 +101,14 @@ export class ShopView {
         break;
       }
       case 'tripStart':
+        if (ev.trip.who === 'wife' || ev.trip.who === 'daughter') {
+          const away = this.servers[ev.trip.who];
+          const other = this.servers[ev.trip.who === 'wife' ? 'daughter' : 'wife'];
+          other.jobs.push(...away.jobs.splice(0));
+          away.serving = false;
+          away.serveStart = null;
+          this.go(away, HOME[ev.trip.who].x, HOME[ev.trip.who].y);
+        }
         this.banner = { text: `${FAMILY_NAME[ev.trip.who]}「${ev.trip.act}に行ってくる！」`, t: 1.6, col: C.w };
         break;
       case 'tripEnd':
@@ -153,19 +170,27 @@ export class ShopView {
     const serveLen = this.art ? animLength(this.art.anim('family-wife', '配膳')) : 1.1;
     for (const k of ['wife', 'daughter'] as const) {
       const s = this.servers[k];
+      if (shop?.away?.who === k) continue;
+      if (this.art && !s.serving && !s.moving && s.jobs.length && Math.hypot(s.x - HOME[k].x, s.y - HOME[k].y) < 1) {
+        const seat = SEATS[s.jobs[0].seat];
+        this.go(s, seat.x - 24, seat.ty + 6);
+        s.serving = true;
+        s.serveStart = null;
+      }
       while (s.path.length > 1 && Math.hypot(s.path[0].x - s.x, s.path[0].y - s.y) <= 1) s.path.shift();
       const to = s.path[0] ?? { x: s.tx, y: s.ty };
       const dx = to.x - s.x;
       const dy = to.y - s.y;
-      const d = Math.hypot(dx, dy) + (s.path.length > 1 ? 2 : 0);
+      const d = Math.hypot(dx, dy);
       const wasMoving = s.moving;
       s.moving = d > 1;
       if (s.moving) {
         if (!wasMoving) s.walkStart = this.time;
         if (Math.abs(dx) > 0.5) s.flip = dx < 0;
-        const sp = Math.min(d, 160 * dt);
+        const sp = Math.min(d, SERVER_WALK_SPEED * dt);
         s.x += (dx / d) * sp;
         s.y += (dy / d) * sp;
+        s.distance += sp;
       }
       s.carry = Math.max(0, s.carry - dt);
       if (s.serving) {
@@ -174,9 +199,13 @@ export class ShopView {
           s.serveStart = this.time;
           s.flip = false;
         }
+        if (s.serveStart !== null && this.time - s.serveStart >= 0.4 && s.jobs[0]) {
+          s.jobs[0].guest.awaitingDelivery = false;
+        }
         if (s.serveStart !== null && this.time - s.serveStart >= serveLen + 0.15) {
           s.serving = false;
           s.serveStart = null;
+          s.jobs.shift();
           this.go(s, HOME[k].x, HOME[k].y);
         }
       } else if (s.carry <= 0 && !s.moving && (s.tx !== HOME[k].x || s.ty !== HOME[k].y)) {
@@ -188,17 +217,22 @@ export class ShopView {
       shop.seats.forEach((g, i) => {
         const prev = this.prevSeats[i];
         if (prev && (!g || g.id !== prev.id) && prev.state !== 'walk') {
-          this.exits.push({ look: prev.look, x: SEATS[i].x, y: SEATS[i].ty - 2, start: this.time });
+          const s = SEATS[i];
+          this.exits.push({ look: prev.look, x: s.x, y: s.ty - 2, start: this.time, distance: 0,
+            path: [{ x: s.x + 26, y: s.ty - 2 }, { x: s.x + 26, y: 156 }, { x: 430, y: 156 }, DOOR] });
         }
       });
       this.prevSeats = [...shop.seats];
     }
     for (const e of this.exits) {
-      const dx = DOOR.x - e.x;
-      const dy = DOOR.y - e.y;
+      while (e.path.length > 1 && Math.hypot(e.path[0].x - e.x, e.path[0].y - e.y) <= 1) e.path.shift();
+      const to = e.path[0];
+      const dx = to.x - e.x;
+      const dy = to.y - e.y;
       const d = Math.hypot(dx, dy);
-      const sp = Math.min(d, 90 * dt);
+      const sp = Math.min(d, WALK_SPEED * dt);
       if (d > 0) { e.x += (dx / d) * sp; e.y += (dy / d) * sp; }
+      e.distance += sp;
     }
     this.exits = this.exits.filter((e) => Math.hypot(DOOR.x - e.x, DOOR.y - e.y) > 1);
     const art = this.art;
@@ -240,7 +274,7 @@ export class ShopView {
     for (const k of ['wife', 'daughter'] as const) {
       if (away === k) continue;
       const s = this.servers[k];
-      const img = s.moving ? FAM[k][Math.floor(t * 8) % 2] : FAM[k][0];
+      const img = s.moving ? FAM[k][Math.floor(s.distance / 8) % 2] : FAM[k][0];
       items.push({
         y: s.y,
         d: () => {
@@ -274,10 +308,9 @@ export class ShopView {
       });
       // 入り口から席へ歩いてくる客
       if (gst && gst.state === 'walk') {
-        const p = 1 - Math.max(0, gst.t) / SHOP.walkTime;
-        const x = DOOR.x + (seat.x - DOOR.x) * p;
-        const y = DOOR.y + (seat.ty - 2 - DOOR.y) * p;
-        items.push({ y, d: () => { shadow(g, x - 1, y, 12); g.drawImage(WALKERS[gst.look % WALKERS.length][Math.floor(t * 8) % 2], Math.round(x - 7), Math.round(y - 20)); } });
+        const p = 1 - Math.max(0, gst.t) / (gst.walkDuration ?? SHOP.walkTime);
+        const { x, y, distance } = entryPose(seat, p);
+        items.push({ y, d: () => { shadow(g, x - 1, y, 12); g.drawImage(WALKERS[gst.look % WALKERS.length][Math.floor(distance / 8) % 2], Math.round(x - 7), Math.round(y - 20)); } });
       }
     });
     shop.queue.forEach((q, i) => items.push({ y: 205 - i * 10, d: () => g.drawImage(WALKERS[q.look % WALKERS.length][0], 446 + (i % 2) * 8, 182 - i * 11) }));
@@ -337,26 +370,26 @@ export class ShopView {
       const first = !!live && twins.length > 1 && twins[0] === live;
       const second = !!live && twins.length > 1 && !first;
       const bw = 62;
-      const bh = 42;
+      const bh = this.art ? ORDER_CARD.height : 42;
       const x = seat.x - bw / 2;
-      const y = seat.ty - 70;
+      const y = seat.ty - (this.art ? ORDER_CARD.offset : 70);
       const edge = second ? C.cream2 : live ? C.gold : gst.lack > 0 ? C.red : C.wood4;
       const a = dim ? 0.5 : 1;
       sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
       sc.PR(seat.x - 2, y + bh, 4, 2, edge, a);
       sc.PR(seat.x - 1, y + bh + 2, 2, 1, edge, a);
-      const nameSize = sc.fitSize(gst.dish.text, 10, bw - 6);
+      const nameSize = sc.fitSize(gst.dish.text, this.art ? 9 : 10, bw - 6);
       sc.T(gst.dish.text, seat.x, y + 2, nameSize, dim ? C.gray : C.w, 'center');
       const m = live?.matcher ?? new RomajiMatcher(gst.dish.kana);
       const romaSize = sc.fitSize(m.typed + m.remaining, 8, bw - 6, 5.5);
-      sc.roma(m.typed, m.remaining, seat.x, y + 14, romaSize, live ? 'active' : dim ? 'dim' : 'idle');
+      sc.roma(m.typed, m.remaining, seat.x, y + (this.art ? 12 : 14), romaSize, live ? 'active' : dim ? 'dim' : 'idle');
       const ids = Object.keys(gst.dish.need) as IngredientId[];
       let ix = seat.x - ids.length * 7 + 1;
       for (const ing of ids) {
         const ok = shop.stock[ing] >= gst.dish.need[ing]!;
-        this.icon(sc, ing, ix, y + 24, 12, dim ? 0.35 : ok ? 1 : 0.4);
-        sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
-        if (!ok) sc.TB('×', ix + 6, y + 23, 11, C.red3, 'center');
+        this.icon(sc, ing, ix, y + (this.art ? 21 : 24), this.art ? 9 : 12, dim ? 0.35 : ok ? 1 : 0.4);
+        if (!this.art) sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
+        if (!ok) sc.TB('×', ix + 6, y + 21, 9, C.red3, 'center');
         ix += 14;
       }
       const p = gst.wait / gst.maxWait;
@@ -435,7 +468,7 @@ export class ShopView {
     const away = shop.away?.who as FamilyId | undefined;
     // おやじ：カウンターの奥。調理中は鍋を混ぜる。下半身はカウンターの前板で隠す
     if (away !== 'master') {
-      if (t < this.stirUntil) art.drawAnim(sc, 'master-stir', '調理・鍋を混ぜる', t, L.master.x, L.master.y, art.scaleFor('master-stir', 0, L.master.hStir));
+      if (t < this.stirUntil) art.drawAnim(sc, 'master-stir', '調理・鍋を混ぜる', t - (this.stirUntil - 2.4), L.master.x, L.master.y, art.scaleFor('master-stir', 0, L.master.hStir));
       else art.drawAnim(sc, 'family-master', '待機', t, L.master.x, L.master.y, art.scaleFor('family-master', 0, L.master.h));
     }
     art.redrawRegion(sc, bg, L.counterFront);
@@ -451,7 +484,12 @@ export class ShopView {
         d: () => {
           this.shadow(sc, s.x, s.y, 14);
           if (s.serving && s.serveStart !== null) art.drawAnim(sc, id, '配膳', t - s.serveStart, s.x, s.y, kk, false);
-          else if (s.moving) art.drawAnim(sc, id, '歩行', t - s.walkStart, s.x, s.y, kk, s.flip);
+          else if (s.moving) {
+            art.drawFrame(sc, `${id}-walk`, walkFrame(art.anim(`${id}-walk`, '歩行'), s.distance, L.family[k]), s.x, s.y,
+              art.scaleFor(`${id}-walk`, 0, L.family[k]), s.flip);
+            if (s.serving && s.jobs[0]) art.drawIcon(sc, 'icons-dishes', dishIcon(s.jobs[0].guest.dish.id),
+              s.x + (s.flip ? -17 : 3), s.y - 24, 14);
+          }
           else art.drawAnim(sc, id, '待機', t, s.x, s.y, kk, false);
         },
       });
@@ -469,24 +507,22 @@ export class ShopView {
             // 表情はゲームの状態から選ぶ（自動で順に再生しない）
             const anim = art.sheet('guests-seated').asset.animations![gst.look % 7];
             const mood = gst.wait / gst.maxWait;
-            const state = gst.state === 'eat' ? 'eat' : mood > 0.55 ? 'smile' : mood > 0.28 ? 'neutral' : 'angry';
+            const state = gst.state === 'eat' ? (gst.awaitingDelivery ? 'neutral' : 'eat') : mood > 0.55 ? 'smile' : mood > 0.28 ? 'neutral' : 'angry';
             const idx = anim.states![state];
             art.drawFrame(sc, 'guests-seated', idx, seat.x, seat.ty + L.guest.foot, art.scaleFor('guests-seated', anim.states!.smile, L.guest.h));
           }
           art.drawFrame(sc, 'props-actions', 8, seat.x, seat.ty + L.table.foot, kTable);
-          if (gst && gst.state === 'eat') art.drawIcon(sc, 'icons-dishes', dishIcon(gst.dish.id), seat.x - 7, seat.ty + L.dish.y, 14);
+          if (gst && gst.state === 'eat' && !gst.awaitingDelivery) art.drawIcon(sc, 'icons-dishes', dishIcon(gst.dish.id), seat.x - 7, seat.ty + L.dish.y, 14);
         },
       });
       // 入り口から席へ歩いてくる客（絵は左向き）
       if (gst && gst.state === 'walk') {
-        const p = 1 - Math.max(0, gst.t) / SHOP.walkTime;
-        const x = DOOR.x + (seat.x - DOOR.x) * p;
-        const y = DOOR.y + (seat.ty - 2 - DOOR.y) * p;
-        const elapsed = SHOP.walkTime - Math.max(0, gst.t);
-        items.push({ y, d: () => this.drawWalker(sc, art, gst.look, x, y, elapsed, false) });
+        const p = 1 - Math.max(0, gst.t) / (gst.walkDuration ?? SHOP.walkTime);
+        const { x, y, flip, distance } = entryPose(seat, p);
+        items.push({ y, d: () => this.drawWalker(sc, art, gst.look, x, y, distance, flip) });
       }
     });
-    for (const e of this.exits) items.push({ y: e.y, d: () => this.drawWalker(sc, art, e.look, e.x, e.y, t - e.start, true) });
+    for (const e of this.exits) items.push({ y: e.y, d: () => this.drawWalker(sc, art, e.look, e.x, e.y, e.distance, true) });
     // 入り口で待つ客：歩行の最初のコマで立ち止まる
     shop.queue.forEach((q, i) => {
       const x = L.queue.x + (i % 2) * 9;
@@ -505,12 +541,12 @@ export class ShopView {
     }
   }
 
-  private drawWalker(sc: Screen, art: Art, look: number, x: number, y: number, elapsed: number, flip: boolean, still = false) {
+  private drawWalker(sc: Screen, art: Art, look: number, x: number, y: number, distance: number, flip: boolean, still = false) {
     const anim = art.sheet('guests-walk').asset.animations![look % 7];
     const k = art.scaleFor('guests-walk', anim.frames[0], AMBER.tavern.walker.h);
     this.shadow(sc, x, y, 12);
     if (still) art.drawFrame(sc, 'guests-walk', anim.frames[0], x, y, k, flip);
-    else art.drawAnim(sc, 'guests-walk', anim.name, elapsed, x, y, k, flip);
+    else art.drawFrame(sc, 'guests-walk', walkFrame(anim, distance, AMBER.tavern.walker.h), x, y, k, flip);
   }
 
   private shadow(sc: Screen, x: number, y: number, w: number) {
