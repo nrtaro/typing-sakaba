@@ -90,7 +90,7 @@ export const DAY_LENGTH = PHASES.reduce((a, p) => a + p.length, 0);
 export const SHOP = {
   seats: 8,
   queueMax: 6,
-  /** 入り口から席まで歩く時間（この間は注文しない） */
+  /** 旧セーブ・手動生成した客の表示用。通常の入店時間は経路長と歩速から決める。 */
   walkTime: 0.9,
   eatTime: 2.4,
   startStock: { fish: 5, meat: 4, veg: 5, mush: 3, ale: 5, spice: 3 } as Record<IngredientId, number>,

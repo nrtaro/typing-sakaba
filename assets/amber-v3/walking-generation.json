@@ -1,0 +1,28 @@
+[
+  {
+    "asset": "family-walk",
+    "source": "C:\\Users\\khrrn\\.codex\\generated_images\\01a1663a-687e-76e2-a7ae-448d16feff6a\\exec-d898601c-30ab-47f1-8979-b71154b9c185.png",
+    "columns": 4,
+    "rows": 3,
+    "poses": [
+      "contact-near",
+      "passing-far",
+      "contact-far",
+      "passing-near"
+    ],
+    "fps": 6
+  },
+  {
+    "asset": "guests-walk-v4",
+    "source": "C:\\Users\\khrrn\\.codex\\generated_images\\01a1663a-687e-76e2-a7ae-448d16feff6a\\exec-558ffb08-0c76-44e8-a8ef-58ef29c0f35d.png",
+    "columns": 4,
+    "rows": 7,
+    "poses": [
+      "contact-near",
+      "passing-far",
+      "contact-far",
+      "passing-near"
+    ],
+    "fps": 6
+  }
+]

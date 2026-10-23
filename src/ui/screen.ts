@@ -155,6 +155,39 @@ export class Screen {
     ctx.globalAlpha = 1;
   }
 
+  /** 背景の外側へ動くスプライトを描かない（横長・縦長画面の余白へ飛び出させない）。 */
+  clip(x: number, y: number, w: number, h: number, draw: () => void) {
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(this.px(x), this.py(y), w * this.S, h * this.S);
+    this.ctx.clip();
+    try { draw(); } finally { this.ctx.restore(); }
+  }
+
+  /** 色の濃さを徐々に変えて塗る（a0 が始点側、a1 が終点側）。端の暗がりなどに使う */
+  fade(x: number, y: number, w: number, h: number, col: Color, a0: number, a1: number, axis: 'x' | 'y') {
+    const { ctx } = this;
+    const x0 = Math.round(this.px(x));
+    const y0 = Math.round(this.py(y));
+    const x1 = Math.round(this.px(x + w));
+    const y1 = Math.round(this.py(y + h));
+    ctx.save();
+    // 実際の画面の1画素ずつ、濃さだけを変えて塗る
+    ctx.fillStyle = col;
+    const steps = Math.max(1, Math.abs(axis === 'x' ? x1 - x0 : y1 - y0));
+    const lx = Math.min(x0, x1);
+    const ly = Math.min(y0, y1);
+    const W = Math.abs(x1 - x0);
+    const H = Math.abs(y1 - y0);
+    for (let i = 0; i < steps; i++) {
+      const p = i / steps;
+      ctx.globalAlpha = a0 + (a1 - a0) * p;
+      if (axis === 'x') ctx.fillRect(x1 >= x0 ? x0 + i : x0 - i - 1, ly, 1, H);
+      else ctx.fillRect(lx, y1 >= y0 ? y0 + i : y0 - i - 1, W, 1);
+    }
+    ctx.restore();
+  }
+
   /** 画面全体を覆う（暗くするなど） */
   cover(col: Color, a: number) {
     const { ctx } = this;
@@ -171,6 +204,35 @@ export class Screen {
     this.PR(x + 1, y + 1, w - 2, h - 2, fill, a);
   }
 
+  /**
+   * 画像の一部を、拡大後の画面へ直接描く（座標は基準の 480x270）。
+   * 平滑化はしない。端は実際の画面の画素に合わせて丸め、隙間やにじみを出さない。
+   */
+  blit(img: CanvasImageSource, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number, flipX = false, alpha = 1, flipY = false) {
+    const { ctx } = this;
+    const x0 = Math.round(this.px(x));
+    const y0 = Math.round(this.py(y));
+    const x1 = Math.round(this.px(x + w));
+    const y1 = Math.round(this.py(y + h));
+    if (x1 <= x0 || y1 <= y0 || sw <= 0 || sh <= 0) return;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = alpha;
+    if (flipX || flipY) {
+      ctx.translate(flipX ? x0 + x1 : 0, flipY ? y0 + y1 : 0);
+      ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, x0, y0, x1 - x0, y1 - y0);
+    ctx.restore();
+  }
+
+  /** 画面全体を背景色で塗る（絵を直接描く画面の描き始め） */
+  clearScreen() {
+    this.g.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.fillStyle = C.bg;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
   /** 低解像度で作った絵（アイコン等）を整数倍で拡大して描く */
   spr(im: HTMLCanvasElement, x: number, y: number, scale = 1, alpha = 1) {
     const { ctx, S } = this;
@@ -181,7 +243,7 @@ export class Screen {
   }
 
   /** ローマ字：打った部分・次の1文字・残りを色分け */
-  roma(typed: string, rest: string, x: number, y: number, size: number, state: 'active' | 'idle' | 'dim', alpha = 1) {
+  roma(typed: string, rest: string, x: number, y: number, size: number, state: 'active' | 'idle' | 'dim', alpha = 1, dark = false) {
     const w = this.W(typed + rest, size);
     let cx = x - w / 2;
     const seg = (s: string, col: Color, a: number) => {
@@ -189,8 +251,8 @@ export class Screen {
       this.T(s, cx, y, size, col, 'left', a * alpha);
       cx += this.W(s, size);
     };
-    seg(typed, C.teal3, 1);
-    seg(rest.slice(0, 1), state === 'active' ? C.gold : C.cream, state === 'dim' ? 0.4 : 1);
-    seg(rest.slice(1), C.cream, state === 'dim' ? 0.35 : 0.8);
+    seg(typed, dark ? '#215a4a' : C.teal3, 1);
+    seg(rest.slice(0, 1), dark ? '#382215' : state === 'active' ? C.gold : C.cream, state === 'dim' ? 0.4 : 1);
+    seg(rest.slice(1), dark ? '#674526' : C.cream, state === 'dim' ? 0.35 : 0.8);
   }
 }
