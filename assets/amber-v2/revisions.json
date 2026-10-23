@@ -1,0 +1,12 @@
+[
+  {
+    "id": "master-stir",
+    "source": "C:\\Users\\khrrn\\.codex\\generated_images\\01a1663a-687e-76e2-a7ae-448d16feff6a\\exec-782311d4-829f-4bb3-b912-d8379e9c2366.png",
+    "prompt": "Production four-frame pixel sprite strip, EXACT four equal square cells in ONE HORIZONTAL ROW. Transparent background. Match reference character identity and amber pixel art style. burly mustached master red bandana cream rolled sleeves brown apron. Front three-quarter view, SAME small black pot at waist level in ALL frames. FOUR modest stirring poses of right hand holding SAME wooden spoon, small circular motion. Left hand rests at pot rim. NO knives, no chopping board, no food toss, no flames. Fixed head, torso, pot, feet. Each frame same scale, same fixed boots baseline at85%cell, character max70%cell height, all props within80%cell width. Crisp square pixels, limited amber warm palette, no smooth interpolation, no text, no grid, no shadow. Frame1 neutral,2 slight motion,3 slight opposite,4 return near neutral; loop cleanly without major pose changes."
+  },
+  {
+    "id": "wife-fishing",
+    "source": "C:\\Users\\khrrn\\.codex\\generated_images\\01a1663a-687e-76e2-a7ae-448d16feff6a\\exec-1270fc5c-6038-40af-9839-fdd7ba5893f3.png",
+    "prompt": "Production four-frame pixel sprite strip, EXACT four equal square cells in ONE HORIZONTAL ROW. Transparent background. Match reference character identity and amber pixel art style. auburn ponytail wife green dress cream apron. Side view facing RIGHT, holding SAME short fishing rod angled up right in ALL four frames. FOUR quiet fishing waiting poses, wrist shifts tiny amount, rod tip bends slightly. NO casting, no caught fish, no rod swapping. Fixed head torso and boots. Rod and line stay well inside cell. Each frame same scale, same fixed boots baseline at85%cell, character max70%cell height, all props within80%cell width. Crisp square pixels, limited amber warm palette, no smooth interpolation, no text, no grid, no shadow. Frame1 neutral,2 slight motion,3 slight opposite,4 return near neutral; loop cleanly without major pose changes."
+  }
+]

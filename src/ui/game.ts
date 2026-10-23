@@ -5,6 +5,7 @@ import { ShopView } from './shopView';
 import { MinigameView } from './minigameView';
 import { FAM, PORTRAIT } from './sprites';
 import { drawLights, drawRoomLive, roomLayer } from './room';
+import { Art } from './amber/art';
 import { CandidateInput } from '../core/candidates';
 import { Shop } from '../core/shop';
 import { createMinigame, type Minigame } from '../core/minigames';
@@ -47,9 +48,24 @@ export class Game {
   private last = performance.now();
   private missFlash = 0;
   private seed = Math.floor(Math.random() * 1e9);
+  /** A案の画像素材。読み込み中は null。失敗したらコードで描く絵で動かす */
+  art: Art | null = null;
+  artState: 'loading' | 'ready' | 'failed' = 'loading';
+  private artProgress = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.sc = new Screen(canvas);
+    Art.load((done, total) => { this.artProgress = done / total; })
+      .then((art) => {
+        this.art = art;
+        this.view.art = art;
+        this.tripView.art = art;
+        this.artState = 'ready';
+      })
+      .catch((err) => {
+        console.warn(err);
+        this.artState = 'failed';
+      });
     this.menu = new CandidateInput(() => this.menuItems().map((it) => ({ id: it.kana, kana: it.kana, data: it })));
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('blur', () => this.autoPause());
@@ -119,6 +135,7 @@ export class Game {
     this.seed = (this.seed * 1103515245 + 12345) >>> 0;
     this.shop = new Shop(new Rng(this.seed), difficultyOf(difficulty));
     this.view = new ShopView();
+    this.view.art = this.art;
     this.trip = null;
     this.paused = false;
     this.mode = 'play';
@@ -140,6 +157,7 @@ export class Game {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     this.sound.unlock();
     if (e.isComposing || e.key === 'Process') return;
+    if (this.artState === 'loading') return;
     const k = e.key;
     if (k === 'Escape' && this.mode === 'play') {
       e.preventDefault();
@@ -206,7 +224,7 @@ export class Game {
     if (this.mode !== 'play' || !this.shop || this.paused) return;
     const shop = this.shop;
     shop.update(dt);
-    this.view.update(dt);
+    this.view.update(dt, shop);
     this.tripView.update(dt);
     if (this.trip) this.stepTrip(dt);
     this.drainEvents();
@@ -247,6 +265,7 @@ export class Game {
         case 'tripStart':
           this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
           this.tripView = new MinigameView();
+          this.tripView.art = this.art;
           this.sound.chord(3);
           break;
         case 'phase': if (!this.trip) this.sound.bgm('shop', PHASES[ev.index].tempo); break;
@@ -294,6 +313,14 @@ export class Game {
 
   private draw() {
     const sc = this.sc;
+    if (this.artState === 'loading') {
+      sc.clearScreen();
+      sc.TB(GAME_TITLE, LW / 2, 100, 24, C.gold3, 'center', C.red2);
+      sc.TB(`絵を読み込み中… ${Math.round(this.artProgress * 100)}%`, LW / 2, 140, 12, C.cream, 'center');
+      sc.PR(LW / 2 - 80, 160, 160, 5, C.ink);
+      sc.PR(LW / 2 - 80, 160, 160 * this.artProgress, 5, C.gold);
+      return;
+    }
     if (this.mode === 'play' && this.shop) {
       if (this.trip?.phase === 'game' || this.trip?.phase === 'outro') {
         this.tripView.draw(sc, this.trip.game, this.shop, this.t);
@@ -308,12 +335,17 @@ export class Game {
     // タイトル・遊び方・結果：店内を背景に
     const g = sc.g;
     const ph = this.mode === 'result' ? 2 : 1;
-    sc.begin();
-    g.drawImage(roomLayer(ph, sc), 0, 0);
-    sc.toBase();
-    drawRoomLive(g, this.t);
-    drawLights(g, ph, sc);
-    sc.present();
+    if (this.art) {
+      sc.clearScreen();
+      this.art.drawBackground(sc, ph === 2 ? 'bg-tavern-night' : 'bg-tavern');
+    } else {
+      sc.begin();
+      g.drawImage(roomLayer(ph, sc), 0, 0);
+      sc.toBase();
+      drawRoomLive(g, this.t);
+      drawLights(g, ph, sc);
+      sc.present();
+    }
     sc.cover(C.bg, 0.5);
     if (this.mode === 'title') this.drawTitle();
     else if (this.mode === 'help') this.drawHelp();
@@ -358,9 +390,18 @@ export class Game {
     const sc = this.sc;
     sc.TB(GAME_TITLE, LW / 2, 14, 34, C.gold3, 'center', C.red2);
     sc.TB(GAME_SUBTITLE, LW / 2, 56, 15, C.cream, 'center', C.red2);
-    sc.spr(FAM.master[0], 190, 76, 2);
-    sc.spr(FAM.wife[0], 226, 78, 2);
-    sc.spr(FAM.daughter[0], 258, 86, 2);
+    if (this.art) {
+      const art = this.art;
+      const t = this.t;
+      art.drawAnim(sc, 'family-master', '待機', t, 207, 126, art.scaleFor('family-master', 0, 46));
+      art.drawAnim(sc, 'family-wife', '待機', t, 241, 126, art.scaleFor('family-wife', 0, 42));
+      art.drawAnim(sc, 'family-daughter', '待機', t, 272, 126, art.scaleFor('family-daughter', 0, 36));
+    } else {
+      sc.spr(FAM.master[0], 190, 76, 2);
+      sc.spr(FAM.wife[0], 226, 78, 2);
+      sc.spr(FAM.daughter[0], 258, 86, 2);
+    }
+    if (this.artState === 'failed') sc.TB('絵の素材を読み込めなかったため、簡易な絵で表示しています', LW / 2, 252, 8, C.red3, 'center');
     sc.TB('おやじ', 207, 128, 9, C.cream, 'center');
     sc.TB('女将', 241, 128, 9, C.cream, 'center');
     sc.TB('看板娘', 271, 128, 9, C.cream, 'center');
