@@ -42,10 +42,10 @@ export interface Trip {
 }
 
 export const TRIPS: Trip[] = [
-  { id: 'fishing', text: 'つり', kana: 'つり', who: 'wife', act: '釣り', place: '貯水池', gives: ['fish'], minimum: { fish: 2 } },
-  { id: 'hunting', text: 'かり', kana: 'かり', who: 'master', act: '狩り', place: '荒野', gives: ['meat'], minimum: { meat: 2 } },
-  { id: 'gathering', text: 'さいしゅ', kana: 'さいしゅ', who: 'daughter', act: '採取', place: '温室', gives: ['veg', 'mush'], minimum: { veg: 2, mush: 1 } },
-  { id: 'trading', text: 'しいれ', kana: 'しいれ', who: 'master', act: '仕入れ', place: '隊商', gives: ['ale', 'spice'], minimum: { ale: 2, spice: 1 } },
+  { id: 'fishing', text: 'つり', kana: 'つり', who: 'wife', act: '釣り', place: '貯水池', gives: ['fish'], minimum: { fish: 4 } },
+  { id: 'hunting', text: 'かり', kana: 'かり', who: 'master', act: '狩り', place: '荒野', gives: ['meat'], minimum: { meat: 4 } },
+  { id: 'gathering', text: 'さいしゅ', kana: 'さいしゅ', who: 'daughter', act: '採取', place: '温室', gives: ['veg', 'mush'], minimum: { veg: 4, mush: 3 } },
+  { id: 'trading', text: 'しいれ', kana: 'しいれ', who: 'master', act: '仕入れ', place: '隊商', gives: ['ale', 'spice'], minimum: { ale: 4, spice: 3 } },
 ];
 
 /** 素材 → 取れる調達 */
@@ -65,9 +65,9 @@ export interface Phase {
 }
 
 export const PHASES: Phase[] = [
-  { name: '朝', length: 50, every: 4.5, maxWait: 26, tempo: 104 },
-  { name: '昼', length: 60, every: 3.0, maxWait: 26, tempo: 120 },
-  { name: '夜', length: 70, every: 2.2, maxWait: 22, tempo: 138 },
+  { name: '朝', length: 50, every: 5.0, maxWait: 30, tempo: 104 },
+  { name: '昼', length: 60, every: 3.6, maxWait: 30, tempo: 120 },
+  { name: '夜', length: 70, every: 2.8, maxWait: 26, tempo: 138 },
 ];
 
 export const DAY_LENGTH = PHASES.reduce((a, p) => a + p.length, 0);
@@ -78,7 +78,7 @@ export const SHOP = {
   /** 入り口から席まで歩く時間（この間は注文しない） */
   walkTime: 0.9,
   eatTime: 2.4,
-  startStock: { fish: 3, meat: 2, veg: 3, mush: 1, ale: 3, spice: 1 } as Record<IngredientId, number>,
+  startStock: { fish: 5, meat: 4, veg: 5, mush: 3, ale: 5, spice: 3 } as Record<IngredientId, number>,
   /** チップの最大額（待ち時間が満タンのとき） */
   tipMax: 60,
   /** 何コンボごとに倍率が上がるか・上がる量・上限 */
@@ -87,15 +87,15 @@ export const SHOP = {
   comboMaxMult: 2,
   angryPenalty: 50,
   /** 調達の前後の演出（出発・帰還）の秒数。ミニゲームの時間とは別 */
-  tripIntro: 1.2,
+  tripIntro: 0.9,
 };
 
 export const MINIGAME_SECONDS = 10;
 
 export const RANKS = [
-  { name: 'S', min: 9000, title: '荒野いちばんの名店' },
-  { name: 'A', min: 6000, title: '街道で評判の酒場' },
-  { name: 'B', min: 3500, title: '常連でにぎわう店' },
+  { name: 'S', min: 12000, title: '荒野いちばんの名店' },
+  { name: 'A', min: 9000, title: '街道で評判の酒場' },
+  { name: 'B', min: 6000, title: '常連でにぎわう店' },
   { name: 'C', min: 0, title: 'あたたかい家族の店' },
 ];
 

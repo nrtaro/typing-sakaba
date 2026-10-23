@@ -64,16 +64,16 @@ describe('調達ミニゲーム', () => {
     expect(fast.gains.meat ?? 0).toBeGreaterThan(slow.gains.meat ?? 0);
   });
 
-  it('採取：1回で2つ摘め、毒きのこを打つとかごから2つこぼれる', () => {
+  it('採取：1回で4つ摘め、毒きのこを打つとかごから2つこぼれる', () => {
     const g = new GatheringGame(new Rng(5));
     g.sprouts = [
       { id: 'a', word: GATHER_GOOD[0], ing: 'veg', slot: 0, life: 5, maxLife: 5 },
       { id: 'b', word: GATHER_BAD[0], ing: null, slot: 1, life: 5, maxLife: 5 },
     ];
     for (const c of defaultRomaji(GATHER_GOOD[0].kana)) g.key(c);
-    expect(g.gains.veg).toBe(2);
+    expect(g.gains.veg).toBe(4);
     for (const c of defaultRomaji(GATHER_BAD[0].kana)) g.key(c);
-    expect(g.gains.veg).toBe(0);
+    expect(g.gains.veg).toBe(2);
   });
 
   it('採取：食べられるものだけ打つ方が毒も打つより多く集まる', () => {
@@ -100,7 +100,7 @@ describe('出題データ', () => {
     ...FISHING_PHRASES, ...HUNTING_WORDS, ...GATHER_GOOD, ...GATHER_BAD, ...TRADE_PHRASES,
     ...DISHES.map((d) => ({ text: d.text, kana: d.kana })), ...TRIPS.map((t) => ({ text: t.text, kana: t.kana })),
     { text: 'はじめる', kana: 'はじめる' }, { text: 'あそびかた', kana: 'あそびかた' }, { text: 'もどる', kana: 'もどる' },
-    { text: 'もういちど', kana: 'もういちど' }, { text: 'たいとる', kana: 'たいとる' }, { text: 'おと', kana: 'おと' },
+    { text: 'もういちど', kana: 'もういちど' }, { text: 'たいとる', kana: 'たいとる' }, { text: 'おと', kana: 'おと' }, { text: 'さいかい', kana: 'さいかい' }, { text: 'やめる', kana: 'やめる' },
   ];
   it.each(all.map((w) => [w.text, w.kana]))('%s（%s）はおすすめ綴りで打ち切れる', (_t, kana) => {
     const m = new RomajiMatcher(kana);

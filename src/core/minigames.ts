@@ -146,7 +146,7 @@ export class FishingGame extends Minigame<null> {
       this.nextWord();
       return;
     }
-    this.add('fish', this.big ? 5 : 2, 0.5, 0.5);
+    this.add('fish', this.big ? 8 : 4, 0.5, 0.5);
     if (this.big) this.calm = 0;
     this.phase = 'land';
     this.word = null;
@@ -234,7 +234,7 @@ export class HuntingGame extends Minigame<Prey> {
     p.hp--;
     p.flash = 0.25;
     if (p.hp <= 0) {
-      this.add('meat', p.kind === 'deer' ? 3 : 1, p.x, p.lane);
+      this.add('meat', p.kind === 'deer' ? 6 : 3, p.x, p.lane);
       this.prey = this.prey.filter((q) => q !== p);
     } else {
       p.word = pickWord(this.rng, HUNTING_WORDS, this.usedFirst(p), p.word);
@@ -303,9 +303,9 @@ export class GatheringGame extends Minigame<Sprout> {
     const s = t.data;
     this.sprouts = this.sprouts.filter((q) => q.id !== s.id);
     if (s.ing) {
-      // 1回摘むと2つ取れる
-      this.basket.push(s.ing, s.ing);
-      this.add(s.ing, 2, s.slot, 0);
+      // 1回摘むと4つ取れる
+      this.basket.push(s.ing, s.ing, s.ing, s.ing);
+      this.add(s.ing, 4, s.slot, 0);
     } else {
       // 毒きのこを摘んでしまった：かごから1つこぼれる
       const lost = this.basket.pop();
@@ -349,7 +349,7 @@ export class TradingGame extends Minigame<null> {
   protected onWord() {
     // 酒と香辛料の箱を交互に。ミスなしなら反対側をおまけで1つ
     const main: IngredientId = this.deals % 2 === 0 ? 'ale' : 'spice';
-    this.add(main, 1, this.deals, 0);
+    this.add(main, 3, this.deals, 0);
     if (!this.wordMissed) this.add(main === 'ale' ? 'spice' : 'ale', 1, this.deals, 1);
     this.deals++;
     this.word = pickWord(this.rng, TRADE_PHRASES, new Set(), this.word);

@@ -243,7 +243,7 @@ export class MinigameView {
       sc.PR(pos.x - 30, top + 22, 60 * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
     }
     sc.panel(140, 236, 300, 14, 'rgba(42,27,38,0.85)', C.green);
-    sc.T('食べられるものだけ打って摘む（1回で2つ）。☠ 毒きのこを打つとかごから2つこぼれる', 290, 239, 6, C.cream, 'center');
+    sc.T('食べられるものだけ打って摘む（1回で4つ）。☠ 毒きのこを打つとかごから2つこぼれる', 290, 239, 6, C.cream, 'center');
   }
 
   // ---------- しいれ ----------

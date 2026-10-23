@@ -59,7 +59,7 @@ export class Game {
   menuItems(): MenuItem[] {
     if (this.mode === 'play' && this.paused) {
       return [
-        { text: 'つづける', kana: 'つづける', act: () => { this.paused = false; } },
+        { text: 'さいかい', kana: 'さいかい', act: () => { this.paused = false; } },
         { text: 'やめる', kana: 'やめる', act: () => this.toTitle() },
       ];
     }
@@ -276,7 +276,7 @@ export class Game {
         this.view.draw(sc, this.shop, this.t, false);
         if (this.trip?.phase === 'intro') this.drawTripIntro();
       }
-      if (this.paused) this.drawMenuScreen('一時停止中', 'つづける／やめる を打って選ぶ（Esc でも再開）');
+      if (this.paused) this.drawMenuScreen('一時停止中', 'さいかい／やめる を打って選ぶ（Esc でも再開）');
       return;
     }
     // タイトル・遊び方・結果：店内を背景に
