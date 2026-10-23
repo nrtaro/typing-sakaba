@@ -1,13 +1,11 @@
 import '@fontsource/dotgothic16/400.css';
-import './ui/style.css';
-import { App } from './ui/app';
-import { TitleScene } from './ui/scenes/title';
+import { Game } from './ui/game';
 
-const app = new App();
-app.go(new TitleScene());
+const canvas = document.getElementById('game') as HTMLCanvasElement;
+const game = new Game(canvas);
+canvas.focus();
+// フォントの読み込みを待ってから文字の幅を測り直す
+void document.fonts?.load("16px 'DotGothic16'");
 
 // 動作確認用（開発時のみ）
-if (import.meta.env.DEV) {
-  (window as unknown as { __app: App }).__app = app;
-  void import('./devtools').then((m) => m.installDevtools(app));
-}
+if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;
