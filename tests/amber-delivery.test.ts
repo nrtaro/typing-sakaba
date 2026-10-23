@@ -130,9 +130,23 @@ describe('連続操作中の文字表示', () => {
     const view = new ShopView();
     for (let combo = 3; combo <= 20; combo++) view.handle({ type: 'serve', seat: 0, gain: 120, combo }, shop);
     expect(view.pops).toHaveLength(2);
-    expect(view.pops.find(p => p.slot === 'combo')?.text).toBe('20 COMBO!!');
+    expect(view.pops.find(p => p.slot === 'combo')?.text).toBe('20 COMBO');
     expect(view.pops.find(p => p.slot === 'income')?.text).toBe('+120円');
-    for (const p of view.pops) expect(p.x).toBeLessThan(140); // 客席の注文枠から離す
+    expect(view.pops.find(p => p.slot === 'combo')?.x).toBe(TAVERN_SEATS[0].x);
+    expect(view.pops.find(p => p.slot === 'income')?.x).toBeLessThan(140);
+  });
+
+  it('コンボは直前に完了した注文の位置へ移動する', () => {
+    const shop = new Shop(new Rng(1)), view = new ShopView();
+    view.art = {} as Art;
+    shop.seats = TAVERN_SEATS.map((_, i) => ({ id: i, dish: DISHES[0], look: 0, wait: 30, maxWait: 30, state: 'eat', t: 4, lack: 0 }));
+    for (const seat of [0, 7, 2, 4]) {
+      view.handle({ type: 'serve', seat, gain: 120, combo: 11 }, shop);
+      const p = view.pops.find(p => p.slot === 'combo')!;
+      expect(p.x).toBe(TAVERN_SEATS[seat].x);
+      expect(p.y).toBe(TAVERN_SEATS[seat].ty - ORDER_CARD.offset);
+      expect(view.pops.filter(p => p.slot === 'combo')).toHaveLength(1);
+    }
   });
 
   it('時間帯の通知はHUDへ浮き上がらず、固定の通知欄に表示する', () => {

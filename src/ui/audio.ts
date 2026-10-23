@@ -1,3 +1,4 @@
+import { comboFx } from './comboFx';
 // 電子音系の効果音とBGM（Web Audio で生成。音声ファイルは使っていない）
 import type { Settings } from '../core/save';
 
@@ -101,13 +102,14 @@ export class Sound {
     this.noise(t, 0.05, 0.06, this.sfx);
   }
 
-  /** 節目は上昇するファンファーレ。重ねても音量を急増させない。 */
+  /** 10以降は毎回ファンファーレ。５コンボごとに音数と和音を増やす。 */
   combo(count: number) {
     if (!this.ac || !this.sfx) return;
-    const t = this.ac.currentTime, milestone = count % 10 === 0;
-    const notes = milestone ? [0, 2, 4, 5, 7, 9] : [Math.min(8, Math.floor(count / 3)) + 3];
-    notes.forEach((n, i) => this.tone(this.note(n), t + i * 0.055, milestone ? 0.3 : 0.13, 'triangle', 0.06, this.sfx!));
-    if (milestone) this.noise(t, 0.08, 0.04, this.sfx);
+    const t = this.ac.currentTime, fx = comboFx(count);
+    fx.notes.forEach((n, i) => this.tone(this.note(n), t + i * 0.045, fx.level ? 0.24 : 0.13, 'triangle', 0.055, this.sfx!));
+    if (fx.level) this.noise(t, 0.06, 0.03, this.sfx);
+    if (fx.level >= 2) this.tone(this.note(2), t, 0.32, 'sine', 0.035, this.sfx);
+    if (fx.level >= 3) this.tone(this.note(4), t + 0.05, 0.34, 'sine', 0.03, this.sfx);
   }
 
   coin() {
