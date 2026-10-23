@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RomajiMatcher, defaultRomaji, firstKeys } from '../src/core/romaji';
-import { FISHING_WORDS, HUNTING_WORDS } from '../src/core/words';
+import { FISHING_PHRASES as FISHING_WORDS, HUNTING_WORDS } from '../src/core/minigames';
 
 function typeAll(reading: string, keys: string): { ok: boolean; misses: number } {
   const m = new RomajiMatcher(reading);

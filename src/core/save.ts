@@ -1,5 +1,4 @@
-import type { GameState } from './game';
-import type { ScoreBreakdown, TypingSummary } from './game';
+// ブラウザへの保存：設定・自己ベスト・直近の結果（3分の一周なので途中経過は保存しない）
 
 export interface KeyValueStore {
   getItem(key: string): string | null;
@@ -8,37 +7,25 @@ export interface KeyValueStore {
 }
 
 export interface Settings {
+  muted: boolean;
   bgmVolume: number;
   seVolume: number;
-  muted: boolean;
-  reduceEffects: boolean;
-  showRomaji: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = {
-  bgmVolume: 0.35,
-  seVolume: 0.6,
-  muted: false,
-  reduceEffects: false,
-  showRomaji: true,
-};
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7 };
 
-export interface RunRecord {
-  seed: number;
-  score: ScoreBreakdown;
-  typing: TypingSummary;
+export interface DayRecord {
+  score: number;
+  served: number;
+  maxCombo: number;
+  angry: number;
+  kps: number;
+  accuracy: number;
   finishedAt: string;
-  playSeconds: number;
 }
 
-const KEYS = {
-  run: 'lastorder.run.v1',
-  settings: 'lastorder.settings.v1',
-  best: 'lastorder.best.v1',
-  last: 'lastorder.last.v1',
-};
+const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last' };
 
-/** ブラウザの保存領域が使えない環境でも落ちないようにする */
 function safe<T>(fn: () => T, fallback: T): T {
   try {
     return fn();
@@ -49,78 +36,50 @@ function safe<T>(fn: () => T, fallback: T): T {
 
 export class SaveStore {
   private keys: typeof KEYS;
+
   /** slot を指定すると別の保存枠を使う（動作確認用） */
   constructor(private store: KeyValueStore | null, slot = '') {
-    const suffix = slot ? `.${slot.replace(/[^a-z0-9_-]/gi, '')}` : '';
-    this.keys = { run: KEYS.run + suffix, settings: KEYS.settings + suffix, best: KEYS.best + suffix, last: KEYS.last + suffix };
+    const sfx = slot ? `.${slot.replace(/[^a-z0-9_-]/gi, '')}` : '';
+    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx };
   }
 
-  saveRun(s: GameState, playSeconds: number) {
-    safe(() => this.store?.setItem(this.keys.run, JSON.stringify({ state: s, playSeconds })), undefined);
-  }
-
-  loadRun(): { state: GameState; playSeconds: number } | null {
-    const raw = safe(() => this.store?.getItem(this.keys.run) ?? null, null);
+  private read<T>(key: string): T | null {
+    const raw = safe(() => this.store?.getItem(key) ?? null, null);
     if (!raw) return null;
-    const data = safe(() => JSON.parse(raw), null);
-    if (!data || !isValidState(data.state)) return null;
-    return { state: data.state, playSeconds: Number(data.playSeconds) || 0 };
+    return safe(() => JSON.parse(raw) as T, null);
   }
 
-  clearRun() {
-    safe(() => this.store?.removeItem(this.keys.run), undefined);
+  private write(key: string, v: unknown) {
+    safe(() => this.store?.setItem(key, JSON.stringify(v)), undefined);
   }
 
   loadSettings(): Settings {
-    const raw = safe(() => this.store?.getItem(this.keys.settings) ?? null, null);
-    const data = raw ? safe(() => JSON.parse(raw), null) : null;
-    return { ...DEFAULT_SETTINGS, ...(data && typeof data === 'object' ? data : {}) };
+    const d = this.read<Partial<Settings>>(this.keys.settings);
+    return { ...DEFAULT_SETTINGS, ...(d && typeof d === 'object' ? d : {}) };
   }
 
   saveSettings(s: Settings) {
-    safe(() => this.store?.setItem(this.keys.settings, JSON.stringify(s)), undefined);
+    this.write(this.keys.settings, s);
   }
 
-  loadBest(): RunRecord | null {
-    return this.loadRecord(this.keys.best);
+  loadBest(): DayRecord | null {
+    const d = this.read<DayRecord>(this.keys.best);
+    return d && typeof d.score === 'number' ? d : null;
   }
 
-  loadLast(): RunRecord | null {
-    return this.loadRecord(this.keys.last);
+  loadLast(): DayRecord | null {
+    const d = this.read<DayRecord>(this.keys.last);
+    return d && typeof d.score === 'number' ? d : null;
   }
 
-  /** 直近の結果を保存し、自己ベストなら更新する。自己ベスト更新なら true */
-  recordResult(r: RunRecord): boolean {
-    safe(() => this.store?.setItem(this.keys.last, JSON.stringify(r)), undefined);
+  /** 結果を記録し、自己ベストを更新したら true */
+  record(r: DayRecord): boolean {
+    this.write(this.keys.last, r);
     const best = this.loadBest();
-    if (!best || r.score.total > best.score.total) {
-      safe(() => this.store?.setItem(this.keys.best, JSON.stringify(r)), undefined);
+    if (!best || r.score > best.score) {
+      this.write(this.keys.best, r);
       return true;
     }
     return false;
   }
-
-  private loadRecord(key: string): RunRecord | null {
-    const raw = safe(() => this.store?.getItem(key) ?? null, null);
-    if (!raw) return null;
-    const data = safe(() => JSON.parse(raw), null);
-    return data && data.score && typeof data.score.total === 'number' ? data : null;
-  }
-}
-
-function isValidState(s: unknown): s is GameState {
-  if (!s || typeof s !== 'object') return false;
-  const g = s as Partial<GameState>;
-  return (
-    g.version === 1 &&
-    typeof g.day === 'number' &&
-    typeof g.cash === 'number' &&
-    typeof g.actionsLeft === 'number' &&
-    !!g.ingredients &&
-    !!g.dishes &&
-    !!g.levels &&
-    Array.isArray(g.menu) &&
-    Array.isArray(g.hauls) &&
-    Array.isArray(g.nights)
-  );
 }
