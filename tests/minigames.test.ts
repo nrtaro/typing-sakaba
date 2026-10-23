@@ -198,3 +198,39 @@ describe('出題データ', () => {
     expect(ALE_GOODS.length + SPICE_GOODS.length).toBeGreaterThanOrEqual(30);
   });
 });
+
+describe('調整（デプロイ前の見直し）', () => {
+  it('仕入れ：落札したらすぐ次の品物を打てる', () => {
+    const g = new TradingGame(new Rng(11));
+    const first = g.lot;
+    for (const c of defaultRomaji(first.word.kana)) g.key(c);
+    expect(g.wins).toBe(1);
+    expect(g.lot).not.toBe(first);
+    expect(g.lot.outcome).toBe('open');
+    expect(g.targets().length).toBe(1);
+  });
+
+  it('採取：毒きのこはふつうで2割未満', () => {
+    let bad = 0;
+    let all = 0;
+    for (let s = 0; s < 30; s++) {
+      const g = new GatheringGame(new Rng(s));
+      const seen = new Set<string>();
+      for (let i = 0; i < 600; i++) {
+        g.update(1 / 60);
+        for (const x of g.sprouts) if (!seen.has(x.id)) { seen.add(x.id); all++; if (!x.ing) bad++; }
+      }
+    }
+    expect(bad / all).toBeLessThan(0.2);
+  });
+
+  it('釣り：ふつうの速さでも狩りと同じくらい取れる', () => {
+    let fish = 0;
+    let meat = 0;
+    for (let s = 1; s <= 20; s++) {
+      fish += play(new FishingGame(new Rng(s)), 5).gains.fish ?? 0;
+      meat += play(new HuntingGame(new Rng(s)), 5).gains.meat ?? 0;
+    }
+    expect(fish / meat).toBeGreaterThan(0.75);
+  });
+});

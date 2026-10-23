@@ -496,13 +496,20 @@ export class ShopView {
     }
     const kTable = art.scaleFor('props-actions', 8, L.table.h);
     const kChair = art.scaleFor('props-actions', 9, L.chair.h);
+    // 椅子と机は、見えている部分の左右中央を席の中心にそろえる（足元の登録位置は左右に少しずれているため）
+    const centerX = (index: number, k: number) => {
+      const f = art.frame('props-actions', index);
+      return ((f.visibleBounds[0] + f.visibleBounds[2]) / 2 - f.registration[0]) * k;
+    };
+    const chairDx = centerX(9, kChair);
+    const tableDx = centerX(8, kTable);
     SEATS.forEach((seat, i) => {
       const gst = shop.seats[i];
       items.push({
         y: seat.ty,
         d: () => {
           this.shadow(sc, seat.x, seat.ty + L.table.foot, 24);
-          art.drawFrame(sc, 'props-actions', 9, seat.x, seat.ty + L.chair.foot, kChair);
+          art.drawFrame(sc, 'props-actions', 9, seat.x - chairDx, seat.ty + L.chair.foot, kChair);
           if (gst && gst.state !== 'walk') {
             // 表情はゲームの状態から選ぶ（自動で順に再生しない）
             const anim = art.sheet('guests-seated').asset.animations![gst.look % 7];
@@ -511,7 +518,7 @@ export class ShopView {
             const idx = anim.states![state];
             art.drawFrame(sc, 'guests-seated', idx, seat.x, seat.ty + L.guest.foot, art.scaleFor('guests-seated', anim.states!.smile, L.guest.h));
           }
-          art.drawFrame(sc, 'props-actions', 8, seat.x, seat.ty + L.table.foot, kTable);
+          art.drawFrame(sc, 'props-actions', 8, seat.x - tableDx, seat.ty + L.table.foot, kTable);
           if (gst && gst.state === 'eat' && !gst.awaitingDelivery) art.drawIcon(sc, 'icons-dishes', dishIcon(gst.dish.id), seat.x - 7, seat.ty + L.dish.y, 14);
         },
       });

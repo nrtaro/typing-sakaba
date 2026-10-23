@@ -1,0 +1,9 @@
+// Cloudflare Workers の静的アセット配信の設定。
+// ビルド結果（dist）をそのまま配信する。サーバー側の処理はない。
+{
+  "name": "typing-sakaba",
+  "compatibility_date": "2026-10-19",
+  "assets": {
+    "directory": "./dist"
+  }
+}

@@ -119,8 +119,8 @@ export const FISHING = {
   bigWords: 3,
   /** ミスでテンションが上がり、この回数で糸が切れる */
   breakAt: 3,
-  smallYield: 3,
-  bigYield: 8,
+  smallYield: 5,
+  bigYield: 11,
   /** 大物と勝負中なら、時間切れでもこの秒数まで延長する */
   overtimeMax: 5,
 };
@@ -183,7 +183,7 @@ export class FishingGame extends Minigame<null> {
       this.events.push({ type: 'bite', big: this.big });
     } else if (this.phase === 'land' || this.phase === 'lost') {
       this.phase = 'wait';
-      this.timer = this.rng.range(0.3, 0.5);
+      this.timer = this.rng.range(0.15, 0.3);
     }
   }
 
@@ -218,7 +218,7 @@ export class FishingGame extends Minigame<null> {
     this.fishIndex++;
     this.word = null;
     this.phase = 'land';
-    this.timer = 0.35;
+    this.timer = 0.25;
   }
 }
 
@@ -366,7 +366,7 @@ export interface Sprout {
 }
 
 export const GATHER_SLOTS = 6;
-export const GATHER = { perPick: 4, poisonLoss: 2, poisonRate: 0.25, life: [3.6, 4.6] as [number, number] };
+export const GATHER = { perPick: 4, poisonLoss: 2, poisonRate: 0.14, life: [3.6, 4.6] as [number, number] };
 
 export class GatheringGame extends Minigame<Sprout> {
   readonly kind = 'gathering' as const;
@@ -449,7 +449,7 @@ export const TRADING = {
   rivalSpeed: 2.6,
   rivalGrow: 0.35,
   rivalMax: 5.5,
-  pause: 0.7,
+  pause: 0.4,
 };
 
 export interface Lot {
@@ -522,7 +522,9 @@ export class TradingGame extends Minigame<null> {
     lot.outcome = 'won';
     this.wins++;
     this.add(lot.item, TRADING.win + (lot.missed ? 0 : TRADING.bonus), 0, 0);
-    this.pause = TRADING.pause;
+    // 落札したら間を置かずに次の品物を出し、すぐ打ち始められるようにする
+    this.lots++;
+    this.lot = this.newLot();
   }
 }
 
