@@ -1,5 +1,5 @@
 import { C, TRIP_COLOR, type Color } from './palette';
-import { Screen, LW, LH } from './screen';
+import { Screen, LW } from './screen';
 import { FAM, guestSprite, ICON, PORTRAIT, WALKERS } from './sprites';
 import { drawChair, drawLights, drawRoomLive, drawTable, pen, roomLayer, shadow } from './room';
 import { Shop, type ShopEvent } from '../core/shop';
@@ -46,7 +46,7 @@ export class ShopView {
           s.ty = seat.ty + 6;
           s.carry = 1.1;
         }
-        this.pops.push({ x: seat.x, y: seat.ty - 56, t: 0, text: `+${ev.gain}`, col: C.gold });
+        this.pops.push({ x: seat.x, y: seat.ty - 60, t: 0, text: `+${ev.gain}`, col: C.gold });
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, C.gold, 10, 80);
         break;
       }
@@ -132,11 +132,12 @@ export class ShopView {
   draw(sc: Screen, shop: Shop, t: number, reduce: boolean) {
     const ph = shop.phaseIndex;
     const g = sc.g;
-    g.clearRect(0, 0, LW, LH);
-    g.drawImage(roomLayer(ph), 0, 0);
+    sc.begin();
+    g.drawImage(roomLayer(ph, sc), 0, 0);
+    sc.toBase();
     drawRoomLive(g, t, reduce);
     this.drawActors(sc, shop, t);
-    drawLights(g, ph);
+    drawLights(g, ph, sc);
     sc.present();
     this.drawHud(sc, shop);
     this.drawOrders(sc, shop);
@@ -212,24 +213,25 @@ export class ShopView {
 
   private drawHud(sc: Screen, shop: Shop) {
     const ph = shop.phaseIndex;
-    sc.panel(4, 2, 472, 14, 'rgba(42,27,38,0.92)', C.wood3);
+    const e = sc.ext;
+    sc.panel(e.x0 + 3, 2, e.w - 6, 24, 'rgba(42,27,38,0.94)', C.wood3);
     let acc = 0;
-    const bx = 10;
-    const bw = 170;
+    const bx = 8;
+    const bw = 168;
     PHASES.forEach((p, i) => {
       const w = (p.length / DAY_LENGTH) * bw;
-      sc.PR(bx + acc, 11, w - 1, 3, i === 0 ? '#f6d29a' : i === 1 ? '#5fb4ea' : '#6a4a9a', i === ph ? 1 : 0.55);
-      sc.T((i === 2 ? '☾ ' : '☀ ') + p.name, bx + acc + w / 2, 3, 7, i === ph ? C.gold3 : C.cream, 'center', i === ph ? 1 : 0.5);
+      sc.PR(bx + acc, 19, w - 1, 4, i === 0 ? '#f6d29a' : i === 1 ? '#5fb4ea' : '#6a4a9a', i === ph ? 1 : 0.5);
+      sc.T((i === 2 ? '☾ ' : '☀ ') + p.name, bx + acc + w / 2, 4, 10, i === ph ? C.gold3 : C.cream, 'center', i === ph ? 1 : 0.5);
       acc += w;
     });
-    sc.PR(bx + (shop.clock / DAY_LENGTH) * bw - 0.5, 9, 1.5, 7, C.w);
+    sc.PR(bx + (shop.clock / DAY_LENGTH) * bw - 0.5, 16, 1.5, 9, C.w);
     const left = shop.timeLeft;
-    sc.T(`残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 190, 4, 7, left < 20 ? C.red3 : C.cream);
-    sc.T('売上', 262, 4, 7, C.cream, 'left', 0.8);
-    sc.TB(shop.score.toLocaleString(), 286, 2, 10, C.gold, 'left');
+    sc.TB(`残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 184, 6, 12, left < 20 ? C.red3 : C.w, 'left');
+    sc.T('売上', 262, 9, 9, C.cream, 'left', 0.85);
+    sc.TB(shop.score.toLocaleString(), 288, 4, 15, C.gold, 'left');
     if (shop.combo > 1) {
       const mult = shop.multiplier;
-      sc.TB(`${shop.combo} コンボ` + (mult > 1 ? `  ×${mult.toFixed(1)}` : ''), 470, 2, 10, mult > 1 ? C.pink : C.w, 'right');
+      sc.TB(`${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : ''), 476, 5, 13, mult > 1 ? C.pink : C.w, 'right');
     }
   }
 
@@ -248,39 +250,42 @@ export class ShopView {
         .sort((a, b) => shop.urgency(a.target.data) - shop.urgency(b.target.data));
       const first = !!live && twins.length > 1 && twins[0] === live;
       const second = !!live && twins.length > 1 && !first;
-      const bw = 60;
-      const bh = 36;
+      const bw = 62;
+      const bh = 42;
       const x = seat.x - bw / 2;
-      const y = seat.ty - 64;
+      const y = seat.ty - 70;
       const edge = second ? C.cream2 : live ? C.gold : gst.lack > 0 ? C.red : C.wood4;
       const a = dim ? 0.5 : 1;
       sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
       sc.PR(seat.x - 2, y + bh, 4, 2, edge, a);
       sc.PR(seat.x - 1, y + bh + 2, 2, 1, edge, a);
-      sc.T(gst.dish.text, seat.x, y + 2, 8, dim ? C.gray : C.w, 'center');
+      const nameSize = sc.W(gst.dish.text, 10) > bw - 4 ? 9 : 10;
+      sc.T(gst.dish.text, seat.x, y + 2, nameSize, dim ? C.gray : C.w, 'center');
       const m = live?.matcher ?? new RomajiMatcher(gst.dish.kana);
-      sc.roma(m.typed, m.remaining, seat.x, y + 12, 6, live ? 'active' : dim ? 'dim' : 'idle');
+      const romaSize = sc.W(m.typed + m.remaining, 8) > bw - 2 ? 7 : 8;
+      sc.roma(m.typed, m.remaining, seat.x, y + 14, romaSize, live ? 'active' : dim ? 'dim' : 'idle');
       const ids = Object.keys(gst.dish.need) as IngredientId[];
       let ix = seat.x - ids.length * 7 + 1;
       for (const ing of ids) {
         const ok = shop.stock[ing] >= gst.dish.need[ing]!;
-        sc.spr(ICON[ing], ix, y + 19, 1, dim ? 0.35 : ok ? 1 : 0.4);
-        sc.PR(ix, y + 31, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
-        if (!ok) sc.TB('×', ix + 6, y + 19, 10, C.red3, 'center');
+        sc.spr(ICON[ing], ix, y + 24, 1, dim ? 0.35 : ok ? 1 : 0.4);
+        sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
+        if (!ok) sc.TB('×', ix + 6, y + 23, 11, C.red3, 'center');
         ix += 14;
       }
       const p = gst.wait / gst.maxWait;
       sc.PR(x + 4, y + bh - 3, bw - 8, 2, C.ink, a);
       sc.PR(x + 4, y + bh - 3, (bw - 8) * p, 2, p > 0.5 ? C.green : p > 0.25 ? C.gold : C.red, a);
-      if (first) sc.TB('▼ 先に出す', seat.x, y - 8, 6, C.gold3, 'center');
-      if (shop.away) sc.TB('待ってるよ', seat.x, y - 8, 6, C.pink3, 'center');
+      if (first) sc.TB('▼先に出す', seat.x, y - 10, 8, C.gold3, 'center');
+      if (shop.away) sc.TB('待ってるよ', seat.x, y - 10, 8, C.pink3, 'center');
     });
   }
 
   /** 調達パネル：調達の言葉・担当・取れる素材と残り数を1つの枠にまとめ、色で結ぶ */
   private drawSupply(sc: Screen, shop: Shop, t: number) {
-    sc.PR(0, 210, LW, 60, C.ink);
-    sc.PR(0, 210, LW, 1, C.wood3);
+    const e = sc.ext;
+    sc.PR(e.x0, 210, e.w, e.y1 - 210, C.ink);
+    sc.PR(e.x0, 210, e.w, 1, C.wood3);
     const typing = shop.input.typed.length > 0;
     TRIPS.forEach((tr, i) => {
       const x = 4 + i * 118;
@@ -297,43 +302,44 @@ export class ShopView {
       sc.panel(x, y, w, h, col.dark, live ? C.gold : lackHere ? C.red3 : col.main, a);
       sc.PR(x + 1, y + 1, w - 2, 18, col.main, dim ? 0.35 : 0.55);
       sc.spr(PORTRAIT[tr.who], x + 3, y + 4, 1, a);
-      sc.TB(tr.text, x + 20, y + 3, 10, live ? C.gold3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
+      sc.TB(tr.text, x + 20, y + 2, 13, live ? C.gold3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
       const m = live?.matcher ?? new RomajiMatcher(tr.kana);
-      const rx = x + 22 + sc.W(tr.text, 10);
-      sc.T(m.typed, rx, y + 7, 7, C.teal3, 'left', dim ? 0.4 : 1);
-      sc.T(m.remaining, rx + sc.W(m.typed, 7), y + 7, 7, C.cream, 'left', dim ? 0.3 : 0.75);
+      const rx = x + 23 + sc.W(tr.text, 13);
+      sc.T(m.typed, rx, y + 6, 9, C.teal3, 'left', dim ? 0.4 : 1);
+      sc.T(m.remaining, rx + sc.W(m.typed, 9), y + 6, 9, C.cream, 'left', dim ? 0.3 : 0.8);
       tr.gives.forEach((ing, k) => {
         const ex = x + 6 + k * 54;
         const ey = y + 21;
         const n = shop.stock[ing];
         if (n <= 1 && Math.floor(t * 3) % 2 === 0) sc.PR(ex - 2, ey - 1, 50, 22, C.red2, 0.7);
         sc.spr(ICON[ing], ex - 1, ey - 1, 2, dim ? 0.5 : 1);
-        sc.T(INGREDIENT_NAME[ing], ex + 24, ey, 6, C.cream, 'left', dim ? 0.4 : 0.8);
-        sc.TB(`×${n}`, ex + 24, ey + 8, 11, n <= 1 ? C.red3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
+        sc.T(INGREDIENT_NAME[ing], ex + 24, ey - 1, 8, C.cream, 'left', dim ? 0.4 : 0.85);
+        sc.TB(`×${n}`, ex + 24, ey + 8, 13, n <= 1 ? C.red3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
         const got = this.gotTrip?.id === tr.id ? this.gotTrip : null;
         if (got && got.gains[ing]) sc.TB(`+${got.gains[ing]}`, ex + 44, ey - 2 - (1.4 - got.t) * 5, 8, C.gold3, 'center');
       });
-      sc.T(`${FAMILY_NAME[tr.who]}が${tr.act}`, x + w - 4, y + h - 9, 6, C.cream, 'right', dim ? 0.35 : 0.6);
+      sc.T(FAMILY_NAME[tr.who], x + w - 4, y + h - 10, 8, C.cream, 'right', dim ? 0.35 : 0.7);
       if (isAway) {
         sc.PR(x + 1, y + 1, w - 2, h - 2, '#000000', 0.45);
-        sc.TB(`${tr.place}で${tr.act}中…`, x + w / 2, y + 20, 8, C.gold3, 'center');
+        sc.TB(`${tr.act}中…`, x + w / 2, y + 20, 11, C.gold3, 'center');
       }
     });
   }
 
   private drawFx(sc: Screen, shop: Shop) {
     for (const p of this.sparks) sc.PR(p.x, p.y, 1.5, 1.5, p.col, 1 - p.t / 0.7);
-    for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 16, p.big ? 14 : 9, p.col, 'center', C.ink, Math.min(1, (1.3 - p.t) * 3));
+    for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 16, p.big ? 18 : 11, p.col, 'center', C.ink, Math.min(1, (1.3 - p.t) * 3));
     if (this.banner) {
-      const tw = sc.W(this.banner.text, 9) + 20;
-      sc.panel(LW / 2 - tw / 2, 24, tw, 18, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));
-      sc.TB(this.banner.text, LW / 2, 28, 9, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
+      const tw = sc.W(this.banner.text, 11) + 24;
+      sc.panel(LW / 2 - tw / 2, 30, tw, 20, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));
+      sc.TB(this.banner.text, LW / 2, 34, 11, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
     }
     // 絞り込み中だけ、打った途中のローマ字を薄く出す
-    if (shop.input.typed) sc.TB(shop.input.typed, LW / 2, 197, 9, C.w, 'center', C.ink, 0.5);
+    if (shop.input.typed) sc.TB(shop.input.typed, LW / 2, 194, 12, C.w, 'center', C.ink, 0.55);
     if (this.missFlash > 0) {
-      sc.PR(0, 0, LW, 2, C.red, this.missFlash * 3);
-      sc.PR(0, LH - 2, LW, 2, C.red, this.missFlash * 3);
+      const e = sc.ext;
+      sc.PR(e.x0, e.y0, e.w, 2, C.red, this.missFlash * 3);
+      sc.PR(e.x0, e.y1 - 2, e.w, 2, C.red, this.missFlash * 3);
     }
   }
 }

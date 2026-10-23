@@ -1,8 +1,8 @@
 {
-  "name": "last-order",
+  "name": "typing-sakaba",
   "version": "0.1.0",
   "private": true,
-  "description": "LAST ORDER（仮題）— タイピングで食材を集める文明崩壊後の酒場経営スコアアタック",
+  "description": "タイピング酒場 ～おやじと女将と看板娘～ — 家族で営む酒場の3分間タイピング営業",
   "type": "module",
   "scripts": {
     "dev": "vite",

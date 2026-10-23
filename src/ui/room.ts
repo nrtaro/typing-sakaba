@@ -1,6 +1,6 @@
 // 店内（斜め上から見た酒場）。動かない部分は時間帯ごとに一度だけ描いて使い回す
 import { C, mix, type Color } from './palette';
-import { LH, LW } from './screen';
+import { LW, type Screen } from './screen';
 
 type G = CanvasRenderingContext2D;
 
@@ -16,28 +16,38 @@ export const SKY: [Color, Color][] = [['#a8d8ec', '#fbe1b4'], ['#5fb4ea', '#c8ec
 export const WINDOWS = [214, 302, 390];
 export const LAMPS = [70, 240, 330, 420];
 
-const cache = new Map<number, HTMLCanvasElement>();
+const cache = new Map<string, HTMLCanvasElement>();
 
-export function roomLayer(ph: number): HTMLCanvasElement {
-  const hit = cache.get(ph);
+/** 店内の動かない部分。描く範囲が広がったときは壁・床・天井を端まで続ける */
+export function roomLayer(ph: number, sc: Screen): HTMLCanvasElement {
+  const key = `${ph}:${sc.vw}x${sc.vh}`;
+  const hit = cache.get(key);
   if (hit) return hit;
   const c = document.createElement('canvas');
-  c.width = LW;
-  c.height = LH;
+  c.width = sc.vw;
+  c.height = sc.vh;
   const g = c.getContext('2d')!;
+  g.setTransform(1, 0, 0, 1, sc.DX, sc.DY);
   const R = pen(g);
+  const { x0: X0, x1: X1, y0: Y0, y1: Y1, w: VW } = sc.ext;
   const night = ph === 2;
   const sky = SKY[ph];
+  const from = (step: number) => Math.floor(X0 / step) * step;
 
+  // 天井（上に広がったとき）
+  if (Y0 < 16) {
+    R(X0, Y0, VW, 16 - Y0, '#3a2420');
+    for (let y = 14; y > Y0; y -= 14) R(X0, y, VW, 2, C.wood1);
+  }
   // 奥の壁：漆喰と梁
-  R(0, 16, LW, 78, C.plaster);
-  for (let i = 0; i < 260; i++) R((i * 97) % LW, 18 + ((i * 53) % 58), 1, 1, C.plaster2);
-  R(0, 16, LW, 4, C.wood1); R(0, 20, LW, 1, C.wood0);
-  for (let bx = 0; bx < LW; bx += 80) { R(bx, 16, 5, 78, C.wood2); R(bx + 1, 16, 1, 78, C.wood3); R(bx + 4, 16, 1, 78, C.wood1); }
+  R(X0, 16, VW, 78, C.plaster);
+  for (let i = 0; i < Math.round(VW * 0.55); i++) R(X0 + ((i * 97) % VW), 18 + ((i * 53) % 58), 1, 1, C.plaster2);
+  R(X0, 16, VW, 4, C.wood1); R(X0, 20, VW, 1, C.wood0);
+  for (let bx = from(80); bx < X1; bx += 80) { R(bx, 16, 5, 78, C.wood2); R(bx + 1, 16, 1, 78, C.wood3); R(bx + 4, 16, 1, 78, C.wood1); }
   // 腰板
-  R(0, 72, LW, 22, C.wood2);
-  for (let bx = 0; bx < LW; bx += 10) { R(bx, 72, 1, 22, C.wood1); R(bx + 1, 72, 1, 22, C.wood3); }
-  R(0, 72, LW, 2, C.wood4); R(0, 92, LW, 2, C.wood0);
+  R(X0, 72, VW, 22, C.wood2);
+  for (let bx = from(10); bx < X1; bx += 10) { R(bx, 72, 1, 22, C.wood1); R(bx + 1, 72, 1, 22, C.wood3); }
+  R(X0, 72, VW, 2, C.wood4); R(X0, 92, VW, 2, C.wood0);
   // 窓（外の景色が時間帯で変わる）
   for (const wx of WINDOWS) {
     R(wx - 3, 26, 46, 40, C.wood1); R(wx - 2, 27, 44, 38, C.wood3);
@@ -88,11 +98,11 @@ export function roomLayer(ph: number): HTMLCanvasElement {
   R(18, 72, 30, 16, '#2a1e24'); R(20, 74, 26, 12, '#3a2228');
   for (const px of [74, 92, 110]) { R(px + 4, 52, 1, 6, C.ink); R(px, 58, 10, 7, C.gray2); R(px, 58, 10, 1, C.gray); R(px + 8, 59, 2, 5, '#4c485a'); }
   // 床（板張り）
-  for (let y = 94; y < LH; y += 7) {
+  for (let y = 94; y < Y1; y += 7) {
     const row = Math.floor((y - 94) / 7);
-    R(0, y, LW, 7, row % 2 ? C.floor1 : C.floor2); R(0, y, LW, 1, C.floor0);
-    for (let x = (row * 37) % 60; x < LW; x += 60) R(x, y, 1, 7, C.floor0);
-    for (let i = 0; i < 18; i++) R((i * 71 + row * 29) % LW, y + 3, 3, 1, row % 2 ? C.floor2 : C.floor3);
+    R(X0, y, VW, 7, row % 2 ? C.floor1 : C.floor2); R(X0, y, VW, 1, C.floor0);
+    for (let x = from(60) + ((row * 37) % 60); x < X1; x += 60) R(x, y, 1, 7, C.floor0);
+    for (let i = 0; i < Math.round(VW / 26); i++) R(X0 + ((i * 71 + row * 29) % VW), y + 3, 3, 1, row % 2 ? C.floor2 : C.floor3);
   }
   // 客席の敷物
   R(170, 98, 252, 108, '#8a3a34'); R(172, 100, 248, 104, '#a8463c');
@@ -119,11 +129,18 @@ export function roomLayer(ph: number): HTMLCanvasElement {
   vg.addColorStop(0.4, 'rgba(40,20,20,0)');
   vg.addColorStop(1, 'rgba(40,20,20,0.22)');
   g.fillStyle = vg;
-  g.fillRect(0, 94, LW, 116);
+  g.fillRect(X0, 94, VW, 116);
+  // 左右に広がった部分：棚と樽を足して店が続いているように見せる
+  for (let bx = from(120) - 120; bx < X1; bx += 120) {
+    if (bx > -10 && bx < LW) continue;
+    R(bx + 20, 40, 60, 3, C.wood4); R(bx + 20, 43, 60, 1, C.wood1);
+    for (let i = 0; i < 7; i++) { const col = [C.green, C.gold2, C.teal2, C.red2][i % 4]; R(bx + 23 + i * 8, 31, 5, 9, col); R(bx + 24 + i * 8, 29, 3, 2, C.ink); }
+    R(bx + 40, 150, 16, 20, C.wood2); R(bx + 41, 150, 14, 2, C.wood4); R(bx + 40, 154, 16, 2, C.gray2); R(bx + 40, 164, 16, 2, C.gray2);
+  }
   // 入り口
   R(436, 96, 40, 4, C.wood1); R(440, 100, 32, 104, '#5a3828'); R(442, 102, 28, 100, night ? '#1e1a3a' : '#cfe8f0');
   R(442, 150, 28, 1, C.wood2);
-  cache.set(ph, c);
+  cache.set(key, c);
   return c;
 }
 
@@ -145,7 +162,8 @@ export function drawRoomLive(g: G, t: number, reduce = false) {
 }
 
 /** 時間帯の光：朝は窓からの光、夜は暗くしてランプとかまどの暖色 */
-export function drawLights(g: G, ph: number) {
+export function drawLights(g: G, ph: number, sc?: Screen) {
+  const e = sc ? sc.ext : { x0: 0, y0: 0, w: LW, h: 270 };
   if (ph === 0) {
     g.save();
     g.globalAlpha = 0.12;
@@ -159,7 +177,7 @@ export function drawLights(g: G, ph: number) {
     g.save();
     g.globalAlpha = 0.38;
     g.fillStyle = '#1c1238';
-    g.fillRect(0, 16, LW, 194);
+    g.fillRect(e.x0, e.y0, e.w, e.h);
     g.restore();
     g.save();
     g.globalCompositeOperation = 'lighter';

@@ -1,21 +1,24 @@
 import { C, TRIP_COLOR, mix, type Color } from './palette';
-import { Screen, LW, LH } from './screen';
+import { Screen, LW } from './screen';
 import { CRATE, DEER, FAM, ICON, MERCHANT, PORTRAIT, RABBIT } from './sprites';
 import { pen, SKY } from './room';
 import {
-  FishingGame, GatheringGame, HuntingGame, TradingGame, GATHER_SLOTS, type Minigame, type MinigameEvent, type Prey, type Sprout,
+  FISHING, FishingGame, GatheringGame, HuntingGame, TradingGame, TRADING, GATHER, GATHER_SLOTS,
+  type Minigame, type MinigameEvent, type Prey, type Sprout,
 } from '../core/minigames';
 import { RomajiMatcher } from '../core/romaji';
-import { FAMILY_NAME, INGREDIENT_NAME, TRIPS, type IngredientId } from '../core/shopConfig';
+import { FAMILY_NAME, INGREDIENT_NAME, TRIPS } from '../core/shopConfig';
 import type { Shop } from '../core/shop';
 
 type G = CanvasRenderingContext2D;
+type Ext = Screen['ext'];
 interface Pop { x: number; y: number; t: number; text: string; col: Color }
 
-const SLOT_POS = Array.from({ length: GATHER_SLOTS }, (_, i) => ({ x: 170 + (i % 3) * 110, y: i < 3 ? 128 : 196 }));
+const SLOT_POS = Array.from({ length: GATHER_SLOTS }, (_, i) => ({ x: 160 + (i % 3) * 112, y: i < 3 ? 130 : 206 }));
 
+/** 狩り：獲物の画面上の位置（足元） */
 function preyPos(p: Prey) {
-  return { x: 70 + p.x * 400, y: 128 + p.lane * 92 };
+  return { x: 74 + p.x * 396, y: 118 + p.lane * 106 };
 }
 
 /** 調達ミニゲームの画面 */
@@ -23,6 +26,8 @@ export class MinigameView {
   pops: Pop[] = [];
   missFlash = 0;
   splash = 0;
+  /** 直前の出来事を大きく見せる（釣れた・逃げた・落札など） */
+  shout: { text: string; col: Color; t: number } | null = null;
 
   handle(ev: MinigameEvent, game: Minigame<unknown>) {
     if (ev.type === 'key' && !ev.ok) this.missFlash = 0.25;
@@ -32,199 +37,242 @@ export class MinigameView {
       const text = ev.type === 'gain' ? `+${ev.amount} ${INGREDIENT_NAME[ev.ingredient]}` : `-1 ${INGREDIENT_NAME[ev.ingredient]}`;
       this.pops.push({ ...p, t: 0, text, col: ev.type === 'gain' ? C.gold3 : C.red3 });
     }
+    if (game instanceof FishingGame) {
+      if (ev.type === 'gain') this.shout = { text: game.big ? '大物を釣り上げた！' : '釣れた！', col: C.gold3, t: 1 };
+      if (ev.type === 'escape') this.shout = { text: ev.id === 'line' ? '糸が切れた…' : '逃げられた…', col: C.red3, t: 1 };
+    }
+    if (game instanceof TradingGame) {
+      if (ev.type === 'gain' && ev.y === 0) this.shout = { text: '落札！', col: C.gold3, t: 0.8 };
+      if (ev.type === 'escape') this.shout = { text: 'ライバルに取られた…', col: C.red3, t: 0.8 };
+    }
   }
 
   private anchor(game: Minigame<unknown>, ev: { x: number; y: number }) {
-    if (game instanceof HuntingGame) return { x: 70 + ev.x * 400, y: 110 + ev.y * 92 };
-    if (game instanceof GatheringGame) return { x: SLOT_POS[ev.x]?.x ?? 240, y: (SLOT_POS[ev.x]?.y ?? 150) - 30 };
-    if (game instanceof TradingGame) return { x: 100 + ev.y * 50, y: 140 };
-    return { x: 290, y: 130 };
+    if (game instanceof HuntingGame) return { x: 74 + ev.x * 396, y: 80 + ev.y * 106 };
+    if (game instanceof GatheringGame) return { x: SLOT_POS[ev.x]?.x ?? 240, y: (SLOT_POS[ev.x]?.y ?? 150) - 40 };
+    if (game instanceof TradingGame) return { x: 100, y: 150 };
+    return { x: 120, y: 120 };
   }
 
   update(dt: number) {
     this.missFlash = Math.max(0, this.missFlash - dt);
     this.splash = Math.max(0, this.splash - dt);
+    if (this.shout && (this.shout.t -= dt) <= 0) this.shout = null;
     for (const p of this.pops) p.t += dt;
     this.pops = this.pops.filter((p) => p.t < 1.2);
   }
 
   draw(sc: Screen, game: Minigame<unknown>, shop: Shop, t: number) {
     const g = sc.g;
-    g.clearRect(0, 0, LW, LH);
-    if (game instanceof FishingGame) this.drawFishingBg(g, game, shop.phaseIndex, t);
-    else if (game instanceof HuntingGame) this.drawHuntingBg(g, game, t);
-    else if (game instanceof GatheringGame) this.drawGatheringBg(g, game, t);
-    else if (game instanceof TradingGame) this.drawTradingBg(g, game, t);
+    sc.begin();
+    sc.toBase();
+    const e = sc.ext;
+    if (game instanceof FishingGame) this.drawFishingBg(g, e, game, shop.phaseIndex, t);
+    else if (game instanceof HuntingGame) this.drawHuntingBg(g, e, game, t);
+    else if (game instanceof GatheringGame) this.drawGatheringBg(g, e, game);
+    else if (game instanceof TradingGame) this.drawTradingBg(g, e, game, t);
     sc.present();
     if (game instanceof FishingGame) this.drawFishingUi(sc, game);
     else if (game instanceof HuntingGame) this.drawHuntingUi(sc, game);
     else if (game instanceof GatheringGame) this.drawGatheringUi(sc, game);
     else if (game instanceof TradingGame) this.drawTradingUi(sc, game);
     this.drawHud(sc, game, shop);
-    for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 18, 9, p.col, 'center', C.ink, Math.min(1, (1.2 - p.t) * 3));
-    if (game.input.typed) sc.TB(game.input.typed, LW / 2, 252, 9, C.w, 'center', C.ink, 0.5);
+    for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 18, 12, p.col, 'center', C.ink, Math.min(1, (1.2 - p.t) * 3));
+    if (this.shout) sc.TB(this.shout.text, LW / 2, 64, 18, this.shout.col, 'center', C.ink, Math.min(1, this.shout.t * 3));
+    if (game.input.typed) sc.TB(game.input.typed, LW / 2, 252, 12, C.w, 'center', C.ink, 0.55);
     if (this.missFlash > 0) {
-      sc.PR(0, 0, LW, 2, C.red, this.missFlash * 3);
-      sc.PR(0, LH - 2, LW, 2, C.red, this.missFlash * 3);
+      sc.PR(e.x0, e.y0, e.w, 2, C.red, this.missFlash * 3);
+      sc.PR(e.x0, e.y1 - 2, e.w, 2, C.red, this.missFlash * 3);
     }
   }
 
   private drawHud(sc: Screen, game: Minigame<unknown>, shop: Shop) {
     const trip = TRIPS.find((x) => x.id === game.kind)!;
     const col = TRIP_COLOR[trip.id];
-    sc.panel(4, 3, 472, 20, col.dark, col.main);
-    sc.spr(PORTRAIT[trip.who], 9, 6);
-    sc.TB(`${FAMILY_NAME[trip.who]}の${trip.act}`, 26, 6, 10, C.w, 'left');
+    const e = sc.ext;
+    sc.panel(e.x0 + 3, 2, e.w - 6, 26, col.dark, col.main);
+    sc.spr(PORTRAIT[trip.who], 8, 6, 1.4);
+    sc.TB(`${FAMILY_NAME[trip.who]}の${trip.act}`, 30, 6, 13, C.w, 'left');
     const tl = game.timeLeft;
-    sc.PR(150, 10, 120, 6, C.ink);
-    sc.PR(150, 10, 120 * (tl / game.duration), 6, tl < 3 ? C.red : col.main);
-    sc.T(`残り ${tl.toFixed(1)}秒`, 276, 8, 7, C.cream);
-    let x = 340;
+    sc.PR(150, 11, 110, 8, C.ink);
+    sc.PR(150, 11, 110 * (tl / game.duration), 8, tl < 3 ? C.red : col.main);
+    sc.TB(tl > 0 ? `残り ${tl.toFixed(1)}秒` : '延長戦！', 266, 7, 11, tl > 0 ? C.w : C.gold3, 'left');
+    let x = 360;
     for (const id of trip.gives) {
-      sc.spr(ICON[id], x, 7, 1);
-      sc.TB(`×${game.gains[id] ?? 0}`, x + 14, 6, 9, C.w, 'left');
-      x += 46;
+      sc.spr(ICON[id], x, 8, 1.2);
+      sc.TB(`×${game.gains[id] ?? 0}`, x + 17, 6, 13, C.w, 'left');
+      x += 56;
     }
     const left = shop.timeLeft;
-    sc.TB(`お店の残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}（お客の待ち時間は止まっています）`, LW / 2, 26, 6, C.cream, 'center');
+    sc.TB(`お店の残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}（お客の待ち時間は止まっています）`, LW / 2, 31, 9, C.cream, 'center');
   }
 
-  /** 中央下の大きな語句（1つだけ打つミニゲーム用） */
+  /** 中央の大きな語句 */
   private bigWord(sc: Screen, text: string, kana: string, game: Minigame<unknown>, y: number, col: Color) {
     const live = game.input.active[0];
     const m = live?.matcher ?? new RomajiMatcher(kana);
-    const w = Math.max(160, sc.W(text, 16) + 40);
-    sc.panel(LW / 2 - w / 2, y, w, 44, 'rgba(42,27,38,0.94)', live ? C.gold : col);
-    sc.TB(text, LW / 2, y + 5, 16, C.w, 'center');
-    sc.roma(m.typed, m.remaining, LW / 2, y + 28, 10, 'active');
+    const w = Math.max(180, sc.W(text, 20) + 50, sc.W(m.typed + m.remaining, 13) + 40);
+    sc.panel(LW / 2 - w / 2, y, w, 52, 'rgba(42,27,38,0.95)', live ? C.gold : col);
+    sc.TB(text, LW / 2, y + 5, 20, C.w, 'center');
+    sc.roma(m.typed, m.remaining, LW / 2, y + 32, 13, 'active');
   }
 
-  // ---------- つり ----------
+  // ---------- つり：あわせて、巻き上げる ----------
 
-  private drawFishingBg(g: G, game: FishingGame, ph: number, t: number) {
+  private drawFishingBg(g: G, e: Ext, game: FishingGame, ph: number, t: number) {
     const R = pen(g);
     const sky = SKY[ph];
-    for (let y = 0; y < 130; y++) R(0, y, LW, 1, mix(sky[0], sky[1], y / 130));
+    for (let y = e.y0; y < 130; y++) R(e.x0, y, e.w, 1, mix(sky[0], sky[1], Math.max(0, y) / 130));
     const far = ph === 2 ? '#2b2650' : '#8e9ab4';
-    for (let i = 0; i < 14; i++) R(i * 36 + ((i * 13) % 11), 130 - (20 + ((i * 29) % 40)), 22, 20 + ((i * 29) % 40), far);
-    for (let y = 130; y < LH; y++) R(0, y, LW, 1, mix(ph === 2 ? '#24305a' : '#3c8296', '#173a52', (y - 130) / 140));
-    // さざ波：静けさがたまるほど穏やか
-    const n = Math.max(6, 28 - game.calm * 9);
-    for (let i = 0; i < n; i++) {
+    for (let i = Math.floor(e.x0 / 36) - 1; i < e.x1 / 36 + 1; i++) {
+      const h = 20 + ((Math.abs(i) * 29) % 40);
+      R(i * 36 + ((Math.abs(i) * 13) % 11), 130 - h, 22, h, far);
+    }
+    for (let y = 130; y < e.y1; y++) R(e.x0, y, e.w, 1, mix(ph === 2 ? '#24305a' : '#3c8296', '#173a52', Math.min(1, (y - 130) / 140)));
+    const calm = game.phase === 'reel' ? 0.3 : 1;
+    for (let i = 0; i < 30; i++) {
       const y = 136 + ((i * 37) % 130);
-      const x = (((i * 97) + t * (10 + (i % 5) * 4)) % (LW + 30)) - 15;
+      const x = e.x0 + ((((i * 97) + t * (10 + (i % 5) * 4) * calm) % (e.w + 30)) - 15);
       R(x, y, 6 + (i % 4) * 3, 1, '#8cc8d4');
     }
-    // 桟橋とおかみ
-    R(0, 160, 120, 8, C.wood3); R(0, 160, 120, 1, C.wood5); R(0, 167, 120, 2, C.wood1);
-    for (const px of [12, 54, 100]) R(px, 168, 6, 60, C.wood1);
-    g.drawImage(FAM.wife[0], 78, 136, FAM.wife[0].width, FAM.wife[0].height);
-    // 竿と糸と浮き
-    const hooked = game.phase === 'hooked';
-    const bend = hooked ? 6 + Math.sin(t * 12) * 2 : 0;
-    const tipX = 150;
-    const tipY = 108 + bend;
-    for (let k = 0; k <= 20; k++) R(92 + (tipX - 92) * (k / 20), 146 + (tipY - 146) * (k / 20), 1, 1, C.wood1);
-    const bx = 290;
-    const by = 160 + (hooked ? 3 + Math.sin(t * 15) : Math.sin(t * 2.5));
-    for (let k = 0; k <= 40; k++) R(tipX + (bx - tipX) * (k / 40), tipY + (by - tipY) * (k / 40) + Math.sin((k / 40) * Math.PI) * 8, 1, 1, C.cream);
-    R(bx - 2, by - 5, 5, 4, C.red); R(bx - 2, by - 1, 5, 2, C.w);
-    if (this.splash > 0) for (let i = 0; i < 6; i++) R(bx - 12 + i * 5, by - 4 - Math.sin(i + this.splash * 10) * 6 * this.splash, 2, 2, C.w);
-    if (hooked) {
+    // 桟橋と女将（2倍）
+    R(e.x0, 168, 130 - e.x0, 8, C.wood3); R(e.x0, 168, 130 - e.x0, 1, C.wood5); R(e.x0, 175, 130 - e.x0, 2, C.wood1);
+    for (let px = Math.floor(e.x0 / 44) * 44 + 12; px < 130; px += 44) R(px, 176, 6, 60, C.wood1);
+    const wife = FAM.wife[0];
+    g.drawImage(wife, 70, 168 - wife.height * 2, wife.width * 2, wife.height * 2);
+    // 竿・糸・浮き
+    const fighting = game.phase === 'reel';
+    const bend = fighting ? 8 + Math.sin(t * 14) * 3 : 0;
+    const tipX = 160;
+    const tipY = 96 + bend;
+    for (let k = 0; k <= 24; k++) R(98 + (tipX - 98) * (k / 24), 138 + (tipY - 138) * (k / 24), 2, 1, C.wood1);
+    let bx = 310;
+    // 巻き上げるほど魚が手前に寄ってくる
+    if (fighting) bx = 310 - (1 - game.wordsLeft / (game.big ? FISHING.bigWords : 1)) * 110 - 20;
+    const dip = game.phase === 'hook' ? 4 + Math.sin(t * 20) * 2 : Math.sin(t * 2.5);
+    const by = 168 + dip;
+    for (let k = 0; k <= 40; k++) R(tipX + (bx - tipX) * (k / 40), tipY + (by - tipY) * (k / 40) + Math.sin((k / 40) * Math.PI) * (fighting ? 2 : 10), 1, 1, C.cream);
+    R(bx - 3, by - 7, 7, 5, C.red); R(bx - 3, by - 2, 7, 3, C.w);
+    if (this.splash > 0) for (let i = 0; i < 8; i++) R(bx - 16 + i * 5, by - 5 - Math.sin(i + this.splash * 10) * 8 * this.splash, 2, 2, C.w);
+    if (game.phase === 'hook' || fighting) {
       g.save();
-      g.globalAlpha = 0.5;
-      const w = game.big ? 40 : 18;
-      R(bx - w / 2 + 6, by + 12, w, game.big ? 10 : 5, '#0e2236');
+      g.globalAlpha = 0.55;
+      const w = game.big ? 56 : 24;
+      R(bx - w / 2 + 8, by + 14, w, game.big ? 14 : 7, '#0e2236');
+      R(bx + w / 2 + 8, by + 14, game.big ? 10 : 5, game.big ? 14 : 7, '#0e2236');
       g.restore();
     }
   }
 
   private drawFishingUi(sc: Screen, game: FishingGame) {
-    // 静けさゲージ
-    sc.panel(12, 40, 120, 30, 'rgba(42,27,38,0.9)', C.blue);
-    sc.T('水面の静けさ', 18, 43, 7, C.cream);
-    for (let i = 0; i < game.calmToBig; i++) sc.PR(18 + i * 26, 56, 22, 6, game.calm > i ? C.teal : C.ink);
-    sc.T('ミスなしで満タン→大物', 72, 56, 5, C.cream, 'left', 0.8);
-    if (game.phase === 'hooked' && game.word) {
-      if (game.big) sc.TB(`大物！ あと${game.wordsLeft}つ`, LW / 2, 172, 10, C.gold3, 'center');
-      this.bigWord(sc, game.word.text, game.word.kana, game, 192, C.blue);
-    } else {
-      sc.TB(game.phase === 'land' ? '釣れた！' : '浮きを見つめている…', LW / 2, 205, 10, C.cream, 'center');
+    // 次の魚の大きさと、何匹目か
+    sc.panel(10, 44, 150, 30, 'rgba(42,27,38,0.9)', C.blue);
+    sc.T(`${game.fishIndex + 1}匹目`, 18, 48, 9, C.cream);
+    sc.TB(game.big || (game.phase === 'wait' && game.isBigNext) ? '大物（ヌシ）！' : '小さい魚', 18, 59, 10, game.big || game.isBigNext ? C.gold3 : C.w, 'left');
+    if (game.phase === 'hook' && game.word) {
+      sc.TB('あわせろ！', LW / 2, 84, 16, C.gold3, 'center');
+      this.bigWord(sc, game.word.text, game.word.kana, game, 106, C.gold);
+      sc.PR(LW / 2 - 80, 162, 160, 5, C.ink);
+      sc.PR(LW / 2 - 80, 162, 160 * Math.max(0, game.hookLeft / FISHING.hookWindow), 5, C.gold);
+    } else if (game.phase === 'reel' && game.word) {
+      const total = game.big ? FISHING.bigWords : 1;
+      sc.TB(`巻き上げ ${total - game.wordsLeft + 1}/${total}`, LW / 2, 162, 12, C.w, 'center');
+      this.bigWord(sc, game.word.text, game.word.kana, game, 182, C.blue);
+      // テンション：ミスでたまり、満タンで糸が切れる
+      sc.panel(340, 44, 130, 30, 'rgba(42,27,38,0.9)', game.tension >= 2 ? C.red : C.blue);
+      sc.T('糸のテンション', 348, 48, 9, C.cream);
+      for (let i = 0; i < FISHING.breakAt; i++) sc.PR(348 + i * 38, 61, 34, 7, i < game.tension ? C.red : C.ink);
+    } else if (game.phase === 'wait') {
+      sc.TB('浮きを見つめている…', LW / 2, 196, 13, C.cream, 'center');
     }
+    if (game.phase !== 'reel') sc.TB('浮きが沈んだら「あわせ」を素早く打つ。巻き上げ中のミスは糸のテンションに', LW / 2, 236, 9, C.cream, 'center');
   }
 
   // ---------- かり ----------
 
-  private drawHuntingBg(g: G, game: HuntingGame, t: number) {
+  private drawHuntingBg(g: G, e: Ext, game: HuntingGame, t: number) {
     const R = pen(g);
-    for (let y = 0; y < 110; y++) R(0, y, LW, 1, mix('#3a2a55', '#ea8f58', y / 110));
-    R(0, 80, LW, 8, '#5a3a55'); R(0, 88, LW, 2, '#2a1b26');
-    for (const x of [40, 160, 280, 400]) R(x, 90, 10, 30, '#5a3a55');
-    for (let x = 0; x < LW; x++) {
-      const y = Math.round(108 + Math.sin(x / 50) * 6);
-      R(x, y, 1, LH - y, C.sand2);
+    for (let y = e.y0; y < 110; y++) R(e.x0, y, e.w, 1, mix('#3a2a55', '#ea8f58', Math.max(0, y) / 110));
+    R(e.x0, 80, e.w, 8, '#5a3a55'); R(e.x0, 88, e.w, 2, '#2a1b26');
+    for (let x = Math.floor(e.x0 / 120) * 120 + 40; x < e.x1; x += 120) R(x, 90, 10, 30, '#5a3a55');
+    for (let x = e.x0; x < e.x1; x++) {
+      const y = Math.round(100 + Math.sin(x / 50) * 6);
+      R(x, y, 1, e.y1 - y, C.sand2);
     }
-    for (let y = 116; y < LH; y += 6) R(0, y, LW, 1, mix(C.sand, C.sand2, (y - 116) / 160));
-    for (let i = 0; i < 40; i++) R((i * 113) % LW, 120 + ((i * 47) % 140), 4, 1, C.sand3);
+    for (let y = 108; y < e.y1; y += 8) R(e.x0, y, e.w, 1, mix(C.sand, C.sand2, Math.min(1, (y - 108) / 160)));
     // 逃げられるライン（柵）
-    for (let y = 112; y < LH; y += 10) { R(56, y, 2, 8, C.wood1); R(54, y + 3, 6, 1, C.wood2); }
-    // マスター（しゃがんで構える）
-    g.drawImage(FAM.master[0], 14, 186);
-    R(30, 196, 26, 2, C.gray2); R(52, 195, 4, 1, C.gray);
+    for (let y = 100; y < e.y1; y += 10) { R(58, y, 2, 8, C.wood1); R(56, y + 3, 6, 1, C.wood2); }
+    // おやじ（2倍、構える）
+    const m = FAM.master[0];
+    g.drawImage(m, 6, 150, m.width * 2, m.height * 2);
+    R(36, 172, 30, 3, C.gray2); R(62, 171, 6, 2, C.gray);
     for (const p of [...game.prey].sort((a, b) => a.lane - b.lane)) {
       const pos = preyPos(p);
       const frame = Math.floor(t * 8) % 2;
       const img = p.kind === 'deer' ? DEER[frame] : RABBIT[frame];
       if (p.flash > 0 && Math.floor(p.flash * 30) % 2 === 0) continue;
+      const w = img.width * 2;
+      const h = img.height * 2;
       g.save();
       g.globalAlpha = 0.25;
       g.fillStyle = '#2a1520';
-      g.fillRect(Math.round(pos.x - img.width / 2 + 2), Math.round(pos.y), img.width - 4, 3);
+      g.fillRect(Math.round(pos.x - w / 2 + 4), Math.round(pos.y), w - 8, 4);
       g.restore();
-      g.drawImage(img, Math.round(pos.x - img.width / 2), Math.round(pos.y - img.height));
+      g.drawImage(img, Math.round(pos.x - w / 2), Math.round(pos.y - h), w, h);
     }
   }
 
   private drawHuntingUi(sc: Screen, game: HuntingGame) {
     const active = game.input.active;
-    for (const p of game.prey) {
+    // ラベルが重ならないよう、重なる分だけ上にずらす
+    const placed: { x: number; y: number; w: number; h: number }[] = [];
+    const preys = [...game.prey].sort((a, b) => a.x - b.x);
+    for (const p of preys) {
       const pos = preyPos(p);
       const live = active.find((l) => l.target.id === p.id);
       const dim = game.input.typed.length > 0 && !live;
       const m = live?.matcher ?? new RomajiMatcher(p.word.kana);
-      const top = pos.y - (p.kind === 'deer' ? 50 : 38);
-      const w = Math.max(44, sc.W(m.typed + m.remaining, 7) + 10);
-      sc.panel(pos.x - w / 2, top, w, 22, live ? '#4a2c3c' : 'rgba(42,27,38,0.9)', live ? C.gold : p.kind === 'deer' ? C.gold2 : C.wood4, dim ? 0.5 : 1);
-      sc.T(p.word.text, pos.x, top + 1, 8, dim ? C.gray : C.w, 'center');
-      sc.roma(m.typed, m.remaining, pos.x, top + 12, 7, live ? 'active' : dim ? 'dim' : 'idle');
-      for (let i = 0; i < p.maxHp; i++) sc.PR(pos.x - p.maxHp * 3 + i * 6, top - 4, 4, 2, i < p.hp ? C.pink : C.ink);
+      const h = 32;
+      const w = Math.max(60, sc.W(m.typed + m.remaining, 10) + 14, sc.W(p.word.text, 12) + 14);
+      const spriteH = p.kind === 'deer' ? 48 : 24;
+      const box = { x: pos.x - w / 2, y: pos.y - spriteH - h - 8, w, h };
+      for (let k = 0; k < 4; k++) {
+        const hit = placed.find((r) => box.x < r.x + r.w + 2 && r.x < box.x + box.w + 2 && box.y < r.y + r.h + 2 && r.y < box.y + box.h + 2);
+        if (!hit) break;
+        box.y = hit.y - h - 4;
+      }
+      placed.push(box);
+      sc.panel(box.x, box.y, w, h, live ? '#4a2c3c' : 'rgba(42,27,38,0.92)', live ? C.gold : p.kind === 'deer' ? C.gold2 : C.wood4, dim ? 0.55 : 1);
+      sc.T(p.word.text, pos.x, box.y + 2, 12, dim ? C.gray : C.w, 'center');
+      sc.roma(m.typed, m.remaining, pos.x, box.y + 18, 10, live ? 'active' : dim ? 'dim' : 'idle');
+      for (let i = 0; i < p.maxHp; i++) sc.PR(pos.x - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
+      if (p.kind === 'deer') sc.TB('大物 肉×12', pos.x, box.y - 16, 9, C.gold3, 'center');
     }
-    sc.T('最初の文字で狙いが決まる。左の柵を越えられると逃げられる', LW / 2, 236, 6, C.ink, 'center');
+    sc.TB('最初の文字で狙いが決まる。左の柵を越えられると逃げられる', LW / 2, 240, 9, C.ink, 'center', C.sand3);
   }
 
   // ---------- さいしゅ ----------
 
-  private drawGatheringBg(g: G, game: GatheringGame, t: number) {
+  private drawGatheringBg(g: G, e: Ext, game: GatheringGame) {
     const R = pen(g);
-    R(0, 0, LW, LH, '#cfe8d4');
-    for (let x = 0; x < LW; x += 40) R(x, 0, 2, 100, '#9ac0a4');
-    for (let y = 0; y < 100; y += 25) R(0, y, LW, 2, '#9ac0a4');
-    for (let i = 0; i < 12; i++) R(i * 41 + 8, 6 + (i % 3) * 25, 10, 3, '#f4fff4');
-    R(0, 96, LW, LH - 96, '#6a4a32');
-    for (let y = 100; y < LH; y += 8) R(0, y, LW, 2, '#5a3c28');
-    for (const s of SLOT_POS) { R(s.x - 34, s.y + 4, 68, 8, '#4a3020'); R(s.x - 32, s.y + 4, 64, 2, '#7a5a3a'); }
-    // 看板娘とかご
-    g.drawImage(FAM.daughter[Math.floor(t * 2) % 2 ? 0 : 0], 38, 180);
-    R(56, 192, 20, 12, C.wood3); R(56, 192, 20, 2, C.wood5); R(58, 195, 16, 1, C.wood2);
+    R(e.x0, e.y0, e.w, 96 - e.y0, '#cfe8d4');
+    for (let x = Math.floor(e.x0 / 40) * 40; x < e.x1; x += 40) R(x, e.y0, 2, 96 - e.y0, '#9ac0a4');
+    for (let y = 0; y < 96; y += 25) R(e.x0, y, e.w, 2, '#9ac0a4');
+    R(e.x0, 96, e.w, e.y1 - 96, '#6a4a32');
+    for (let y = 100; y < e.y1; y += 8) R(e.x0, y, e.w, 2, '#5a3c28');
+    for (const s of SLOT_POS) { R(s.x - 40, s.y + 4, 80, 8, '#4a3020'); R(s.x - 38, s.y + 4, 76, 2, '#7a5a3a'); }
+    const d = FAM.daughter[0];
+    g.drawImage(d, 20, 170, d.width * 2, d.height * 2);
+    R(52, 196, 26, 16, C.wood3); R(52, 196, 26, 3, C.wood5); R(54, 200, 22, 1, C.wood2);
     const veg = game.gains.veg ?? 0;
     const mush = game.gains.mush ?? 0;
-    for (let i = 0; i < Math.min(veg + mush, 8); i++) R(58 + (i % 4) * 4, 189 - Math.floor(i / 4) * 3, 3, 3, i < veg ? C.gold2 : C.red);
+    for (let i = 0; i < Math.min(Math.ceil((veg + mush) / 2), 10); i++) R(55 + (i % 5) * 4, 192 - Math.floor(i / 5) * 3, 3, 3, i < veg / 2 ? C.gold2 : C.red);
     for (const s of game.sprouts) {
       const pos = SLOT_POS[s.slot];
       const grow = Math.min(1, (s.maxLife - s.life) * 4);
       const icon = s.ing ? ICON[s.ing] : ICON.poison;
-      const sz = Math.round(24 * grow);
-      if (sz > 0) g.drawImage(icon, pos.x - sz / 2, pos.y + 4 - sz, sz, sz);
+      const sz = Math.round(36 * grow);
+      if (sz > 0) g.drawImage(icon, Math.round(pos.x - sz / 2), Math.round(pos.y + 4 - sz), sz, sz);
     }
   }
 
@@ -235,50 +283,67 @@ export class MinigameView {
       const live = active.find((l) => l.target.id === s.id);
       const dim = game.input.typed.length > 0 && !live;
       const m = live?.matcher ?? new RomajiMatcher(s.word.kana);
-      const top = pos.y - 52;
       const bad = !s.ing;
-      sc.panel(pos.x - 36, top, 72, 24, live ? '#4a2c3c' : bad ? '#3a1e48' : 'rgba(42,27,38,0.9)', live ? C.gold : bad ? C.purple : C.green, dim ? 0.5 : 1);
-      sc.T((bad ? '☠ ' : '') + s.word.text, pos.x, top + 2, 8, bad ? '#e0c8ff' : dim ? C.gray : C.w, 'center');
-      sc.roma(m.typed, m.remaining, pos.x, top + 13, 7, live ? 'active' : dim ? 'dim' : 'idle');
-      sc.PR(pos.x - 30, top + 22, 60 * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
+      const w = Math.max(92, sc.W(m.typed + m.remaining, 10) + 12);
+      const top = pos.y - 70;
+      sc.panel(pos.x - w / 2, top, w, 30, live ? '#4a2c3c' : bad ? '#3a1e48' : 'rgba(42,27,38,0.92)', live ? C.gold : bad ? C.purple : C.green, dim ? 0.55 : 1);
+      sc.T((bad ? '☠ ' : '') + s.word.text, pos.x, top + 2, 11, bad ? '#e0c8ff' : dim ? C.gray : C.w, 'center');
+      sc.roma(m.typed, m.remaining, pos.x, top + 17, 10, live ? 'active' : dim ? 'dim' : 'idle');
+      sc.PR(pos.x - w / 2 + 4, top + 28, (w - 8) * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
     }
-    sc.panel(140, 236, 300, 14, 'rgba(42,27,38,0.85)', C.green);
-    sc.T('食べられるものだけ打って摘む（1回で4つ）。☠ 毒きのこを打つとかごから2つこぼれる', 290, 239, 6, C.cream, 'center');
+    sc.panel(100, 240, 370, 18, 'rgba(42,27,38,0.88)', C.green);
+    sc.T(`食べられるものだけ打って摘む（1回で${GATHER.perPick}つ）。☠ 毒きのこを打つと${GATHER.poisonLoss}つこぼれる`, 285, 243, 9, C.cream, 'center');
   }
 
-  // ---------- しいれ ----------
+  // ---------- しいれ：早い者勝ちの競り ----------
 
-  private drawTradingBg(g: G, game: TradingGame, t: number) {
+  private drawTradingBg(g: G, e: Ext, game: TradingGame, t: number) {
     const R = pen(g);
-    for (let y = 0; y < 120; y++) R(0, y, LW, 1, mix('#f6c27a', '#fbe8c0', y / 120));
-    R(380, 30, 18, 18, '#fff3c0');
-    for (let x = 0; x < LW; x++) { const y = Math.round(112 + Math.sin(x / 70) * 5); R(x, y, 1, LH - y, C.sand); }
-    for (let y = 130; y < LH; y += 7) R(0, y, LW, 1, C.sand2);
+    for (let y = e.y0; y < 120; y++) R(e.x0, y, e.w, 1, mix('#f6c27a', '#fbe8c0', Math.max(0, y) / 120));
+    R(420, 26, 18, 18, '#fff3c0');
+    for (let x = e.x0; x < e.x1; x++) { const y = Math.round(118 + Math.sin(x / 70) * 5); R(x, y, 1, e.y1 - y, C.sand); }
+    for (let y = 130; y < e.y1; y += 7) R(e.x0, y, e.w, 1, C.sand2);
     // 隊商の荷車
-    R(250, 96, 170, 70, '#c8a878'); R(250, 96, 170, 6, '#e8d0a0');
-    for (let x = 258; x < 420; x += 22) R(x, 96, 2, 70, '#a88858');
-    R(244, 164, 182, 8, C.wood1);
-    for (const wx of [276, 392]) { R(wx - 14, 166, 28, 28, C.wood0); R(wx - 10, 170, 20, 20, C.wood3); R(wx - 2, 178, 4, 4, C.wood0); }
-    for (let i = 0; i < 6; i++) g.drawImage(CRATE, 300 + (i % 3) * 20, 148 - Math.floor(i / 3) * 16, 20, 16);
-    g.drawImage(MERCHANT, 336, 158, MERCHANT.width * 2, MERCHANT.height * 2);
-    g.drawImage(FAM.master[Math.floor(t * 2) % 2 ? 0 : 0], 80, 160, FAM.master[0].width * 2, FAM.master[0].height * 2);
-    // 値切って手に入れた箱
+    R(270, 120, 180, 70, '#c8a878'); R(270, 120, 180, 6, '#e8d0a0');
+    for (let x = 278; x < 450; x += 22) R(x, 120, 2, 70, '#a88858');
+    R(264, 188, 192, 8, C.wood1);
+    for (const wx of [296, 420]) { R(wx - 14, 190, 28, 28, C.wood0); R(wx - 10, 194, 20, 20, C.wood3); R(wx - 2, 202, 4, 4, C.wood0); }
+    for (let i = 0; i < 6; i++) g.drawImage(CRATE, 320 + (i % 3) * 20, 172 - Math.floor(i / 3) * 16, 20, 16);
+    g.drawImage(MERCHANT, 404, 168, MERCHANT.width * 2, MERCHANT.height * 2);
+    const m = FAM.master[0];
+    g.drawImage(m, 30, 172, m.width * 2, m.height * 2);
+    // 落札した箱
     const ale = game.gains.ale ?? 0;
     const spice = game.gains.spice ?? 0;
-    for (let i = 0; i < Math.min(ale + spice, 12); i++) {
-      const x = 20 + (i % 4) * 14;
-      const y = 238 - Math.floor(i / 4) * 12;
-      g.drawImage(CRATE, x, y, 14, 11);
-      g.drawImage(i < ale ? ICON.ale : ICON.spice, x + 3, y + 2, 8, 8);
+    const boxes = Math.min(ale + spice, 16);
+    for (let i = 0; i < boxes; i++) {
+      const x = 76 + (i % 4) * 16;
+      const y = 240 - Math.floor(i / 4) * 12;
+      g.drawImage(CRATE, x, y, 15, 12);
+      g.drawImage(i < ale ? ICON.ale : ICON.spice, x + 3, y + 2, 9, 9);
     }
+    void t;
   }
 
   private drawTradingUi(sc: Screen, game: TradingGame) {
-    sc.panel(300, 64, 150, 24, 'rgba(42,27,38,0.9)', C.gold2);
-    sc.T('商人「さあ、いくらで買う？」', 375, 71, 7, C.cream, 'center');
-    this.bigWord(sc, game.word.text, game.word.kana, game, 194, C.gold2);
-    sc.TB('打ち切るたびに酒か香辛料が1箱。ミスなしならおまけでもう1箱', LW / 2, 242, 6, C.cream, 'center');
+    const lot = game.lot;
+    // 競りに出た品物
+    sc.panel(LW / 2 - 100, 42, 200, 32, 'rgba(42,27,38,0.92)', C.gold2);
+    sc.spr(ICON[lot.item], LW / 2 - 92, 46, 2);
+    sc.TB(`${INGREDIENT_NAME[lot.item]} ${TRADING.win}箱を競り中`, LW / 2 + 10, 50, 13, C.w, 'center');
+    if (lot.outcome === 'open') {
+      this.bigWord(sc, lot.word.text, lot.word.kana, game, 80, C.gold2);
+      // 自分とライバルの進み具合
+      const live = game.input.active[0];
+      const mine = live ? live.matcher.kanaPos / lot.word.kana.length : 0;
+      sc.T('あなた', 112, 140, 10, C.ink);
+      sc.PR(160, 141, 200, 8, C.ink);
+      sc.PR(160, 141, 200 * mine, 8, C.teal);
+      sc.T('ライバル', 112, 154, 10, C.ink);
+      sc.PR(160, 155, 200, 8, C.ink);
+      sc.PR(160, 155, 200 * lot.rival, 8, C.red);
+    }
+    sc.TB(`落札 ${game.wins}　取られた ${game.losses}`, 380, 82, 10, C.w, 'left');
+    sc.TB('ライバルより先に品物の名前を打ち切れば落札。ミスなしならおまけ1箱', LW / 2, 226, 9, C.w, 'center');
   }
 }
-
-export { type IngredientId };

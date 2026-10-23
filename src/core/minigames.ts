@@ -386,7 +386,7 @@ export class GatheringGame extends Minigame<Sprout> {
         const bad = this.rng.next() < GATHER.poisonRate;
         const w = bad ? pickWord(this.rng, GATHER_BAD, used) : pickWord(this.rng, GATHER_GOOD, used);
         const life = this.rng.range(GATHER.life[0], GATHER.life[1]);
-        this.sprouts.push({ id: `s${this.n++}`, word: w, ing: bad ? null : (w as { ing: IngredientId }).ing, slot: this.rng.pick(free), life, maxLife: life });
+        this.sprouts.push({ id: `s${this.n++}`, word: w, ing: bad ? null : (w as unknown as { ing: IngredientId }).ing, slot: this.rng.pick(free), life, maxLife: life });
       }
     }
     for (const s of this.sprouts) s.life -= dt;
