@@ -1,8 +1,8 @@
 import { CandidateInput, type Target } from './candidates';
 import { Rng } from './rng';
 import {
-  DAY_LENGTH, DISHES, INGREDIENT_ORDER, PHASES, SHOP, TRIPS,
-  type Dish, type IngredientId, type Trip,
+  DAY_LENGTH, DIFFICULTIES, DISHES, INGREDIENT_ORDER, PHASES, SHOP, TRIPS,
+  type Difficulty, type Dish, type IngredientId, type Trip,
 } from './shopConfig';
 
 export const LOOK_COUNT = 7;
@@ -61,7 +61,7 @@ export class Shop {
   private events: ShopEvent[] = [];
   private lastPhase = 0;
 
-  constructor(private readonly rng: Rng) {
+  constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1]) {
     this.input = new CandidateInput(() => this.targets());
   }
 
@@ -202,7 +202,7 @@ export class Shop {
 
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      this.spawnTimer = PHASES[ph].every * this.rng.range(0.75, 1.25);
+      this.spawnTimer = PHASES[ph].every * this.difficulty.everyMult * this.rng.range(0.75, 1.25);
       if (this.queue.length < SHOP.queueMax) this.queue.push(this.makeGuest());
     }
     // 調達中は入り口で待ってもらう。戻ったら空いた席へ一気に入る
@@ -255,7 +255,7 @@ export class Shop {
         break;
       }
     }
-    const maxWait = PHASES[ph].maxWait;
+    const maxWait = PHASES[ph].maxWait * this.difficulty.waitMult;
     return { id: this.nextId++, dish, look: this.rng.int(0, LOOK_COUNT - 1), wait: maxWait, maxWait, state: 'walk', t: 0, lack: 0 };
   }
 }

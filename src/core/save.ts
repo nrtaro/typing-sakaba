@@ -10,9 +10,11 @@ export interface Settings {
   muted: boolean;
   bgmVolume: number;
   seVolume: number;
+  /** 前回選んだ難易度（Enter で始めるときに使う） */
+  difficulty: 'easy' | 'normal' | 'hard';
 }
 
-export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7 };
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal' };
 
 export interface DayRecord {
   score: number;
@@ -62,8 +64,13 @@ export class SaveStore {
     this.write(this.keys.settings, s);
   }
 
-  loadBest(): DayRecord | null {
-    const d = this.read<DayRecord>(this.keys.best);
+  /** 自己ベストは難易度ごと（ふつうは以前の記録と同じ場所） */
+  private bestKey(difficulty: string) {
+    return difficulty === 'normal' ? this.keys.best : `${this.keys.best}.${difficulty}`;
+  }
+
+  loadBest(difficulty = 'normal'): DayRecord | null {
+    const d = this.read<DayRecord>(this.bestKey(difficulty));
     return d && typeof d.score === 'number' ? d : null;
   }
 
@@ -73,11 +80,11 @@ export class SaveStore {
   }
 
   /** 結果を記録し、自己ベストを更新したら true */
-  record(r: DayRecord): boolean {
+  record(r: DayRecord, difficulty = 'normal'): boolean {
     this.write(this.keys.last, r);
-    const best = this.loadBest();
+    const best = this.loadBest(difficulty);
     if (!best || r.score > best.score) {
-      this.write(this.keys.best, r);
+      this.write(this.bestKey(difficulty), r);
       return true;
     }
     return false;

@@ -11,9 +11,12 @@ import { createMinigame, type Minigame } from '../core/minigames';
 import { Rng } from '../core/rng';
 import { RomajiMatcher } from '../core/romaji';
 import { SaveStore, type DayRecord } from '../core/save';
-import { DAY_LENGTH, FAMILY_NAME, GAME_SUBTITLE, GAME_TITLE, INGREDIENT_NAME, PHASES, SHOP, rankFor } from '../core/shopConfig';
+import {
+  DAY_LENGTH, DIFFICULTIES, FAMILY_NAME, GAME_SUBTITLE, GAME_TITLE, INGREDIENT_NAME, PHASES, SHOP, difficultyOf, rankFor,
+  type DifficultyId,
+} from '../core/shopConfig';
 
-type Mode = 'title' | 'help' | 'play' | 'result';
+type Mode = 'title' | 'help' | 'difficulty' | 'play' | 'result';
 interface MenuItem { text: string; kana: string; act: () => void }
 
 const TYPABLE = /^[a-z\-]$/;
@@ -38,7 +41,7 @@ export class Game {
   trip: { game: Minigame<unknown>; phase: 'intro' | 'game' | 'outro'; t: number } | null = null;
   tripView = new MinigameView();
   paused = false;
-  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number }) | null = null;
+  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string }) | null = null;
   readonly menu: CandidateInput<MenuItem>;
   private t = 0;
   private last = performance.now();
@@ -66,12 +69,17 @@ export class Game {
     switch (this.mode) {
       case 'title':
         return [
-          { text: 'はじめる', kana: 'はじめる', act: () => this.start() },
+          { text: 'はじめる', kana: 'はじめる', act: () => { this.mode = 'difficulty'; } },
           { text: 'あそびかた', kana: 'あそびかた', act: () => { this.mode = 'help'; } },
           { text: this.settings.muted ? 'おと：なし' : 'おと：あり', kana: 'おと', act: () => this.toggleMute() },
         ];
       case 'help':
         return [{ text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } }];
+      case 'difficulty':
+        return [
+          ...DIFFICULTIES.map((d) => ({ text: d.name, kana: d.kana, act: () => this.start(d.id) })),
+          { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
+        ];
       case 'result':
         return [
           { text: 'もういちど', kana: 'もういちど', act: () => this.start() },
@@ -96,9 +104,20 @@ export class Game {
     this.sound.bgm('title', 96);
   }
 
-  start() {
+  /** Enter で選ばれる項目：難易度の画面では前回の難易度、それ以外は先頭 */
+  private enterItem(): MenuItem | undefined {
+    const items = this.menuItems();
+    if (this.mode === 'difficulty') return items.find((it) => it.kana === difficultyOf(this.settings.difficulty).kana);
+    return items[0];
+  }
+
+  start(difficulty: DifficultyId = this.settings.difficulty) {
+    if (difficulty !== this.settings.difficulty) {
+      this.settings.difficulty = difficulty;
+      this.store.saveSettings(this.settings);
+    }
     this.seed = (this.seed * 1103515245 + 12345) >>> 0;
-    this.shop = new Shop(new Rng(this.seed));
+    this.shop = new Shop(new Rng(this.seed), difficultyOf(difficulty));
     this.view = new ShopView();
     this.trip = null;
     this.paused = false;
@@ -132,7 +151,7 @@ export class Game {
     if (inMenu) {
       if (k === 'Enter') {
         e.preventDefault();
-        const first = this.menuItems()[0];
+        const first = this.enterItem();
         if (first) { this.sound.chord(2); first.act(); this.menu.reset(); }
         return;
       }
@@ -226,7 +245,7 @@ export class Game {
         case 'serve': this.sound.chord(Math.floor(ev.combo / 3)); this.sound.coin(); break;
         case 'lack': case 'angry': this.sound.bad(); break;
         case 'tripStart':
-          this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919)), phase: 'intro', t: SHOP.tripIntro };
+          this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
           this.tripView = new MinigameView();
           this.sound.chord(3);
           break;
@@ -261,9 +280,10 @@ export class Game {
       score: shop.score, served: s.served, maxCombo: s.maxCombo, angry: s.angry,
       kps: s.correctKeys / DAY_LENGTH, accuracy: total ? s.correctKeys / total : 1, finishedAt: new Date().toISOString(),
     };
-    const best = this.store.record(rec);
-    const rank = rankFor(rec.score);
-    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: s.trips };
+    const diff = shop.difficulty;
+    const best = this.store.record(rec, diff.id);
+    const rank = rankFor(rec.score, diff);
+    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: s.trips, difficulty: diff.name };
     this.mode = 'result';
     this.menu.reset();
     this.sound.bgm('title', 96);
@@ -297,28 +317,32 @@ export class Game {
     sc.cover(C.bg, 0.5);
     if (this.mode === 'title') this.drawTitle();
     else if (this.mode === 'help') this.drawHelp();
+    else if (this.mode === 'difficulty') this.drawDifficulty();
     else this.drawResult();
-    this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 176 : 172);
+    this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 176 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);
   }
 
   private drawMenu(y: number) {
     const sc = this.sc;
     const items = this.menuItems();
-    const iw = 124;
-    const gap = 12;
+    const iw = items.length >= 4 ? 108 : 124;
+    const gap = items.length >= 4 ? 8 : 12;
+    const def = this.enterItem();
     const total = items.length * iw + (items.length - 1) * gap;
     const typing = this.menu.typed.length > 0;
     items.forEach((it, k) => {
       const x = LW / 2 - total / 2 + k * (iw + gap);
       const live = this.menu.active.find((l) => l.target.id === it.kana);
       const dim = typing && !live;
-      sc.panel(x, y, iw, 40, live ? '#4a2c3c' : 'rgba(42,27,38,0.95)', live ? C.gold : C.wood4, dim ? 0.5 : 1);
+      const isDefault = !typing && def === it && this.mode === 'difficulty';
+      sc.panel(x, y, iw, 40, live ? '#4a2c3c' : 'rgba(42,27,38,0.95)', live || isDefault ? C.gold : C.wood4, dim ? 0.5 : 1);
       sc.T(it.text, x + iw / 2, y + 3, 14, dim ? C.gray : C.w, 'center');
       const m = live?.matcher ?? new RomajiMatcher(it.kana);
       sc.roma(m.typed, m.remaining, x + iw / 2, y + 23, 11, live ? 'active' : dim ? 'dim' : 'idle');
     });
-    const enterHint = this.mode === 'help' ? 'Enter：もどる' : this.mode === 'result' ? 'Enter：もういちど' : this.paused ? 'Enter：さいかい' : 'Enter：はじめる';
+    const enterHint = this.mode === 'help' ? 'Enter：もどる' : this.mode === 'result' ? 'Enter：もういちど'
+      : this.mode === 'difficulty' ? `Enter：${def?.text ?? ''}` : this.paused ? 'Enter：さいかい' : 'Enter：はじめる';
     sc.TB(`メニューも打って選ぶ　${enterHint}　Backspace：1文字戻す　Space：やり直し`, LW / 2, y + 46, 9, C.cream, 'center');
   }
 
@@ -340,9 +364,26 @@ export class Game {
     sc.TB('おやじ', 207, 128, 9, C.cream, 'center');
     sc.TB('女将', 241, 128, 9, C.cream, 'center');
     sc.TB('看板娘', 271, 128, 9, C.cream, 'center');
-    const best = this.store.loadBest();
-    sc.TB(best ? `自己ベスト ${best.score.toLocaleString()}（${rankFor(best.score).name}）` : '自己ベスト ―', LW / 2, 146, 11, C.gold3, 'center');
+    const diff = difficultyOf(this.settings.difficulty);
+    const best = this.store.loadBest(diff.id);
+    sc.TB(best ? `自己ベスト（${diff.name}） ${best.score.toLocaleString()}（${rankFor(best.score, diff).name}）` : `自己ベスト（${diff.name}） ―`, LW / 2, 146, 11, C.gold3, 'center');
     sc.TB('3分間、家族で酒場を回すタイピングゲーム。IMEはオフに。音は最初のキー入力から鳴ります', LW / 2, 236, 8, C.cream2, 'center');
+  }
+
+  private drawDifficulty() {
+    const sc = this.sc;
+    sc.TB('難易度をえらぶ', LW / 2, 16, 20, C.gold3, 'center');
+    sc.TB('打って選ぶ（Enter で前回と同じ難易度）', LW / 2, 44, 10, C.cream, 'center');
+    DIFFICULTIES.forEach((d, i) => {
+      const x = 22 + i * 148;
+      const chosen = d.id === this.settings.difficulty;
+      sc.panel(x, 64, 140, 96, 'rgba(42,27,38,0.94)', chosen ? C.gold : C.wood4);
+      sc.TB(d.name, x + 70, 70, 15, i === 0 ? C.green3 : i === 1 ? C.gold3 : C.red3, 'center');
+      const words = d.desc.split('。').filter(Boolean);
+      words.forEach((w, k) => sc.T(w, x + 70, 94 + k * 14, 8.5, C.cream, 'center'));
+      const best = this.store.loadBest(d.id);
+      sc.T(best ? `自己ベスト ${best.score.toLocaleString()}（${rankFor(best.score, d).name}）` : '自己ベスト ―', x + 70, 140, 9, C.gold3, 'center');
+    });
   }
 
   private drawHelp() {
@@ -369,7 +410,7 @@ export class Game {
     if (!r) return;
     sc.TB('本日の営業終了', LW / 2, 8, 18, C.gold3, 'center');
     sc.TB(`売上 ${r.score.toLocaleString()}`, LW / 2, 32, 26, C.w, 'center');
-    sc.TB(`ランク ${r.rank}　${r.title}`, LW / 2, 66, 14, C.pink, 'center');
+    sc.TB(`${r.difficulty}　ランク ${r.rank}　${r.title}`, LW / 2, 66, 14, C.pink, 'center');
     if (r.best) sc.TB('自己ベスト更新！', LW / 2, 86, 12, C.gold, 'center');
     const stats = [
       [`${r.served}皿`, '出した料理'], [`${r.maxCombo}`, '最大コンボ'], [`${r.angry}人`, '怒って帰った客'],

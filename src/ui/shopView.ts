@@ -259,10 +259,10 @@ export class ShopView {
       sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
       sc.PR(seat.x - 2, y + bh, 4, 2, edge, a);
       sc.PR(seat.x - 1, y + bh + 2, 2, 1, edge, a);
-      const nameSize = sc.W(gst.dish.text, 10) > bw - 4 ? 9 : 10;
+      const nameSize = sc.fitSize(gst.dish.text, 10, bw - 6);
       sc.T(gst.dish.text, seat.x, y + 2, nameSize, dim ? C.gray : C.w, 'center');
       const m = live?.matcher ?? new RomajiMatcher(gst.dish.kana);
-      const romaSize = sc.W(m.typed + m.remaining, 8) > bw - 2 ? 7 : 8;
+      const romaSize = sc.fitSize(m.typed + m.remaining, 8, bw - 6, 5.5);
       sc.roma(m.typed, m.remaining, seat.x, y + 14, romaSize, live ? 'active' : dim ? 'dim' : 'idle');
       const ids = Object.keys(gst.dish.need) as IngredientId[];
       let ix = seat.x - ids.length * 7 + 1;

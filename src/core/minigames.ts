@@ -1,7 +1,7 @@
 import { CandidateInput, type Target } from './candidates';
 import { defaultRomaji, firstKeys } from './romaji';
 import { Rng } from './rng';
-import { MINIGAME_SECONDS, type IngredientId, type TripId } from './shopConfig';
+import { DIFFICULTIES, MINIGAME_SECONDS, type Difficulty, type IngredientId, type TripId } from './shopConfig';
 
 export interface Word {
   text: string;
@@ -33,7 +33,7 @@ export abstract class Minigame<T = unknown> {
   readonly input: CandidateInput<T>;
   protected events: MinigameEvent[] = [];
 
-  constructor(protected readonly rng: Rng) {
+  constructor(protected readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1]) {
     this.input = new CandidateInput(() => this.targets());
   }
 
@@ -138,6 +138,11 @@ export class FishingGame extends Minigame<null> {
   overtime = 0;
   private timer = 0.4;
 
+  /** あわせの猶予（難易度で変わる） */
+  get hookWindow() {
+    return FISHING.hookWindow * this.difficulty.hookMult;
+  }
+
   get isBigNext() {
     return this.fishIndex % 2 === 1;
   }
@@ -173,7 +178,7 @@ export class FishingGame extends Minigame<null> {
     if (this.phase === 'wait' && this.timeLeft > 0) {
       this.big = this.isBigNext;
       this.phase = 'hook';
-      this.hookLeft = FISHING.hookWindow;
+      this.hookLeft = this.hookWindow;
       this.word = this.rng.pick(HOOK_WORDS);
       this.events.push({ type: 'bite', big: this.big });
     } else if (this.phase === 'land' || this.phase === 'lost') {
@@ -310,7 +315,7 @@ export class HuntingGame extends Minigame<Prey> {
   private addPrey(kind: 'rabbit' | 'deer', lane: number) {
     const def = HUNTING[kind];
     this.prey.push({
-      id: `p${this.n++}`, kind, x: 1.05, lane, speed: 1.1 / def.crossTime,
+      id: `p${this.n++}`, kind, x: 1.05, lane, speed: (1.1 / def.crossTime) * this.difficulty.preyMult,
       hp: def.hp, maxHp: def.hp, word: pickWord(this.rng, HUNTING_WORDS, this.usedFirst()), flash: 0,
     });
   }
@@ -383,9 +388,9 @@ export class GatheringGame extends Minigame<Sprout> {
       if (free.length) {
         const used = new Set<string>();
         for (const s of this.sprouts) for (const k of firstKeys(s.word.kana)) used.add(k);
-        const bad = this.rng.next() < GATHER.poisonRate;
+        const bad = this.rng.next() < this.difficulty.poisonRate;
         const w = bad ? pickWord(this.rng, GATHER_BAD, used) : pickWord(this.rng, GATHER_GOOD, used);
-        const life = this.rng.range(GATHER.life[0], GATHER.life[1]);
+        const life = this.rng.range(GATHER.life[0], GATHER.life[1]) * this.difficulty.sproutLifeMult;
         this.sprouts.push({ id: `s${this.n++}`, word: w, ing: bad ? null : (w as unknown as { ing: IngredientId }).ing, slot: this.rng.pick(free), life, maxLife: life });
       }
     }
@@ -467,8 +472,8 @@ export class TradingGame extends Minigame<null> {
   losses = 0;
   private pause = 0;
 
-  constructor(rng: Rng) {
-    super(rng);
+  constructor(rng: Rng, difficulty?: Difficulty) {
+    super(rng, difficulty);
     this.lot = this.newLot();
   }
 
@@ -478,7 +483,7 @@ export class TradingGame extends Minigame<null> {
     const word = pickWord(this.rng, list, new Set(), this.lot?.word);
     return {
       item, word, rival: 0, rivalKeys: defaultRomaji(word.kana).length, delay: TRADING.rivalDelay, missed: false, outcome: 'open',
-      rivalSpeed: Math.min(TRADING.rivalMax, TRADING.rivalSpeed + this.lots * TRADING.rivalGrow),
+      rivalSpeed: Math.min(TRADING.rivalMax, TRADING.rivalSpeed + this.lots * TRADING.rivalGrow) * this.difficulty.rivalMult,
     };
   }
 
@@ -521,11 +526,11 @@ export class TradingGame extends Minigame<null> {
   }
 }
 
-export function createMinigame(id: TripId, rng: Rng): Minigame<unknown> {
+export function createMinigame(id: TripId, rng: Rng, difficulty?: Difficulty): Minigame<unknown> {
   switch (id) {
-    case 'fishing': return new FishingGame(rng) as Minigame<unknown>;
-    case 'hunting': return new HuntingGame(rng) as Minigame<unknown>;
-    case 'gathering': return new GatheringGame(rng) as Minigame<unknown>;
-    case 'trading': return new TradingGame(rng) as Minigame<unknown>;
+    case 'fishing': return new FishingGame(rng, difficulty) as Minigame<unknown>;
+    case 'hunting': return new HuntingGame(rng, difficulty) as Minigame<unknown>;
+    case 'gathering': return new GatheringGame(rng, difficulty) as Minigame<unknown>;
+    case 'trading': return new TradingGame(rng, difficulty) as Minigame<unknown>;
   }
 }

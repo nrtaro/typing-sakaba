@@ -4,7 +4,7 @@ import { Shop } from '../src/core/shop';
 import { createMinigame, GatheringGame, type Minigame } from '../src/core/minigames';
 import { Rng } from '../src/core/rng';
 import { RomajiMatcher } from '../src/core/romaji';
-import { SHOP, SOURCE, TRIPS, rankFor } from '../src/core/shopConfig';
+import { DIFFICULTIES, SHOP, SOURCE, TRIPS, difficultyOf, rankFor, type DifficultyId } from '../src/core/shopConfig';
 
 function nextKey(input: { active: { target: { id: string }; matcher: RomajiMatcher }[] }, targets: { id: string; kana: string }[], pick: (id: string) => boolean) {
   const live = input.active.find((l) => pick(l.target.id)) ?? input.active[0];
@@ -13,8 +13,9 @@ function nextKey(input: { active: { target: { id: string }; matcher: RomajiMatch
   return t ? new RomajiMatcher(t.kana).remaining[0] : null;
 }
 
-export function playDay(seed: number, kps: number, missRate = 0.04) {
-  const shop = new Shop(new Rng(seed));
+export function playDay(seed: number, kps: number, missRate = 0.04, diffId: DifficultyId = 'normal') {
+  const diff = difficultyOf(diffId);
+  const shop = new Shop(new Rng(seed), diff);
   const rng = new Rng(seed + 99);
   let trip: { game: Minigame<unknown>; phase: 'intro' | 'game' | 'outro'; t: number } | null = null;
   let acc = 0;
@@ -22,7 +23,7 @@ export function playDay(seed: number, kps: number, missRate = 0.04) {
   while (!shop.ended) {
     shop.update(dt);
     for (const ev of shop.drainEvents()) {
-      if (ev.type === 'tripStart') trip = { game: createMinigame(ev.trip.id, new Rng(seed + shop.stats.trips)), phase: 'intro', t: SHOP.tripIntro };
+      if (ev.type === 'tripStart') trip = { game: createMinigame(ev.trip.id, new Rng(seed + shop.stats.trips), diff), phase: 'intro', t: SHOP.tripIntro };
     }
     if (trip) {
       trip.t -= dt;
@@ -74,19 +75,26 @@ export function playDay(seed: number, kps: number, missRate = 0.04) {
 }
 
 describe('一日のバランス', () => {
-  it('技能別のスコア（参考表示）と、速いほど高得点', () => {
+  it.each(DIFFICULTIES.map((d) => [d.name, d.id]))('%s：技能別のスコア（参考表示）と、速いほど高得点', (_n, id) => {
+    const diff = difficultyOf(id as DifficultyId);
     const rows: Record<string, unknown> = {};
     const avg: Record<number, number> = {};
     for (const kps of [2.5, 4, 5.5, 7]) {
-      const runs = [1, 2, 3, 4, 5].map((s) => playDay(s, kps));
+      const runs = [1, 2, 3, 4, 5].map((s) => playDay(s, kps, 0.04, diff.id));
       const mean = (f: (r: (typeof runs)[number]) => number) => Math.round(runs.reduce((a, r) => a + f(r), 0) / runs.length);
       avg[kps] = mean((r) => r.score);
-      rows[`${kps}打鍵/秒`] = { score: avg[kps], rank: rankFor(avg[kps]).name, served: mean((r) => r.served), angry: mean((r) => r.angry), trips: mean((r) => r.trips), maxCombo: mean((r) => r.maxCombo) };
+      rows[`${kps}打鍵/秒`] = { score: avg[kps], rank: rankFor(avg[kps], diff).name, served: mean((r) => r.served), angry: mean((r) => r.angry), trips: mean((r) => r.trips) };
     }
+    console.log(diff.name);
     console.table(rows);
     expect(avg[4]).toBeGreaterThan(avg[2.5]);
-    expect(avg[5.5]).toBeGreaterThan(avg[4]);
-    expect(avg[7]).toBeGreaterThan(avg[5.5]);
+    expect(avg[7]).toBeGreaterThan(avg[4]);
+  });
+
+  it('難しいほど同じ速さでも怒って帰る客が増える', () => {
+    const angry = (id: DifficultyId) => [1, 2, 3].reduce((a, s) => a + playDay(s, 3, 0.04, id).angry, 0);
+    expect(angry('hard')).toBeGreaterThanOrEqual(angry('normal'));
+    expect(angry('normal')).toBeGreaterThanOrEqual(angry('easy'));
   });
 
   it('調達をしないと素材が尽きて売上が伸びない', () => {

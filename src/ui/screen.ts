@@ -135,6 +135,13 @@ export class Screen {
     ctx.globalAlpha = 1;
   }
 
+  /** 幅 width に収まる文字の大きさ（max から小さくしていく。min より小さくはしない） */
+  fitSize(text: string, max: number, width: number, min = 6) {
+    const w = this.W(text, max);
+    if (w <= width) return max;
+    return Math.max(min, Math.floor((max * width) / w * 2) / 2);
+  }
+
   W(text: string, size: number) {
     this.font(size);
     return this.ctx.measureText(text).width / this.S;

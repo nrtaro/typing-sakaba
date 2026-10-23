@@ -173,7 +173,7 @@ export class MinigameView {
       sc.TB('あわせろ！', LW / 2, 84, 16, C.gold3, 'center');
       this.bigWord(sc, game.word.text, game.word.kana, game, 106, C.gold);
       sc.PR(LW / 2 - 80, 162, 160, 5, C.ink);
-      sc.PR(LW / 2 - 80, 162, 160 * Math.max(0, game.hookLeft / FISHING.hookWindow), 5, C.gold);
+      sc.PR(LW / 2 - 80, 162, 160 * Math.max(0, game.hookLeft / game.hookWindow), 5, C.gold);
     } else if (game.phase === 'reel' && game.word) {
       const total = game.big ? FISHING.bigWords : 1;
       sc.TB(`巻き上げ ${total - game.wordsLeft + 1}/${total}`, LW / 2, 162, 12, C.w, 'center');
