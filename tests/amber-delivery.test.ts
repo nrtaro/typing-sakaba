@@ -1,3 +1,4 @@
+import { procurementReward, rewardKeys } from '../src/core/procurementRewards';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../src/ui/sprites', () => ({ FAM: {}, ICON: {}, PORTRAIT: {}, WALKERS: [], guestSprite: () => null }));
 import { ShopView } from '../src/ui/shopView';
@@ -109,17 +110,19 @@ describe('狩りのゲージと報酬', () => {
     expect(y).toBeCloseTo(118 + deer.lane * 106 - 48 + 8);
   });
 
-  it('小物は1語で肉3、大物は3語で肉12を得る', () => {
+  it('小物は1語、大物は3語の文字数に応じて肉を得る', () => {
     const game = new HuntingGame(new Rng(7));
     for (let i = 0; i < 600 && !(game.prey.some((p) => p.kind === 'deer') && game.prey.some((p) => p.kind === 'rabbit')); i++) game.update(1 / 60);
     for (const kind of ['rabbit', 'deer'] as const) {
       const prey = game.prey.find((p) => p.kind === kind)!;
       expect(prey.maxHp).toBe(kind === 'rabbit' ? 1 : 3);
       const before = game.gains.meat ?? 0;
+      let keys = 0;
       for (let hit = 0; hit < HUNTING[kind].hp; hit++) {
+        keys += rewardKeys(prey.word.kana);
         for (const key of new RomajiMatcher(prey.word.kana).remaining) game.key(key);
       }
-      expect((game.gains.meat ?? 0) - before).toBe(kind === 'rabbit' ? 3 : 12);
+      expect((game.gains.meat ?? 0) - before).toBe(procurementReward('hunting', keys, kind === 'deer'));
     }
   });
 });

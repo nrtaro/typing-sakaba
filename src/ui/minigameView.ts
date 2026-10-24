@@ -1,9 +1,10 @@
+import { procurementReward, rewardKeys } from '../core/procurementRewards';
 import { C, TRIP_COLOR, mix, type Color } from './palette';
 import { Screen, LW } from './screen';
 import { CRATE, DEER, FAM, ICON, MERCHANT, PORTRAIT, RABBIT } from './sprites';
 import { pen, SKY } from './room';
 import {
-  FISHING, FishingGame, GatheringGame, HuntingGame, TradingGame, TRADING, GATHER_SLOTS,
+  FISHING, FishingGame, GatheringGame, HuntingGame, TradingGame, GATHER_SLOTS,
   type Minigame, type MinigameEvent, type Prey, type Sprout,
 } from '../core/minigames';
 import { RomajiMatcher } from '../core/romaji';
@@ -239,7 +240,15 @@ export class MinigameView {
     const x0 = LW / 2 - w / 2;
     // 上の縁：今やること（短く）と大物の印、巻き上げの残り
     this.tag(sc, reel ? '巻き上げ' : 'あわせ', x0 + 8, y - 7, reel ? C.blue : C.gold, reel ? C.w : C.ink);
-    if (game.big) this.tag(sc, '大物', x0 + w - 36, y - 7, C.gold3, C.ink);
+    // 右上：大物の印。最後の巻き上げでは、釣り上げたときの数（長い言葉ほど多い）
+    let tx = x0 + w - 8;
+    if (reel && game.wordsLeft === 1) {
+      const text = `魚×${procurementReward('fishing', game.catchKeys + rewardKeys(game.word.kana), game.big)}`;
+      tx -= sc.W(text, 8) + 8;
+      this.tag(sc, text, tx, y - 7, C.gold3, C.ink);
+      tx -= 3;
+    }
+    if (game.big) this.tag(sc, '大物', tx - sc.W('大物', 8) - 8, y - 7, C.gold3, C.ink);
     if (reel && game.big) {
       const total = FISHING.bigWords;
       const done = total - game.wordsLeft;
@@ -308,8 +317,9 @@ export class MinigameView {
       const live = active.find((l) => l.target.id === p.id);
       const dim = game.input.typed.length > 0 && !live;
       const m = live?.matcher ?? new RomajiMatcher(p.word.kana);
+      const label = p.word.text + (p.kind === 'rabbit' ? ` ×${procurementReward('hunting', rewardKeys(p.word.kana))}` : '');
       const h = 32;
-      const w = Math.max(60, sc.W(m.typed + m.remaining, 10) + 14, sc.W(p.word.text, 12) + 14);
+      const w = Math.max(60, sc.W(m.typed + m.remaining, 10) + 14, sc.W(label, 12) + 14);
       const spriteH = p.kind === 'deer' ? 48 : 24;
       const deer = p.kind === 'deer';
       // 大物の頭上は中段の小物の走路。横に寄せて、その小物を枠で隠さない。
@@ -329,10 +339,10 @@ export class MinigameView {
       for (let k = 0; k <= n; k++) sc.PR(ax + (tx - ax) * (k / n) - 0.5, ay + (ty - ay) * (k / n) - 0.5, 1, 1, edge, a * 0.8);
       if (live) sc.glow(box.x, box.y, w, h);
       sc.panel(box.x, box.y, w, h, live ? '#4a2c3c' : dim ? '#241820' : '#1e131a', edge, a);
-      sc.T(p.word.text, cx, box.y + 2, 12, dim ? '#a89a90' : C.w, 'center');
+      sc.T(label, cx, box.y + 2, 12, dim ? '#a89a90' : C.w, 'center');
       sc.roma(m.typed, m.remaining, cx, box.y + 18, 10, live ? 'active' : dim ? 'dim' : 'idle');
       for (let i = 0; i < p.maxHp; i++) sc.PR(cx - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
-      if (p.kind === 'deer') this.tag(sc, '大物', box.x - 4, box.y - 8, C.gold3, C.ink);
+      if (p.kind === 'deer') this.tag(sc, p.hp === 1 ? `大物 肉×${procurementReward('hunting', (p.rewardKeys ?? 0) + rewardKeys(p.word.kana), true)}` : '大物', box.x - 4, box.y - 8, C.gold3, C.ink);
     }
   }
 
@@ -369,12 +379,13 @@ export class MinigameView {
       const dim = game.input.typed.length > 0 && !live;
       const m = live?.matcher ?? new RomajiMatcher(s.word.kana);
       const bad = !s.ing;
-      const w = Math.max(92, sc.W(m.typed + m.remaining, 10) + 12);
+      const label = (bad ? '☠ ' : '') + s.word.text + (bad ? '' : ` ×${procurementReward('gathering', rewardKeys(s.word.kana))}`);
+      const w = Math.max(92, sc.W(m.typed + m.remaining, 10) + 12, sc.W(label, 11) + 12);
       // 絵があるときは芽のすぐ上に置き、前の列の芽を隠さない
       const top = pos.y - (this.art ? AMBER.gathering.sprout.size + 31 : 70);
       if (live) sc.glow(pos.x - w / 2, top, w, 30);
       sc.panel(pos.x - w / 2, top, w, 30, live ? '#4a2c3c' : bad ? '#3a1e48' : '#241820', live ? C.gold : dim ? '#5a4a40' : bad ? C.purple : C.green);
-      sc.T((bad ? '☠ ' : '') + s.word.text, pos.x, top + 2, 11, dim ? '#a89a90' : bad ? '#e0c8ff' : C.w, 'center');
+      sc.T(label, pos.x, top + 2, 11, dim ? '#a89a90' : bad ? '#e0c8ff' : C.w, 'center');
       sc.roma(m.typed, m.remaining, pos.x, top + 17, 10, live ? 'active' : dim ? 'dim' : 'idle');
       sc.PR(pos.x - w / 2 + 4, top + 28, (w - 8) * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
     }
@@ -420,7 +431,7 @@ export class MinigameView {
     const x0 = LW / 2 - w / 2;
     if (this.art) this.art.drawIcon(sc, 'icons-dishes', ICON_INDEX[lot.item], x0 + 6, y + 6, 22);
     else sc.spr(ICON[lot.item], x0 + 8, y + 8, 1.5);
-    sc.TB(`×${TRADING.win}`, x0 + 17, y + 30, 9, C.gold3, 'center');
+    sc.TB(`×${procurementReward('trading', rewardKeys(lot.word.kana))}`, x0 + 17, y + 30, 9, C.gold3, 'center');
     const live = game.input.active[0];
     const mine = live ? live.matcher.kanaPos / lot.word.kana.length : 0;
     // 札のすぐ下に、自分とライバルの進み具合を並べる

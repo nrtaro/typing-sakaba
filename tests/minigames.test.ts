@@ -1,3 +1,4 @@
+import { procurementReward, rewardKeys } from '../src/core/procurementRewards';
 import { describe, expect, it } from 'vitest';
 import {
   ALE_GOODS, FISHING, FishingGame, GATHER, GATHER_BAD, GATHER_GOOD, GatheringGame, HOOK_WORDS, HUNTING, HUNTING_WORDS, HuntingGame,
@@ -57,14 +58,19 @@ describe('調達ミニゲーム', () => {
     const g = new FishingGame(new Rng(3));
     const land = () => {
       while (g.phase !== 'hook') g.update(1 / 60);
-      while (g.phase === 'hook' || g.phase === 'reel') g.key(g.input.active[0]?.matcher.remaining[0] ?? new RomajiMatcher(g.word!.kana).remaining[0]);
+      let keys = 0;
+      while (g.phase === 'hook' || g.phase === 'reel') {
+        keys += rewardKeys(g.word!.kana);
+        for (const c of defaultRomaji(g.word!.kana)) g.key(c);
+      }
+      return procurementReward('fishing', keys, g.big);
     };
-    land();
-    expect(g.gains.fish).toBe(FISHING.smallYield);
+    const small = land();
+    expect(g.gains.fish).toBe(small);
     while (g.phase !== 'hook') g.update(1 / 60);
     expect(g.big).toBe(true);
-    land();
-    expect(g.gains.fish).toBe(FISHING.smallYield + FISHING.bigYield);
+    const big = land();
+    expect(g.gains.fish).toBe(small + big);
   });
 
   it('釣り：巻き上げ中に3回ミスすると糸が切れる', () => {
@@ -126,9 +132,11 @@ describe('調達ミニゲーム', () => {
     expect(g.phase).toBe('reel');
     expect(g.big).toBe(true);
     for (let i = 0; i < FISHING.bigWords; i++) word();
-    expect(g.gains.fish).toBe(FISHING.smallYield + FISHING.bigYield);
+    expect(g.fishIndex).toBe(2);
+    const before = g.gains.fish!;
     word(); word();
-    expect(g.gains.fish).toBe(FISHING.smallYield * 2 + FISHING.bigYield);
+    expect(g.fishIndex).toBe(3);
+    expect(g.gains.fish).toBeGreaterThan(before);
   });
 
   it('釣り：次の合図を入力途中でも、釣り上げ演出の終了で入力が消えない', () => {
@@ -156,11 +164,11 @@ describe('調達ミニゲーム', () => {
     }
   });
 
-  it('狩り：速く打つほど多く仕留め、大物は12個', () => {
+  it('狩り：速く打つほど多く仕留め、大物は3語', () => {
     const slow = play(new HuntingGame(new Rng(7)), 2.5);
     const fast = play(new HuntingGame(new Rng(7)), 7);
     expect(fast.gains.meat ?? 0).toBeGreaterThan(slow.gains.meat ?? 0);
-    expect(HUNTING.deer.yield).toBe(12);
+    expect(HUNTING.deer.hp).toBe(3);
   });
 
   it('狩り：同じ通り道で獲物が詰まらない（文字が重ならない）', () => {
@@ -173,16 +181,16 @@ describe('調達ミニゲーム', () => {
     }
   });
 
-  it('採取：1回で4つ摘め、毒きのこを打つとかごから2つこぼれる', () => {
+  it('採取：文字数に応じて摘め、毒きのこを打つとかごから2つこぼれる', () => {
     const g = new GatheringGame(new Rng(9));
     g.sprouts = [
       { id: 'a', word: GATHER_GOOD[0], ing: 'veg', slot: 0, life: 5, maxLife: 5 },
       { id: 'b', word: GATHER_BAD[0], ing: null, slot: 1, life: 5, maxLife: 5 },
     ];
     for (const c of defaultRomaji(GATHER_GOOD[0].kana)) g.key(c);
-    expect(g.gains.veg).toBe(GATHER.perPick);
+    expect(g.gains.veg).toBe(procurementReward('gathering', rewardKeys(GATHER_GOOD[0].kana)));
     for (const c of defaultRomaji(GATHER_BAD[0].kana)) g.key(c);
-    expect(g.gains.veg).toBe(GATHER.perPick - GATHER.poisonLoss);
+    expect(g.gains.veg).toBe(procurementReward('gathering', rewardKeys(GATHER_GOOD[0].kana)) - GATHER.poisonLoss);
   });
 
   it('採取：畑に片方しかないとき、次の安全な出題で不足側を補う', () => {
@@ -196,13 +204,14 @@ describe('調達ミニゲーム', () => {
     expect(g.sprouts.some(s => s.ing === 'veg')).toBe(true);
   });
 
-  it('仕入れ：落札2個に、ノーミスのときだけ1個を追加する', () => {
+  it('仕入れ：文字数で決まる箱数に、ノーミスのときだけ1個を追加する', () => {
     for (const miss of [false, true]) {
       const g = new TradingGame(new Rng(10));
       const ing = g.lot.item;
+      const base = procurementReward('trading', rewardKeys(g.lot.word.kana));
       if (miss) g.key('q');
       for (const c of defaultRomaji(g.lot.word.kana)) g.key(c);
-      expect(g.gains[ing]).toBe(miss ? 2 : 3);
+      expect(g.gains[ing]).toBe(base + (miss ? 0 : 1));
     }
   });
 
