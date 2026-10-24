@@ -3,11 +3,11 @@ import { Screen, LW } from './screen';
 import { CRATE, DEER, FAM, ICON, MERCHANT, PORTRAIT, RABBIT } from './sprites';
 import { pen, SKY } from './room';
 import {
-  FISHING, FishingGame, GatheringGame, HuntingGame, TradingGame, TRADING, GATHER, GATHER_SLOTS,
+  FISHING, FishingGame, GatheringGame, HuntingGame, TradingGame, TRADING, GATHER_SLOTS,
   type Minigame, type MinigameEvent, type Prey, type Sprout,
 } from '../core/minigames';
 import { RomajiMatcher } from '../core/romaji';
-import { FAMILY_NAME, INGREDIENT_NAME, TRIPS } from '../core/shopConfig';
+import { INGREDIENT_NAME, TRIPS } from '../core/shopConfig';
 import type { Shop } from '../core/shop';
 import type { Art } from './amber/art';
 import { animLength, frameAt } from './amber/manifest';
@@ -63,13 +63,14 @@ export class MinigameView {
       const p = this.anchor(game, ev);
       this.fxs.push({ anim: 'きらめき', x: p.x, y: p.y + 24, h: 30, start: this.time });
     }
-    if (ev.type === 'gain' || ev.type === 'loss') {
+    // 釣りは札の上の一言に釣果をまとめ、別の場所に数字を出さない
+    if ((ev.type === 'gain' || ev.type === 'loss') && !(game instanceof FishingGame)) {
       const p = this.anchor(game, ev);
       const text = ev.type === 'gain' ? `+${ev.amount} ${INGREDIENT_NAME[ev.ingredient]}` : `-1 ${INGREDIENT_NAME[ev.ingredient]}`;
       this.pops.push({ ...p, t: 0, text, col: ev.type === 'gain' ? C.gold3 : C.red3 });
     }
     if (game instanceof FishingGame) {
-      if (ev.type === 'gain') this.shout = { text: game.big ? '大物を釣り上げた！' : '釣れた！', col: C.gold3, t: 1 };
+      if (ev.type === 'gain') this.shout = { text: `${game.big ? '大物！' : '釣れた！'} 魚+${ev.amount}`, col: C.gold3, t: 1 };
       if (ev.type === 'escape') this.shout = { text: ev.id === 'line' ? '糸が切れた…' : '逃げられた…', col: C.red3, t: 1 };
     }
     if (game instanceof TradingGame) {
@@ -126,11 +127,12 @@ export class MinigameView {
     else if (game instanceof TradingGame) this.drawTradingUi(sc, game);
     this.drawHud(sc, game, shop);
     for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 18, 12, p.col, 'center', C.ink, Math.min(1, (1.2 - p.t) * 3));
-    if (this.shout) sc.TB(this.shout.text, LW / 2, 64, 18, this.shout.col, 'center', C.ink, Math.min(1, this.shout.t * 3));
-    if (game.input.typed) sc.TB(game.input.typed, LW / 2, 252, 12, C.w, 'center', C.ink, 0.55);
+    // 結果の一言は、打つ札のすぐ上に出す（目線を動かさずに読めるように）
+    if (this.shout) sc.TB(this.shout.text, LW / 2, game instanceof FishingGame ? 84 : 68, 16, this.shout.col, 'center', C.ink, Math.min(1, this.shout.t * 3));
     if (canReturn) {
-      sc.panel(379, 249, 94, 16, C.ink, C.gold);
-      sc.T('Enter：店へ戻る', 426, 253, 8, C.gold3, 'center');
+      // 途中帰還：キーの絵と短い言葉だけを右下に小さく
+      const kw = sc.keycap('Enter', 416, 251, 7, 0.85);
+      sc.T('戻る', 416 + kw + 3, 252, 8, C.cream, 'left', 0.85);
     }
     if (this.missFlash > 0) {
       sc.PR(e.x0, e.y0, e.w, 2, C.red, this.missFlash * 3);
@@ -145,11 +147,11 @@ export class MinigameView {
     sc.panel(e.x0 + 3, 2, e.w - 6, 26, col.dark, col.main);
     if (this.art) this.art.drawHead(sc, `family-${trip.who}`, 0, 8, 6, 19);
     else sc.spr(PORTRAIT[trip.who], 8, 6, 1.4);
-    sc.TB(`${FAMILY_NAME[trip.who]}の${trip.act}`, 30, 6, 13, C.w, 'left');
+    sc.TB(trip.act, 30, 6, 13, C.w, 'left');
     const tl = game.timeLeft;
-    sc.PR(150, 11, 110, 8, C.ink);
-    sc.PR(150, 11, 110 * (tl / game.duration), 8, tl < 3 ? C.red : col.main);
-    sc.TB(tl > 0 ? `残り ${tl.toFixed(1)}秒` : game.finished ? '終了' : '延長戦！', 266, 7, 11, tl > 0 ? C.w : C.gold3, 'left');
+    sc.PR(100, 11, 170, 8, C.ink);
+    sc.PR(100, 11, 170 * (tl / game.duration), 8, tl < 3 ? C.red : col.main);
+    sc.TB(tl > 0 ? tl.toFixed(1) : game.finished ? '終了' : '延長！', 276, 7, 11, tl > 0 ? C.w : C.gold3, 'left');
     let x = 360;
     for (const id of trip.gives) {
       if (this.art) this.art.drawIcon(sc, 'icons-dishes', ICON_INDEX[id], x, 6, 16);
@@ -157,8 +159,9 @@ export class MinigameView {
       sc.TB(`×${game.gains[id] ?? 0}`, x + 17, 6, 13, C.w, 'left');
       x += 56;
     }
+    // お店の残り時間は右端に小さく（お客の待ち時間は止まっているので、急がせる表示にしない）
     const left = shop.timeLeft;
-    sc.TB(`お店の残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}（お客の待ち時間は止まっています）`, LW / 2, 31, 9, C.cream, 'center');
+    sc.T(`店 ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 312, 9, 8, C.cream, 'left', 0.7);
   }
 
   /** 中央の大きな語句 */
@@ -166,6 +169,11 @@ export class MinigameView {
     const live = game.input.active[0];
     const m = live?.matcher ?? new RomajiMatcher(kana);
     const w = Math.max(180, sc.W(text, 20) + 50, sc.W(m.typed + m.remaining, 13) + 40);
+    this.drawBigWord(sc, text, m, !!live, y, w, col);
+    return w;
+  }
+
+  private drawBigWord(sc: Screen, text: string, m: RomajiMatcher, live: boolean, y: number, w: number, col: Color) {
     if (live) sc.glow(LW / 2 - w / 2, y, w, 52);
     sc.panel(LW / 2 - w / 2, y, w, 52, 'rgba(42,27,38,0.95)', live ? C.gold : col);
     sc.TB(text, LW / 2, y + 5, 20, C.w, 'center');
@@ -219,29 +227,42 @@ export class MinigameView {
     }
   }
 
+  /**
+   * 釣り：必要な情報はすべて言葉の札の縁に付ける。
+   * 上の縁に「あわせ」「巻き上げ」と大物の印、下の縁にあわせの残り時間か糸の傷み。
+   */
   private drawFishingUi(sc: Screen, game: FishingGame) {
-    // 次の魚の大きさと、何匹目か
-    sc.panel(10, 44, 150, 30, 'rgba(42,27,38,0.9)', C.blue);
-    sc.T(`${game.fishIndex + 1}匹目`, 18, 48, 9, C.cream);
-    const nextBig = game.phase === 'wait' || game.phase === 'land' ? game.isBigNext : game.big;
-    sc.TB(nextBig ? '大物（ヌシ）！' : '小さい魚', 18, 59, 10, nextBig ? C.gold3 : C.w, 'left');
-    if ((game.phase === 'hook' || game.phase === 'land') && game.word) {
-      sc.TB('あわせろ！', LW / 2, 84, 16, C.gold3, 'center');
-      this.bigWord(sc, game.word.text, game.word.kana, game, 112, C.gold);
-      sc.PR(LW / 2 - 80, 178, 160, 5, C.ink);
-      sc.PR(LW / 2 - 80, 178, 160 * Math.max(0, game.hookLeft / game.hookWindow), 5, C.gold);
-    } else if (game.phase === 'reel' && game.word) {
-      const total = game.big ? FISHING.bigWords : 1;
-      sc.TB(`巻き上げ ${total - game.wordsLeft + 1}/${total}`, LW / 2, 84, 12, C.w, 'center');
-      this.bigWord(sc, game.word.text, game.word.kana, game, 112, C.blue);
-      // テンション：ミスでたまり、満タンで糸が切れる
-      sc.panel(340, 44, 130, 30, 'rgba(42,27,38,0.9)', game.tension >= 2 ? C.red : C.blue);
-      sc.T('糸のテンション', 348, 48, 9, C.cream);
-      for (let i = 0; i < FISHING.breakAt; i++) sc.PR(348 + i * 38, 61, 34, 7, i < game.tension ? C.red : C.ink);
-    } else if (game.phase === 'wait') {
-      sc.TB('浮きを見つめている…', LW / 2, 196, 13, C.cream, 'center');
+    if (!game.word || (game.phase !== 'hook' && game.phase !== 'land' && game.phase !== 'reel')) return;
+    const y = 112;
+    const reel = game.phase === 'reel';
+    const w = this.bigWord(sc, game.word.text, game.word.kana, game, y, reel ? C.blue : C.gold);
+    const x0 = LW / 2 - w / 2;
+    // 上の縁：今やること（短く）と大物の印、巻き上げの残り
+    this.tag(sc, reel ? '巻き上げ' : 'あわせ', x0 + 8, y - 7, reel ? C.blue : C.gold, reel ? C.w : C.ink);
+    if (game.big) this.tag(sc, '大物', x0 + w - 36, y - 7, C.gold3, C.ink);
+    if (reel && game.big) {
+      const total = FISHING.bigWords;
+      const done = total - game.wordsLeft;
+      for (let i = 0; i < total; i++) sc.PR(LW / 2 - total * 5 + i * 10 + 2, y - 4, 6, 3, i < done ? C.gold3 : C.ink);
     }
-    sc.TB('釣れたらすぐ次の言葉！ 速く打つほど大漁。巻き上げ中は３ミスで糸が切れる', LW / 2, 236, 9, C.cream, 'center');
+    // 下の縁：あわせの残り時間、巻き上げ中は糸の傷み（ミスで減る）
+    if (!reel) {
+      sc.PR(x0 + 4, y + 49, w - 8, 3, C.ink);
+      sc.PR(x0 + 4, y + 49, (w - 8) * Math.max(0, game.hookLeft / game.hookWindow), 3, C.gold);
+    } else {
+      for (let i = 0; i < FISHING.breakAt; i++) {
+        const ok = i >= game.tension;
+        sc.PR(LW / 2 - FISHING.breakAt * 9 + i * 18 + 2, y + 48, 14, 3, ok ? C.teal3 : C.red, ok ? 1 : 0.9);
+      }
+    }
+  }
+
+  /** 札の縁に付ける小さな見出し */
+  private tag(sc: Screen, text: string, x: number, y: number, fill: Color, ink: Color) {
+    const w = sc.W(text, 8) + 8;
+    sc.panel(x, y, w, 12, fill, C.ink);
+    sc.T(text, x + w / 2, y + 2, 8, ink, 'center');
+    return w;
   }
 
   // ---------- かり ----------
@@ -311,9 +332,8 @@ export class MinigameView {
       sc.T(p.word.text, cx, box.y + 2, 12, dim ? '#a89a90' : C.w, 'center');
       sc.roma(m.typed, m.remaining, cx, box.y + 18, 10, live ? 'active' : dim ? 'dim' : 'idle');
       for (let i = 0; i < p.maxHp; i++) sc.PR(cx - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
-      if (p.kind === 'deer') sc.TB('大物 肉×12', cx, box.y - 16, 9, C.gold3, 'center');
+      if (p.kind === 'deer') this.tag(sc, '大物', box.x - 4, box.y - 8, C.gold3, C.ink);
     }
-    sc.TB('最初の文字で狙いが決まる。左の柵を越えられると逃げられる', LW / 2, 236, 9, C.ink, 'center', C.sand3);
   }
 
   // ---------- さいしゅ ----------
@@ -358,8 +378,7 @@ export class MinigameView {
       sc.roma(m.typed, m.remaining, pos.x, top + 17, 10, live ? 'active' : dim ? 'dim' : 'idle');
       sc.PR(pos.x - w / 2 + 4, top + 28, (w - 8) * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
     }
-    sc.panel(100, 234, 370, 15, 'rgba(42,27,38,0.88)', C.green);
-    sc.T(`食べられるものだけ打つ（1回で${GATHER.perPick}つ）。☠ は${GATHER.poisonLoss}つ失う`, 285, 238, 8, C.cream, 'center');
+
   }
 
   // ---------- しいれ：早い者勝ちの競り ----------
@@ -394,27 +413,26 @@ export class MinigameView {
 
   private drawTradingUi(sc: Screen, game: TradingGame) {
     const lot = game.lot;
-    // 競りに出た品物
-    sc.panel(LW / 2 - 100, 42, 200, 32, 'rgba(42,27,38,0.92)', C.gold2);
-    if (this.art) this.art.drawIcon(sc, 'icons-dishes', ICON_INDEX[lot.item], LW / 2 - 94, 44, 26);
-    else sc.spr(ICON[lot.item], LW / 2 - 92, 46, 2);
-    sc.TB(`${INGREDIENT_NAME[lot.item]} ${TRADING.win}箱を競り中`, LW / 2 + 10, 50, 13, C.w, 'center');
-    if (lot.outcome === 'open') {
-      this.bigWord(sc, lot.word.text, lot.word.kana, game, 80, C.gold2);
-      // 自分とライバルの進み具合
-      const live = game.input.active[0];
-      const mine = live ? live.matcher.kanaPos / lot.word.kana.length : 0;
-      const labelCol = this.art ? C.w : C.ink;
-      if (this.art) sc.panel(104, 136, 264, 31, 'rgba(42,27,38,0.88)', C.gold2);
-      sc.T('あなた', 112, 140, 10, labelCol);
-      sc.PR(160, 141, 200, 8, C.ink);
-      sc.PR(160, 141, 200 * mine, 8, C.teal);
-      sc.T('ライバル', 112, 154, 10, labelCol);
-      sc.PR(160, 155, 200, 8, C.ink);
-      sc.PR(160, 155, 200 * lot.rival, 8, C.red);
-    }
-    sc.TB(`落札 ${game.wins}　取られた ${game.losses}`, 380, 82, 10, C.w, 'left');
-    sc.TB('ライバルより先に品物の名前を打ち切れば落札。ミスなしならおまけ1箱', LW / 2, this.art ? 236 : 226, 9, C.w, 'center');
+    if (lot.outcome !== 'open') return;
+    // 品物の札：左上に品物の絵と箱数、下の縁に自分（緑）とライバル（赤）の進み具合
+    const y = 92;
+    const w = this.bigWord(sc, lot.word.text, lot.word.kana, game, y, C.gold2);
+    const x0 = LW / 2 - w / 2;
+    if (this.art) this.art.drawIcon(sc, 'icons-dishes', ICON_INDEX[lot.item], x0 + 6, y + 6, 22);
+    else sc.spr(ICON[lot.item], x0 + 8, y + 8, 1.5);
+    sc.TB(`×${TRADING.win}`, x0 + 17, y + 30, 9, C.gold3, 'center');
+    const live = game.input.active[0];
+    const mine = live ? live.matcher.kanaPos / lot.word.kana.length : 0;
+    // 札のすぐ下に、自分とライバルの進み具合を並べる
+    sc.panel(x0 + 8, y + 50, w - 16, 18, '#1e131a', C.gold2);
+    const bx = x0 + 34;
+    const bw = w - 50;
+    sc.T('自分', x0 + 14, y + 52, 7, C.teal3);
+    sc.PR(bx, y + 54, bw, 3, C.ink);
+    sc.PR(bx, y + 54, bw * mine, 3, C.teal3);
+    sc.T('相手', x0 + 14, y + 60, 7, C.red3);
+    sc.PR(bx, y + 62, bw, 3, C.ink);
+    sc.PR(bx, y + 62, bw * lot.rival, 3, C.red);
   }
 
   // ---------- 画像素材（A案）で描く ----------

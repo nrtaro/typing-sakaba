@@ -10,7 +10,7 @@ import { entryPose, WALK_SPEED, SERVER_WALK_SPEED, serverWalkSpeed } from '../co
 import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/layout';
 import { RomajiMatcher } from '../core/romaji';
 import {
-  DAY_LENGTH, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type FamilyId, type IngredientId, type TripId,
+  DAY_LENGTH, FAMILY_NAME, PHASES, SHOP, SOURCE, TRIPS, type FamilyId, type IngredientId, type TripId,
 } from '../core/shopConfig';
 
 /** 席の位置（斜め上視点：2列×4席）。ty はテーブルの高さ */
@@ -438,7 +438,6 @@ export class ShopView {
       sc.PR(x + 4, y + bh - 3, bw - 8, 2, C.ink, a);
       sc.PR(x + 4, y + bh - 3, (bw - 8) * p, 2, p > 0.5 ? C.green : p > 0.25 ? C.gold : C.red, a);
       if (first) sc.TB('▼先に出す', seat.x, y - 10, 8, C.gold3, 'center');
-      if (shop.away) sc.TB('待ってるよ', seat.x, y - 10, 8, C.pink3, 'center', C.ink, dim ? 0.4 : 1);
     });
   }
 
@@ -475,12 +474,10 @@ export class ShopView {
         const n = shop.stock[ing];
         if (n <= 1 && Math.floor(t * 3) % 2 === 0) sc.PR(ex - 2, ey - 1, 50, 22, C.red2, 0.7);
         this.icon(sc, ing, ex - 1, ey - 1, 24, dim ? 0.5 : 1);
-        sc.T(INGREDIENT_NAME[ing], ex + 24, ey - 1, 8, C.cream, 'left', dim ? 0.4 : 0.85);
-        sc.TB(`×${n}`, ex + 24, ey + 8, 13, n <= 1 ? C.red3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
+        sc.TB(`×${n}`, ex + 24, ey + 4, 13, n <= 1 ? C.red3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
         const got = this.gotTrip?.id === tr.id ? this.gotTrip : null;
         if (got && got.gains[ing]) sc.TB(`+${got.gains[ing]}`, ex + 44, ey - 2 - (1.4 - got.t) * 5, 8, C.gold3, 'center');
       });
-      sc.T(FAMILY_NAME[tr.who], x + w - 4, y + h - 10, 8, C.cream, 'right', dim ? 0.35 : 0.7);
       if (isAway) {
         sc.PR(x + 1, y + 1, w - 2, h - 2, '#000000', 0.45);
         sc.TB(`${tr.act}中…`, x + w / 2, y + 20, 11, C.gold3, 'center');
@@ -603,7 +600,7 @@ export class ShopView {
     sc.PR(x - w / 2, y - 0.5, w, 1.5, '#1a0c10', 0.22);
   }
 
-  private drawFx(sc: Screen, shop: Shop) {
+  private drawFx(sc: Screen, _shop: Shop) {
     for (const p of this.sparks) {
       const draw = () => sc.PR(p.x, p.y, 1.5, 1.5, p.col, 1 - p.t / 0.7);
       if (p.bounds) sc.clip(p.bounds.x, p.bounds.y, p.bounds.w, p.bounds.h, draw);
@@ -662,7 +659,6 @@ export class ShopView {
       sc.TB(this.banner.text, LW / 2, 34, 11, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
     }
     // 絞り込み中だけ、打った途中のローマ字を薄く出す
-    if (shop.input.typed) sc.TB(shop.input.typed, LW / 2, 194, 12, C.w, 'center', C.ink, 0.55);
     if (this.missFlash > 0) {
       const e = sc.ext;
       sc.PR(e.x0, e.y0, e.w, 2, C.red, this.missFlash * 3);
