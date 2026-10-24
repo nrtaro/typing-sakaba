@@ -94,8 +94,8 @@ describe('文字数に応じた調達報酬', () => {
     expect(g.prey).toHaveLength(0);
   });
 
-  it('仕入れ：短い品物2箱、長い品物3箱に、ノーミス1箱を追加', () => {
-    for (const [kana, base] of [['くみん', 2], ['ろーずまりー', 3]] as const) {
+  it('仕入れ：短い品物2箱、長い品物4箱に、ノーミス1箱を追加', () => {
+    for (const [kana, base] of [['くみん', 2], ['ろーずまりー', 4]] as const) {
       for (const miss of [false, true]) {
         const g = new TradingGame(new Rng(4));
         g.lot.word = { text: kana, kana };

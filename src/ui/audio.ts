@@ -30,9 +30,19 @@ export class Sound {
       this.sfx.connect(this.ac.destination);
       this.music.connect(this.ac.destination);
       this.apply(this.settings);
+      // 音が使えるようになる前に頼まれていた曲を、ここで始める
+      if (this.tempo) {
+        this.stop();
+        this.bgm(this.mode, this.tempo);
+      }
     } catch {
       this.ac = null;
     }
+  }
+
+  /** 音が鳴らせる状態か（ブラウザは最初の操作まで音を止めている） */
+  get ready() {
+    return !!this.ac && this.ac.state === 'running';
   }
 
   apply(s: Settings) {

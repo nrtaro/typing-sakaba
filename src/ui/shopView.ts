@@ -672,8 +672,8 @@ export class ShopView {
     if (shop.combo >= 1 && live.edge > 0) {
       const pulse = 0.78 + 0.22 * Math.sin(this.time * (4 + live.level));
       const col = live.max ? CONFETTI[Math.floor(this.time * 6) % CONFETTI.length] : live.color;
-      const a = (0.25 + live.edge * 0.5) * pulse;
-      const w = 8 + live.level * 1.8;
+      const a = (0.12 + live.edge * 0.26) * pulse;
+      const w = 6 + live.level * 1.2;
       sc.fade(e.x0, e.y0, w, e.h, col, a, 0, 'x');
       sc.fade(e.x1, e.y0, -w, e.h, col, a, 0, 'x');
       sc.fade(e.x0, e.y0, e.w, w, col, a, 0, 'y');
@@ -697,37 +697,32 @@ export class ShopView {
       const a = Math.min(1, this.comboBurst * 2);
       const { x, y } = this.comboAnchor;
       const col = fx.color;
-      sc.clip(x - 30, y - 20, 60, 58, () => {
-        // 柱状の光・多重リング・星形の放射光。完了した席の幅で切り、隣の注文を守る。
-        if (fx.level) {
-          const pulse = 0.7 + Math.sin(age * 12) * 0.3;
-          sc.PR(x - 28, y - 18, 56, 48, col, a * (0.05 + fx.level * 0.018) * pulse);
-          for (let band = 0; band < fx.level; band++) {
-            const xx = x - 25 + (band + 0.5) * 50 / fx.level;
-            sc.PR(xx, y - 18, 1.5, 48, col, a * 0.15 * pulse);
-          }
+      // 丸く柔らかい光を重ね、周りの空間に溶け込ませる（四角く切り取らない）
+      const pulse = 0.75 + Math.sin(age * 12) * 0.25;
+      const grow = Math.min(1, age / 0.12);
+      sc.radialGlow(x, y + 4, (18 + fx.level * 2.2) * (0.6 + grow * 0.4), col, a * (0.28 + fx.level * 0.035) * pulse, 0.8);
+      if (fx.level >= 4) sc.radialGlow(x, y + 4, 10 + fx.level, '#fff7ea', a * 0.25 * pulse, 0.8);
+      for (let ring = 0; ring < fx.rings; ring++) {
+        const r = 8 + ((age * 26 + ring * 9) % 22);
+        const ra = a * 0.7 * (1 - r / 32);
+        for (let k = 0; k < 24; k++) {
+          const angle = k * Math.PI / 12 - age * 0.8;
+          sc.PR(x + Math.cos(angle) * r, y + Math.sin(angle) * r * 0.75, 1.5, 1.5, ring % 2 ? C.gold3 : col, ra);
         }
-        for (let ring = 0; ring < fx.rings; ring++) {
-          const r = 8 + ((age * 26 + ring * 9) % 27);
-          for (let i = 0; i < 24; i++) {
-            const angle = i * Math.PI / 12 - age * 0.8;
-            sc.PR(x + Math.cos(angle) * r, y + Math.sin(angle) * r * 0.75, 1.5, 1.5, ring % 2 ? C.gold3 : col, a * 0.7);
-          }
+      }
+      for (let k = 0; k < fx.rays; k++) {
+        const angle = k * Math.PI * 2 / fx.rays + age * 0.8;
+        const r = 12 + ((age * 18 + k * 3) % 14);
+        for (let jj = 0; jj < 2 + Math.ceil(fx.level / 2); jj++) {
+          const radius = r + jj * 1.7;
+          sc.PR(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius * 0.75, 1.5, 1.5, col, a * (1 - jj * 0.14) * (1 - radius / 34));
         }
-        for (let i = 0; i < fx.rays; i++) {
-          const angle = i * Math.PI * 2 / fx.rays + age * 0.8;
-          const r = 13 + ((age * 18 + i * 3) % 17);
-          for (let j = 0; j < 2 + Math.ceil(fx.level / 2); j++) {
-            const radius = r + j * 1.7;
-            sc.PR(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius * 0.75, 1.5, 1.5, col, a * (1 - j * 0.12));
-          }
-          if (fx.level >= 3 && i % 3 === 0) {
-            const xx = x + Math.cos(angle) * r, yy = y + Math.sin(angle) * r * 0.75;
-            sc.PR(xx - 3, yy, 7, 1, C.w, a);
-            sc.PR(xx, yy - 3, 1, 7, C.w, a);
-          }
+        if (fx.level >= 3 && k % 3 === 0) {
+          const xx = x + Math.cos(angle) * r, yy = y + Math.sin(angle) * r * 0.75;
+          sc.PR(xx - 3, yy, 7, 1, C.w, a * 0.8);
+          sc.PR(xx, yy - 3, 1, 7, C.w, a * 0.8);
         }
-      });
+      }
     }
     for (const p of this.pops) {
       const a = Math.min(1, (1.3 - p.t) * 3);

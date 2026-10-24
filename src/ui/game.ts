@@ -57,6 +57,8 @@ export class Game {
   /** 客席から上がる掛け声や音符 */
   private cheers: { x: number; y: number; t: number; text: string; col: string }[] = [];
   private cheerNext = 0.6;
+  /** 遊び方で試し打ちしたときの演出 */
+  private helpFx: { x: number; y: number; start: number; text: string; icon: number }[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.sc = new Screen(canvas);
@@ -73,6 +75,9 @@ export class Game {
       });
     this.menu = new CandidateInput(() => this.menuItems().map((it) => ({ id: it.kana, kana: it.kana, data: it })));
     window.addEventListener('keydown', (e) => this.onKey(e));
+    // クリックでも音を鳴らせるようにする（ブラウザは操作の前に音を出させない）
+    window.addEventListener('pointerdown', () => this.sound.unlock());
+    this.sound.bgm('title', 96);
     window.addEventListener('blur', () => this.autoPause());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.autoPause(); });
     requestAnimationFrame((now) => this.frame(now));
@@ -95,7 +100,13 @@ export class Game {
           { text: this.settings.muted ? 'おと：なし' : 'おと：あり', kana: 'おと', act: () => this.toggleMute() },
         ];
       case 'help':
-        return [{ text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } }];
+        // 遊び方の画面では、例の言葉を実際に打って試せる（打ち切ると演出が出て、また打てる）
+        return [
+          { text: '焼き魚', kana: 'やきざかな', act: () => this.helpPlay('dish') },
+          { text: 'つり', kana: 'つり', act: () => this.helpPlay('fishing') },
+          { text: 'かり', kana: 'かり', act: () => this.helpPlay('hunting') },
+          { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
+        ];
       case 'difficulty':
         return [
           ...DIFFICULTIES.map((d) => ({ text: d.name, kana: d.kana, act: () => this.start(d.id) })),
@@ -129,6 +140,7 @@ export class Game {
   private enterItem(): MenuItem | undefined {
     const items = this.menuItems();
     if (this.mode === 'difficulty') return items.find((it) => it.kana === difficultyOf(this.settings.difficulty).kana);
+    if (this.mode === 'help') return items[items.length - 1];
     return items[0];
   }
 
@@ -171,10 +183,11 @@ export class Game {
       return;
     }
     const inMenu = this.mode !== 'play' || this.paused;
-    if (k === 'Escape' && (this.mode === 'help' || this.mode === 'difficulty')) {
+    if (k === 'Escape' && (this.mode === 'help' || this.mode === 'difficulty' || this.mode === 'result')) {
       e.preventDefault();
       this.sound.chord(2);
-      this.mode = 'title';
+      if (this.mode === 'result') this.toTitle();
+      else this.mode = 'title';
       this.menu.reset();
       return;
     }
@@ -453,7 +466,7 @@ export class Game {
     else if (this.mode === 'help') this.drawHelp();
     else if (this.mode === 'difficulty') this.drawDifficulty();
     else this.drawResult();
-    this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 176 : this.mode === 'difficulty' ? 170 : 172);
+    this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 194 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);
   }
 
@@ -482,6 +495,7 @@ export class Game {
       const m = live?.matcher ?? new RomajiMatcher(it.kana);
       sc.roma(m.typed, m.remaining, x + iw / 2, yy + 23, 11, live ? 'active' : dim ? 'dim' : 'idle');
       if (k === 0 && !typing) sc.keycap('Enter', x + iw - 30, yy - 7, 6);
+      if (this.mode === 'result' && k === items.length - 1 && !typing) sc.keycap('Esc', x + iw - 22, yy - 7, 6);
     });
   }
 
@@ -577,6 +591,7 @@ export class Game {
     sc.panel(LW / 2 - tw / 2, 205, tw, 13, '#2a1a10', '#a8743f');
     sc.T(tag, LW / 2, 207.5, 8, C.gold3, 'center');
     sc.shifted(0, (e.y1 - 270) / 2, () => {
+      if (!this.sound.ready && !this.settings.muted) sc.T('♪ キーかクリックで音楽が流れます', 470, 207, 7, C.cream2, 'right', 0.8);
       const [start, help, sound] = this.menuItems();
       this.button(start, 30, 224, 180, 38, 'primary', 'Enter');
       this.button(help, 218, 228, 130, 30, 'plain');
@@ -642,9 +657,37 @@ export class Game {
     });
   }
 
+  /** 遊び方の試し打ち：本番と同じ音と演出を小さく出す */
+  private helpPlay(kind: 'dish' | 'fishing' | 'hunting') {
+    if (kind === 'dish') {
+      this.helpFx.push({ x: 116, y: 70, start: this.t, text: '+120円', icon: 7 });
+      this.sound.coin();
+    } else {
+      const fish = kind === 'fishing';
+      this.helpFx.push({ x: fish ? 205 : 269, y: 86, start: this.t, text: fish ? '魚+5' : '肉+4', icon: fish ? 0 : 1 });
+      this.sound.chord(3);
+    }
+  }
+
+  /** 遊び方の札：打っている間は光り、打ち切ると演出が出る */
+  private helpWord(kana: string, text: string, cx: number, y: number, size: number) {
+    const sc = this.sc;
+    const live = this.menu.active.find((l) => l.target.id === kana);
+    const typing = this.menu.typed.length > 0;
+    const dim = typing && !live;
+    const m = live?.matcher ?? new RomajiMatcher(kana);
+    const w = Math.max(sc.W(text, size + 2), sc.W(m.typed + m.remaining, size)) + 14;
+    const h = size * 2 + 14;
+    if (live) sc.glow(cx - w / 2, y, w, h);
+    sc.panel(cx - w / 2, y, w, h, live ? '#4a2c3c' : '#211712', live ? C.gold : C.wood4);
+    sc.T(text, cx, y + 3, size + 2, dim ? '#a89a90' : C.cream, 'center');
+    sc.roma(m.typed, m.remaining, cx, y + size + 8, size, live ? 'active' : dim ? 'dim' : 'idle');
+  }
+
   private drawHelp() {
     const sc = this.sc;
     sc.TB('遊び方', 24, 18, 22, C.gold3, 'left');
+    sc.T('札の言葉を打って試せます', 108, 26, 9, C.cream2);
     const titles = ['料理名を打つ', '減ったら調達', 'たくさん出そう'];
     const lines = [['お客の頭上のローマ字を', '打つと、料理を出せます。'], ['下の言葉を打って食材集め。', 'Enterで途中帰還できます。'], ['お客を待たせすぎず、', '３分間の売上に挑戦！']];
     titles.forEach((title, i) => {
@@ -652,19 +695,30 @@ export class Game {
       sc.panel(x, 54, 138, 128, 'rgba(55,37,23,0.94)', C.wood4);
       sc.T(`0${i + 1}`, x + 12, 63, 9, C.gold3);
       if (i === 0) {
-        this.art?.drawIcon(sc, 'icons-dishes', 7, x + 12, 80, 34);
-        sc.panel(x + 55, 80, 73, 33, '#211712', C.wood4);
-        sc.T('焼き魚', x + 91, 84, 10, C.cream, 'center');
-        sc.roma('yaki', 'zakana', x + 91, 99, 7, 'active');
+        this.art?.drawIcon(sc, 'icons-dishes', 7, x + 10, 80, 32);
+        this.helpWord('やきざかな', '焼き魚', x + 92, 78, 8);
       } else if (i === 1) {
-        this.art?.drawIcon(sc, 'icons-dishes', 0, x + 24, 82, 25);
-        this.art?.drawIcon(sc, 'icons-dishes', 1, x + 88, 82, 25);
-        sc.T('つり', x + 36.5, 111, 10, C.cream, 'center');
-        sc.T('かり', x + 100.5, 111, 10, C.cream, 'center');
+        this.art?.drawIcon(sc, 'icons-dishes', 0, x + 24, 74, 22);
+        this.art?.drawIcon(sc, 'icons-dishes', 1, x + 88, 74, 22);
+        this.helpWord('つり', 'つり', x + 35, 98, 8);
+        this.helpWord('かり', 'かり', x + 99, 98, 8);
       } else sc.T('3:00', x + 69, 86, 25, C.gold3, 'center');
       sc.T(title, x + 12, 130, 13, C.cream);
       lines[i].forEach((line, j) => sc.T(line, x + 12, 152 + j * 13, 8, C.cream2));
     });
+    // 試し打ちの演出：火花と、出した数・取れた数が浮かぶ
+    this.helpFx = this.helpFx.filter((f) => this.t - f.start < 1);
+    for (const f of this.helpFx) {
+      const age = this.t - f.start;
+      const a = Math.min(1, (1 - age) * 3);
+      for (let k = 0; k < 14; k++) {
+        const ang = (k / 14) * Math.PI * 2;
+        const r = 6 + age * 34;
+        sc.PR(f.x + Math.cos(ang) * r, f.y + Math.sin(ang) * r * 0.7, 1.5, 1.5, k % 2 ? C.gold : C.gold3, a);
+      }
+      this.art?.drawIcon(sc, 'icons-dishes', f.icon, f.x - 9, f.y - 12 - age * 10, 18, a);
+      sc.TB(f.text, f.x, f.y - 26 - age * 14, 11, C.gold3, 'center', C.ink, a);
+    }
     // 操作キー：キーの形の札で並べる
     let kx = 24;
     for (const [key, label] of [['Backspace', '1文字戻す'], ['Space', '打ち直し'], ['Esc', '一時停止']] as const) {
@@ -678,19 +732,19 @@ export class Game {
     const sc = this.sc;
     const r = this.result;
     if (!r) return;
-    sc.TB('本日の営業終了', LW / 2, 8, 18, C.gold3, 'center');
-    sc.TB(`売上 ${r.score.toLocaleString()}円`, LW / 2, 32, 26, C.w, 'center');
-    sc.TB(`${r.difficulty}　ランク ${r.rank}　${r.title}`, LW / 2, 66, 14, C.pink, 'center');
-    if (r.best) sc.TB('自己ベスト更新！', LW / 2, 86, 12, C.gold, 'center');
+    sc.TB('本日の営業終了', LW / 2, 20, 18, C.gold3, 'center');
+    sc.TB(`売上 ${r.score.toLocaleString()}円`, LW / 2, 44, 26, C.w, 'center');
+    sc.TB(`${r.difficulty}　ランク ${r.rank}　${r.title}`, LW / 2, 78, 14, C.pink, 'center');
+    if (r.best) sc.TB('自己ベスト更新！', LW / 2, 98, 12, C.gold, 'center');
     const stats = [
       [`${r.served}皿`, '出した料理'], [`${r.maxCombo}`, '最大コンボ'], [`${r.angry}人`, '怒って帰った客'],
       [`${r.kps.toFixed(2)}`, '打鍵/秒'], [`${(r.accuracy * 100).toFixed(1)}%`, '正確さ'], [`${r.trips}回`, '調達'],
     ];
     stats.forEach(([v, l], i) => {
       const x = 28 + i * 72;
-      sc.panel(x, 106, 66, 44, 'rgba(42,27,38,0.92)', C.wood4);
-      sc.TB(v, x + 33, 110, 14, C.gold3, 'center');
-      sc.T(l, x + 33, 133, 9, C.cream, 'center');
+      sc.panel(x, 120, 66, 44, 'rgba(42,27,38,0.92)', C.wood4);
+      sc.TB(v, x + 33, 124, 14, C.gold3, 'center');
+      sc.T(l, x + 33, 147, 9, C.cream, 'center');
     });
   }
 
