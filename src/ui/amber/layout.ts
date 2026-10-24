@@ -2,7 +2,7 @@
 import { DISHES, dishGroup, type IngredientId } from '../../core/shopConfig';
 
 export { TAVERN_SEATS, entryPosition } from '../../core/tavernNavigation';
-export const ORDER_CARD = { height: 34, offset: 58 };
+export const ORDER_CARD = { height: 36, offset: 58 };
 
 export const AMBER = {
   tavern: {

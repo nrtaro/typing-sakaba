@@ -12,9 +12,11 @@ export interface Settings {
   seVolume: number;
   /** 前回選んだ難易度（Enter で始めるときに使う） */
   difficulty: 'easy' | 'normal' | 'hard';
+  /** 最初の営業で、注文と調達の案内を見せ終えたか */
+  guided: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal' };
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false };
 
 export interface DayRecord {
   score: number;

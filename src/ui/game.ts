@@ -18,6 +18,11 @@ import {
 } from '../core/shopConfig';
 
 type Mode = 'title' | 'help' | 'difficulty' | 'play' | 'result';
+
+/** 時間帯ごとの曲 */
+const PHASE_TRACK = ['morning', 'noon', 'night'] as const;
+/** 結果画面の演出が終わるまでの秒数（この後にメニューを出す） */
+const RESULT_READY = 2.6;
 interface MenuItem { text: string; kana: string; act: () => void }
 
 const TYPABLE = /^[a-z\-]$/;
@@ -57,8 +62,11 @@ export class Game {
   /** 客席から上がる掛け声や音符 */
   private cheers: { x: number; y: number; t: number; text: string; col: string }[] = [];
   private cheerNext = 0.6;
-  /** 遊び方で試し打ちしたときの演出 */
-  private helpFx: { x: number; y: number; start: number; text: string; icon: number }[] = [];
+  /** 遊び方で試し打ちしたときの演出（料理は提供、調達は出発） */
+  private helpFx: { kind: 'dish' | 'fishing' | 'hunting'; x: number; y: number; start: number }[] = [];
+  /** 結果画面の演出の開始時刻と、鳴らした音の記録 */
+  private resultAt = 0;
+  private resultFx = { tick: 0, stamped: false, sparkled: false };
 
   constructor(canvas: HTMLCanvasElement) {
     this.sc = new Screen(canvas);
@@ -77,7 +85,7 @@ export class Game {
     window.addEventListener('keydown', (e) => this.onKey(e));
     // クリックでも音を鳴らせるようにする（ブラウザは操作の前に音を出させない）
     window.addEventListener('pointerdown', () => this.sound.unlock());
-    this.sound.bgm('title', 96);
+    this.sound.play('title');
     window.addEventListener('blur', () => this.autoPause());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.autoPause(); });
     requestAnimationFrame((now) => this.frame(now));
@@ -133,7 +141,7 @@ export class Game {
     this.shop = null;
     this.trip = null;
     this.paused = false;
-    this.sound.bgm('title', 96);
+    this.sound.play('title');
   }
 
   /** Enter で選ばれる項目：難易度の画面では前回の難易度、それ以外は先頭 */
@@ -157,8 +165,8 @@ export class Game {
     this.paused = false;
     this.mode = 'play';
     this.result = null;
-    this.sound.bgm('shop', PHASES[0].tempo);
-    this.sound.chord(0);
+    this.sound.play('morning');
+    this.sound.bell();
   }
 
   private autoPause() {
@@ -183,9 +191,15 @@ export class Game {
       return;
     }
     const inMenu = this.mode !== 'play' || this.paused;
+    // 結果の演出中にキーを押したら、演出を飛ばして最後の状態にする
+    if (this.mode === 'result' && this.t - this.resultAt < RESULT_READY && k !== 'Escape') {
+      e.preventDefault();
+      this.resultAt = this.t - RESULT_READY;
+      return;
+    }
     if (k === 'Escape' && (this.mode === 'help' || this.mode === 'difficulty' || this.mode === 'result')) {
       e.preventDefault();
-      this.sound.chord(2);
+      this.sound.select();
       if (this.mode === 'result') this.toTitle();
       else this.mode = 'title';
       this.menu.reset();
@@ -195,7 +209,7 @@ export class Game {
       if (k === 'Enter') {
         e.preventDefault();
         const first = this.enterItem();
-        if (first) { this.sound.chord(2); first.act(); this.menu.reset(); }
+        if (first) { this.sound.select(); first.act(); this.menu.reset(); }
         return;
       }
       if (k === 'Backspace') { e.preventDefault(); this.menu.backspace(); return; }
@@ -205,7 +219,7 @@ export class Game {
         const r = this.menu.key(k);
         if (r.kind === 'miss') { this.sound.miss(); this.missFlash = 0.25; return; }
         this.sound.key(this.menu.typed.length || 1);
-        if (r.done.length) { this.sound.chord(2); r.done[0].data.act(); this.menu.reset(); }
+        if (r.done.length) { if (this.mode !== 'help' || r.done[0].data.kana === 'もどる') this.sound.select(); r.done[0].data.act(); this.menu.reset(); }
       }
       return;
     }
@@ -254,6 +268,8 @@ export class Game {
     this.t += dt;
     this.missFlash = Math.max(0, this.missFlash - dt);
     if (this.mode === 'title') this.demoStep(dt);
+    if (this.mode === 'result') this.resultStep();
+    if (this.mode === 'play' && this.shop) this.view.guide = this.settings.guided ? null : this.guideFor(this.shop);
     if (this.mode !== 'play' || !this.shop || this.paused) return;
     // 背景の読み込み待ちで営業時間を消費しない。
     if (this.trip?.phase === 'intro' && this.trip.t <= 0 && this.tripView.art && !this.tripView.art.has(`bg-${this.trip.game.kind}`)) return;
@@ -271,7 +287,7 @@ export class Game {
     trip.earlyReturn = earlyReturn && !trip.game.finished;
     trip.phase = 'outro';
     trip.t = SHOP.tripIntro;
-    this.sound.chord(5);
+    this.sound.tripReturn();
   }
 
   private stepTrip(dt: number) {
@@ -280,7 +296,7 @@ export class Game {
     if (trip.phase === 'intro' && trip.t <= 0) {
       if (this.tripView.art && !this.tripView.art.has(`bg-${trip.game.kind}`)) return;
       trip.phase = 'game';
-      this.sound.bgm('trip', 132);
+      this.sound.play(trip.game.kind);
     } else if (trip.phase === 'game') {
       trip.game.update(dt);
       if (trip.game.finished) this.endTrip();
@@ -290,7 +306,7 @@ export class Game {
       this.shop!.stats.missKeys += r.missKeys;
       this.shop!.returnFromTrip(r.gains, trip.earlyReturn);
       this.trip = null;
-      this.sound.bgm('shop', PHASES[this.shop!.phaseIndex].tempo);
+      this.sound.play(PHASE_TRACK[this.shop!.phaseIndex]);
     }
   }
 
@@ -301,16 +317,19 @@ export class Game {
       this.view.handle(ev, shop);
       switch (ev.type) {
         case 'key': if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); break;
-        case 'serve': this.sound.chord(Math.floor(ev.combo / 3)); this.sound.coin(); if (ev.combo >= 1) this.sound.combo(ev.combo); break;
-        case 'lack': case 'angry': this.sound.bad(); break;
+        case 'serve': this.sound.serve(); if (ev.combo >= 1) this.sound.combo(ev.combo); break;
+        case 'lack': this.sound.lack(); break;
+        case 'angry': this.sound.angry(); break;
         case 'tripStart':
           this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
           this.tripView = new MinigameView();
           this.tripView.art = this.art;
           if (this.art) void this.art.ensure(`bg-${ev.trip.id}`).catch(() => { this.tripView.art = null; });
-          this.sound.chord(3);
+          this.sound.tripStart();
+          // 最初の調達に出たら、はじめての人向けの案内は終わり
+          if (!this.settings.guided) { this.settings.guided = true; this.store.saveSettings(this.settings); }
           break;
-        case 'phase': if (!this.trip) this.sound.bgm('shop', PHASES[ev.index].tempo); break;
+        case 'phase': this.sound.bell(); if (!this.trip) this.sound.play(PHASE_TRACK[ev.index]); break;
         case 'end': this.finish(); break;
         default: break;
       }
@@ -319,9 +338,9 @@ export class Game {
       for (const ev of this.trip.game.drainEvents()) {
         this.tripView.handle(ev, this.trip.game);
         if (ev.type === 'key') { if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); }
-        else if (ev.type === 'gain') this.sound.chord(2);
-        else if (ev.type === 'loss' || ev.type === 'escape') this.sound.bad();
-        else if (ev.type === 'bite') this.sound.chord(1);
+        else if (ev.type === 'gain') this.sound.gain(this.trip.game.kind);
+        else if (ev.type === 'loss' || ev.type === 'escape') this.sound.loss();
+        else if (ev.type === 'bite') this.sound.bite();
       }
     }
   }
@@ -347,8 +366,17 @@ export class Game {
     this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: s.trips, difficulty: diff.name };
     this.mode = 'result';
     this.menu.reset();
-    this.sound.bgm('title', 96);
-    this.sound.chord(8);
+    this.resultAt = this.t;
+    this.resultFx = { tick: 0, stamped: false, sparkled: false };
+    this.sound.play('result');
+  }
+
+  /** はじめての営業だけ出す案内：まず料理を出す → 食材が減ったら調達 */
+  private guideFor(shop: Shop): 'order' | 'supply' | null {
+    if (shop.away || this.trip) return null;
+    if (shop.stats.served === 0) return shop.seats.some((g) => g && g.state === 'wait') ? 'order' : null;
+    const low = Object.values(shop.stock).some((n) => n <= 3);
+    return low || shop.stats.served >= 3 ? 'supply' : null;
   }
 
   // ---------- タイトルの背景：にぎわう夜の店 ----------
@@ -466,7 +494,7 @@ export class Game {
     else if (this.mode === 'help') this.drawHelp();
     else if (this.mode === 'difficulty') this.drawDifficulty();
     else this.drawResult();
-    this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 194 : this.mode === 'difficulty' ? 170 : 172);
+    if (this.mode !== 'result' || this.t - this.resultAt > RESULT_READY - 0.3) this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 200 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);
   }
 
@@ -657,37 +685,50 @@ export class Game {
     });
   }
 
-  /** 遊び方の試し打ち：本番と同じ音と演出を小さく出す */
+  /** 遊び方の試し打ち：料理は提供の演出、調達は家族が出かける演出（本番と同じ音） */
   private helpPlay(kind: 'dish' | 'fishing' | 'hunting') {
     if (kind === 'dish') {
-      this.helpFx.push({ x: 116, y: 70, start: this.t, text: '+120円', icon: 7 });
-      this.sound.coin();
+      this.helpFx.push({ kind, x: 116, y: 70, start: this.t });
+      this.sound.serve();
     } else {
-      const fish = kind === 'fishing';
-      this.helpFx.push({ x: fish ? 205 : 269, y: 86, start: this.t, text: fish ? '魚+5' : '肉+4', icon: fish ? 0 : 1 });
-      this.sound.chord(3);
+      this.helpFx.push({ kind, x: kind === 'fishing' ? 196 : 260, y: 86, start: this.t });
+      this.sound.tripStart();
     }
   }
 
-  /** 遊び方の札：打っている間は光り、打ち切ると演出が出る */
+  /**
+   * 遊び方の札：本番の注文札と同じ見た目にし、何も打っていない間も「次に打つ文字」を光らせ、
+   * 横でキーが押されている絵を動かして、打てる札だと見て分かるようにする。
+   */
   private helpWord(kana: string, text: string, cx: number, y: number, size: number) {
     const sc = this.sc;
     const live = this.menu.active.find((l) => l.target.id === kana);
     const typing = this.menu.typed.length > 0;
     const dim = typing && !live;
     const m = live?.matcher ?? new RomajiMatcher(kana);
-    const w = Math.max(sc.W(text, size + 2), sc.W(m.typed + m.remaining, size)) + 14;
+    const w = Math.max(sc.W(text, size + 2), sc.W(m.typed + m.remaining, size)) + 16;
     const h = size * 2 + 14;
+    // 何も打っていない間は、ゆっくり呼吸するように光らせる
     if (live) sc.glow(cx - w / 2, y, w, h);
-    sc.panel(cx - w / 2, y, w, h, live ? '#4a2c3c' : '#211712', live ? C.gold : C.wood4);
+    else if (!typing) sc.glow(cx - w / 2, y, w, h, C.gold3, 0.45 + 0.35 * Math.sin(this.t * 3));
+    sc.panel(cx - w / 2, y, w, h, live ? '#4a2c3c' : '#211712', live ? C.gold : dim ? C.wood3 : C.gold2);
     sc.T(text, cx, y + 3, size + 2, dim ? '#a89a90' : C.cream, 'center');
-    sc.roma(m.typed, m.remaining, cx, y + size + 8, size, live ? 'active' : dim ? 'dim' : 'idle');
+    sc.roma(m.typed, m.remaining, cx, y + size + 8, size, dim ? 'dim' : 'active');
+    // 右上で、次に打つキーが押されている絵（押す・離すを繰り返す）
+    if (!dim) {
+      const next = (m.remaining[0] ?? '').toUpperCase();
+      const down = Math.floor(this.t * 2.5 + cx) % 2 === 0;
+      const kx = cx + w / 2 - 4;
+      const ky = y - 9 + (down ? 1.5 : 0);
+      sc.PR(kx + 1, y - 6, 12, 12, '#1a0f08', 0.7);
+      sc.panel(kx, ky, 12, 12, down ? '#e3c890' : '#f6e2b8', '#8a6232');
+      sc.T(next, kx + 6, ky + 2, 8, '#3a2414', 'center');
+    }
   }
 
   private drawHelp() {
     const sc = this.sc;
     sc.TB('遊び方', 24, 18, 22, C.gold3, 'left');
-    sc.T('札の言葉を打って試せます', 108, 26, 9, C.cream2);
     const titles = ['料理名を打つ', '減ったら調達', 'たくさん出そう'];
     const lines = [['お客の頭上のローマ字を', '打つと、料理を出せます。'], ['下の言葉を打って食材集め。', 'Enterで途中帰還できます。'], ['お客を待たせすぎず、', '３分間の売上に挑戦！']];
     titles.forEach((title, i) => {
@@ -695,30 +736,20 @@ export class Game {
       sc.panel(x, 54, 138, 128, 'rgba(55,37,23,0.94)', C.wood4);
       sc.T(`0${i + 1}`, x + 12, 63, 9, C.gold3);
       if (i === 0) {
-        this.art?.drawIcon(sc, 'icons-dishes', 7, x + 10, 80, 32);
-        this.helpWord('やきざかな', '焼き魚', x + 92, 78, 8);
+        this.art?.drawIcon(sc, 'icons-dishes', 7, x + 8, 84, 32);
+        this.helpWord('やきざかな', '焼き魚', x + 90, 82, 8);
       } else if (i === 1) {
-        this.art?.drawIcon(sc, 'icons-dishes', 0, x + 24, 74, 22);
-        this.art?.drawIcon(sc, 'icons-dishes', 1, x + 88, 74, 22);
-        this.helpWord('つり', 'つり', x + 35, 98, 8);
-        this.helpWord('かり', 'かり', x + 99, 98, 8);
+        // 出かけている間は、元の場所の顔を消す
+        const away = (k: string) => this.helpFx.some((f) => f.kind === k);
+        if (this.art && !away('fishing')) this.art.drawHead(sc, 'family-wife', 0, x + 26, 70, 18);
+        if (this.art && !away('hunting')) this.art.drawHead(sc, 'family-master', 0, x + 90, 70, 18);
+        this.helpWord('つり', 'つり', x + 35, 96, 8);
+        this.helpWord('かり', 'かり', x + 99, 96, 8);
       } else sc.T('3:00', x + 69, 86, 25, C.gold3, 'center');
       sc.T(title, x + 12, 130, 13, C.cream);
       lines[i].forEach((line, j) => sc.T(line, x + 12, 152 + j * 13, 8, C.cream2));
     });
-    // 試し打ちの演出：火花と、出した数・取れた数が浮かぶ
-    this.helpFx = this.helpFx.filter((f) => this.t - f.start < 1);
-    for (const f of this.helpFx) {
-      const age = this.t - f.start;
-      const a = Math.min(1, (1 - age) * 3);
-      for (let k = 0; k < 14; k++) {
-        const ang = (k / 14) * Math.PI * 2;
-        const r = 6 + age * 34;
-        sc.PR(f.x + Math.cos(ang) * r, f.y + Math.sin(ang) * r * 0.7, 1.5, 1.5, k % 2 ? C.gold : C.gold3, a);
-      }
-      this.art?.drawIcon(sc, 'icons-dishes', f.icon, f.x - 9, f.y - 12 - age * 10, 18, a);
-      sc.TB(f.text, f.x, f.y - 26 - age * 14, 11, C.gold3, 'center', C.ink, a);
-    }
+    this.drawHelpFx();
     // 操作キー：キーの形の札で並べる
     let kx = 24;
     for (const [key, label] of [['Backspace', '1文字戻す'], ['Space', '打ち直し'], ['Esc', '一時停止']] as const) {
@@ -728,24 +759,123 @@ export class Game {
     }
   }
 
+  /** 試し打ちの演出 */
+  private drawHelpFx() {
+    const sc = this.sc;
+    this.helpFx = this.helpFx.filter((f) => this.t - f.start < 1.2);
+    for (const f of this.helpFx) {
+      const age = this.t - f.start;
+      const a = Math.min(1, (1.2 - age) * 3);
+      if (f.kind === 'dish') {
+        // 提供：金色の火花・料理の皿・売上
+        for (let k = 0; k < 14; k++) {
+          const ang = (k / 14) * Math.PI * 2;
+          const r = 6 + age * 34;
+          sc.PR(f.x + Math.cos(ang) * r, f.y + Math.sin(ang) * r * 0.7, 1.5, 1.5, k % 2 ? C.gold : C.gold3, a);
+        }
+        this.art?.drawIcon(sc, 'icons-dishes', 7, f.x - 9, f.y - 12 - age * 10, 18, a);
+        sc.TB('+120円', f.x, f.y - 26 - age * 14, 11, C.gold3, 'center', C.ink, a);
+      } else {
+        // 調達：家族が手を振って右へ出かけていく。足もとに土ぼこり、吹き出しで「いってきます」
+        const who = f.kind === 'fishing' ? 'family-wife' : 'family-master';
+        const x = f.x - 8 + age * 40;
+        const hop = Math.abs(Math.sin(age * 14)) * 2;
+        for (let k = 0; k < 4; k++) {
+          const d = age - k * 0.12;
+          if (d > 0) sc.PR(x - 6 - k * 7, f.y + 4 - d * 6, 3, 2, '#c9a77a', Math.max(0, 0.7 - d) * a);
+        }
+        this.art?.drawHead(sc, who, 0, x - 9, f.y - 16 - hop, 18, 0.42, a);
+        const say = 'いってきます！';
+        const bw = sc.W(say, 7) + 8;
+        sc.panel(x - bw / 2, f.y - 32 - hop, bw, 12, C.cream, C.ink, a);
+        sc.T(say, x, f.y - 30 - hop, 7, C.ink, 'center', a);
+      }
+    }
+  }
+
+  /** 結果画面の演出が終わって、選べるようになるまでの時間 */
+  private resultStep() {
+    const r = this.result;
+    if (!r) return;
+    const age = this.t - this.resultAt;
+    // 売上を数え上げる間、カチカチ鳴らす
+    if (age > 0.3 && age < 1.6 && age - this.resultFx.tick > 0.06) {
+      this.resultFx.tick = age;
+      this.sound.tick();
+    }
+    if (!this.resultFx.stamped && age > 1.8) {
+      this.resultFx.stamped = true;
+      this.sound.stamp();
+    }
+    if (r.best && !this.resultFx.sparkled && age > 2.4) {
+      this.resultFx.sparkled = true;
+      this.sound.sparkle();
+    }
+  }
+
   private drawResult() {
     const sc = this.sc;
     const r = this.result;
     if (!r) return;
-    sc.TB('本日の営業終了', LW / 2, 20, 18, C.gold3, 'center');
-    sc.TB(`売上 ${r.score.toLocaleString()}円`, LW / 2, 44, 26, C.w, 'center');
-    sc.TB(`${r.difficulty}　ランク ${r.rank}　${r.title}`, LW / 2, 78, 14, C.pink, 'center');
-    if (r.best) sc.TB('自己ベスト更新！', LW / 2, 98, 12, C.gold, 'center');
+    const age = this.t - this.resultAt;
+    const ease = (v: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
+    // 売上の後ろに、あたたかい明かり
+    sc.radialGlow(LW / 2, 62, 140, '#ffb45a', 0.22 * ease(age / 0.6), 0.45);
+    sc.TB('本日の営業終了', LW / 2, 16, 16, C.gold3, 'center', C.ink, ease(age / 0.3));
+    // 売上：数字が駆け上がり、止まった瞬間に少し弾む
+    const count = Math.round(r.score * ease((age - 0.3) / 1.3));
+    const pop = age > 1.6 && age < 1.8 ? 1 + (1.8 - age) * 0.6 : 1;
+    sc.TB(`${count.toLocaleString()}円`, LW / 2, 40 - (pop - 1) * 10, 30 * pop, C.w, 'center', C.ink, ease(age / 0.3));
+    // ランクの判子：大きく現れて押し付けられる
+    if (age > 1.65) {
+      const p = ease((age - 1.65) / 0.15);
+      const scale = 2.2 - 1.2 * p;
+      const cx = LW / 2 - 70;
+      const cy = 92;
+      const col = r.rank === 'S' ? '#ffd27a' : r.rank === 'A' ? '#ff9fbd' : r.rank === 'B' ? '#9cc4f6' : '#e8c9a0';
+      sc.radialGlow(cx, cy, 20 * scale, col, 0.35 * p);
+      sc.panel(cx - 14 * scale, cy - 14 * scale, 28 * scale, 28 * scale, '#3a1f18', col, Math.min(1, p * 1.5));
+      sc.TB(r.rank, cx, cy - 11 * scale, 20 * scale, col, 'center', C.ink, Math.min(1, p * 1.5));
+      sc.T(r.difficulty, cx + 26, cy - 11, 9, C.cream2, 'left', p);
+      sc.TB(r.title, cx + 26, cy - 1, 13, C.pink, 'left', C.ink, p);
+    }
+    // 自己ベスト更新：帯と紙吹雪
+    if (r.best && age > 2.3) {
+      const p = ease((age - 2.3) / 0.25);
+      const bw = 140 * p;
+      sc.panel(LW / 2 - bw / 2, 112, bw, 16, '#7a2a3a', C.gold3, p);
+      sc.TB('自己ベスト更新！', LW / 2, 114, 11, C.gold3, 'center', C.ink, p);
+      const colors = ['#ffd25c', '#ff7fb0', '#7fc8ff', '#7ff0d8', '#fff7ea'];
+      for (let k = 0; k < 36; k++) {
+        const t = age - 2.3 - (k % 6) * 0.08;
+        if (t < 0) continue;
+        const life = (t % 3) / 3;
+        const x = ((k * 53) % 480) + Math.sin(t * 2 + k) * 8;
+        const y = -6 + life * 280;
+        sc.PR(x, y, 2, 1 + Math.abs(Math.sin(t * 6 + k)) * 2, colors[k % colors.length], 0.9 * (1 - life));
+      }
+    }
+    // 成績：左から順に浮かび上がる
     const stats = [
       [`${r.served}皿`, '出した料理'], [`${r.maxCombo}`, '最大コンボ'], [`${r.angry}人`, '怒って帰った客'],
       [`${r.kps.toFixed(2)}`, '打鍵/秒'], [`${(r.accuracy * 100).toFixed(1)}%`, '正確さ'], [`${r.trips}回`, '調達'],
     ];
     stats.forEach(([v, l], i) => {
+      const p = ease((age - 2.0 - i * 0.06) / 0.25);
+      if (p <= 0) return;
       const x = 28 + i * 72;
-      sc.panel(x, 120, 66, 44, 'rgba(42,27,38,0.92)', C.wood4);
-      sc.TB(v, x + 33, 124, 14, C.gold3, 'center');
-      sc.T(l, x + 33, 147, 9, C.cream, 'center');
+      const y = 136 + (1 - p) * 10;
+      sc.panel(x, y, 66, 44, 'rgba(42,27,38,0.92)', C.wood4, p);
+      sc.TB(v, x + 33, y + 4, 14, C.gold3, 'center', C.ink, p);
+      sc.T(l, x + 33, y + 27, 9, C.cream, 'center', p);
     });
+    // 家族が見送る
+    if (this.art) {
+      const p = ease((age - 0.4) / 0.5);
+      for (const [id, x, hgt] of [['master', 28, 58], ['wife', 452, 52]] as const) {
+        this.art.drawAnim(sc, `family-${id}`, '待機', this.t, x, 268 + (1 - p) * 30, this.art.scaleFor(`family-${id}`, 0, hgt), false, p);
+      }
+    }
   }
 
   private drawTripIntro() {
