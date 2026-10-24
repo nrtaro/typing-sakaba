@@ -1,9 +1,10 @@
+import { procurementReward, rewardKeys } from '../core/procurementRewards';
 import { C, TRIP_COLOR, mix, type Color } from './palette';
 import { Screen, LW } from './screen';
 import { CRATE, DEER, FAM, ICON, MERCHANT, PORTRAIT, RABBIT } from './sprites';
 import { pen, SKY } from './room';
 import {
-  FISHING, FishingGame, GatheringGame, HuntingGame, TradingGame, TRADING, GATHER, GATHER_SLOTS,
+  FISHING, FishingGame, GatheringGame, HuntingGame, TradingGame, GATHER, GATHER_SLOTS,
   type Minigame, type MinigameEvent, type Prey, type Sprout,
 } from '../core/minigames';
 import { RomajiMatcher } from '../core/romaji';
@@ -233,6 +234,7 @@ export class MinigameView {
       const total = game.big ? FISHING.bigWords : 1;
       sc.TB(`巻き上げ ${total - game.wordsLeft + 1}/${total}`, LW / 2, 84, 12, C.w, 'center');
       this.bigWord(sc, game.word.text, game.word.kana, game, 112, C.blue);
+      if (game.wordsLeft === 1) sc.TB(`釣り上げで魚×${procurementReward('fishing', game.catchKeys + rewardKeys(game.word.kana), game.big)}`, LW / 2, 176, 10, C.gold3, 'center');
       // テンション：ミスでたまり、満タンで糸が切れる
       sc.panel(340, 44, 130, 30, 'rgba(42,27,38,0.9)', game.tension >= 2 ? C.red : C.blue);
       sc.T('糸のテンション', 348, 48, 9, C.cream);
@@ -240,7 +242,7 @@ export class MinigameView {
     } else if (game.phase === 'wait') {
       sc.TB('浮きを見つめている…', LW / 2, 196, 13, C.cream, 'center');
     }
-    sc.TB('釣れたらすぐ次の言葉！ 速く打つほど大漁。巻き上げ中は３ミスで糸が切れる', LW / 2, 236, 9, C.cream, 'center');
+    sc.TB('長い言葉ほど大漁！ 釣れたらすぐ次へ。巻き上げ中は３ミスで糸が切れる', LW / 2, 236, 9, C.cream, 'center');
   }
 
   // ---------- かり ----------
@@ -286,8 +288,9 @@ export class MinigameView {
       const live = active.find((l) => l.target.id === p.id);
       const dim = game.input.typed.length > 0 && !live;
       const m = live?.matcher ?? new RomajiMatcher(p.word.kana);
+      const label = p.word.text + (p.kind === 'rabbit' ? ` ×${procurementReward('hunting', rewardKeys(p.word.kana))}` : '');
       const h = 32;
-      const w = Math.max(60, sc.W(m.typed + m.remaining, 10) + 14, sc.W(p.word.text, 12) + 14);
+      const w = Math.max(60, sc.W(m.typed + m.remaining, 10) + 14, sc.W(label, 12) + 14);
       const spriteH = p.kind === 'deer' ? 48 : 24;
       const deer = p.kind === 'deer';
       // 大物の頭上は中段の小物の走路。横に寄せて、その小物を枠で隠さない。
@@ -296,12 +299,12 @@ export class MinigameView {
         y: deer ? pos.y - spriteH + 8 : pos.y - spriteH - h - 8, w, h };
       const cx = box.x + w / 2;
       sc.panel(box.x, box.y, w, h, live ? '#4a2c3c' : 'rgba(42,27,38,0.92)', live ? C.gold : p.kind === 'deer' ? C.gold2 : C.wood4, dim ? 0.55 : 1);
-      sc.T(p.word.text, cx, box.y + 2, 12, dim ? C.gray : C.w, 'center');
+      sc.T(label, cx, box.y + 2, 12, dim ? C.gray : C.w, 'center');
       sc.roma(m.typed, m.remaining, cx, box.y + 18, 10, live ? 'active' : dim ? 'dim' : 'idle');
       for (let i = 0; i < p.maxHp; i++) sc.PR(cx - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
-      if (p.kind === 'deer') sc.TB('大物 肉×12', cx, box.y - 16, 9, C.gold3, 'center');
+      if (p.kind === 'deer') sc.TB(p.hp === 1 ? `大物 肉×${procurementReward('hunting', (p.rewardKeys ?? 0) + rewardKeys(p.word.kana), true)}` : '大物', cx, box.y - 16, 9, C.gold3, 'center');
     }
-    sc.TB('最初の文字で狙いが決まる。左の柵を越えられると逃げられる', LW / 2, 236, 9, C.ink, 'center', C.sand3);
+    sc.TB('長い言葉ほど肉が多い。最初の文字で狙いが決まり、左の柵で逃げられる', LW / 2, 236, 9, C.ink, 'center', C.sand3);
   }
 
   // ---------- さいしゅ ----------
@@ -337,16 +340,17 @@ export class MinigameView {
       const dim = game.input.typed.length > 0 && !live;
       const m = live?.matcher ?? new RomajiMatcher(s.word.kana);
       const bad = !s.ing;
-      const w = Math.max(92, sc.W(m.typed + m.remaining, 10) + 12);
+      const label = (bad ? '☠ ' : '') + s.word.text + (bad ? '' : ` ×${procurementReward('gathering', rewardKeys(s.word.kana))}`);
+      const w = Math.max(92, sc.W(m.typed + m.remaining, 10) + 12, sc.W(label, 11) + 12);
       // 絵があるときは芽のすぐ上に置き、前の列の芽を隠さない
       const top = pos.y - (this.art ? AMBER.gathering.sprout.size + 31 : 70);
       sc.panel(pos.x - w / 2, top, w, 30, live ? '#4a2c3c' : bad ? '#3a1e48' : 'rgba(42,27,38,0.92)', live ? C.gold : bad ? C.purple : C.green, dim ? 0.55 : 1);
-      sc.T((bad ? '☠ ' : '') + s.word.text, pos.x, top + 2, 11, bad ? '#e0c8ff' : dim ? C.gray : C.w, 'center');
+      sc.T(label, pos.x, top + 2, 11, bad ? '#e0c8ff' : dim ? C.gray : C.w, 'center');
       sc.roma(m.typed, m.remaining, pos.x, top + 17, 10, live ? 'active' : dim ? 'dim' : 'idle');
       sc.PR(pos.x - w / 2 + 4, top + 28, (w - 8) * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
     }
     sc.panel(100, 234, 370, 15, 'rgba(42,27,38,0.88)', C.green);
-    sc.T(`食べられるものだけ打つ（1回で${GATHER.perPick}つ）。☠ は${GATHER.poisonLoss}つ失う`, 285, 238, 8, C.cream, 'center');
+    sc.T(`長い言葉ほど多く摘める。☠ は${GATHER.poisonLoss}つ失う`, 285, 238, 8, C.cream, 'center');
   }
 
   // ---------- しいれ：早い者勝ちの競り ----------
@@ -385,7 +389,7 @@ export class MinigameView {
     sc.panel(LW / 2 - 100, 42, 200, 32, 'rgba(42,27,38,0.92)', C.gold2);
     if (this.art) this.art.drawIcon(sc, 'icons-dishes', ICON_INDEX[lot.item], LW / 2 - 94, 44, 26);
     else sc.spr(ICON[lot.item], LW / 2 - 92, 46, 2);
-    sc.TB(`${INGREDIENT_NAME[lot.item]} ${TRADING.win}箱を競り中`, LW / 2 + 10, 50, 13, C.w, 'center');
+    sc.TB(`${INGREDIENT_NAME[lot.item]} ${procurementReward('trading', rewardKeys(lot.word.kana))}箱を競り中`, LW / 2 + 10, 50, 13, C.w, 'center');
     if (lot.outcome === 'open') {
       this.bigWord(sc, lot.word.text, lot.word.kana, game, 80, C.gold2);
       // 自分とライバルの進み具合

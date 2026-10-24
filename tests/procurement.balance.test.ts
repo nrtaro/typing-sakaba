@@ -1,5 +1,6 @@
+import { procurementReward } from '../src/core/procurementRewards';
 import { describe, expect, it } from 'vitest';
-import { createMinigame, GatheringGame, HuntingGame, HUNTING } from '../src/core/minigames';
+import { createMinigame, GatheringGame, HuntingGame } from '../src/core/minigames';
 import { Rng } from '../src/core/rng';
 import { RomajiMatcher, defaultRomaji } from '../src/core/romaji';
 import { DIFFICULTIES, DISHES, TRIPS, type Difficulty, type TripId, type IngredientId } from '../src/core/shopConfig';
@@ -13,7 +14,7 @@ export function tripRun(id: TripId, seed: number, wpm: number, diff: Difficulty)
     let targets = game.targets();
     if (game instanceof GatheringGame) targets = targets.filter(t => game.sprouts.find(s => s.id === t.id)?.ing);
     if (game instanceof HuntingGame) targets.sort((a, b) => {
-      const cost = (id: string) => {const p = game.prey.find(p => p.id === id)!;return HUNTING[p.kind].yield / (p.hp * defaultRomaji(p.word.kana).length);};
+      const cost = (id: string) => {const p = game.prey.find(p => p.id === id)!;const remaining = p.hp * defaultRomaji(p.word.kana).length; return procurementReward('hunting', (p.rewardKeys ?? 0) + remaining, p.kind === 'deer') / remaining;};
       return cost(b.id) - cost(a.id);
     });
     const live = game.input.active.find(a => targets.some(t => t.id === a.target.id));
@@ -51,6 +52,7 @@ export function procurementRows() {
 describe('WPM別の調達バランス', () => {
   it('難易度とWPMごとの比較を再現できる', () => {
     const rows = procurementRows();
+    if (import.meta.env.VITE_PROCUREMENT_REPORT) console.log('PROCUREMENT_REPORT', JSON.stringify(rows));
     expect(rows).toHaveLength(60);
     for (const row of rows) expect(row.total).toBeGreaterThan(0);
     for (const diff of DIFFICULTIES) for (const trip of TRIPS) {
@@ -66,6 +68,5 @@ describe('WPM別の調達バランス', () => {
       expect(ratio).toBeGreaterThan(.8);
       expect(ratio).toBeLessThan(1.25);
     }
-    if (import.meta.env.VITE_PROCUREMENT_REPORT) console.log('PROCUREMENT_REPORT', JSON.stringify(rows));
   });
 });
