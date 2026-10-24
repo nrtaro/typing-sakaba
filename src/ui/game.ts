@@ -459,8 +459,9 @@ export class Game {
       sc.T(['のんびり楽しむ','ほどよい忙しさ','次々くる注文に挑戦'][i], x + 12, 136, 9, C.cream2);
       const m = live?.matcher ?? new RomajiMatcher(d.kana);
       sc.roma(m.typed, m.remaining, x + 69, 154, 10, live ? 'active' : 'idle');
+      sc.T(d.comboMissAllowance ? `コンボ：${d.comboMissAllowance}ミスまでOK` : 'コンボ：ノーミスに挑戦', x + 12, 173, 7, C.gold3);
       if (this.art) for (let j = 0; j <= i; j++) this.art.drawFrame(sc, 'guests-seated', j * 4,
-        x + 23 + j * 33, 200, this.art.scaleFor('guests-seated', j * 4, 29));
+        x + 23 + j * 33, 204, this.art.scaleFor('guests-seated', j * 4, 23));
       for (let j = 0; j < 3; j++) sc.PR(x + 12 + j * 16, 208, 12, 2, j <= i ? C.gold3 : C.wood3);
     });
   }

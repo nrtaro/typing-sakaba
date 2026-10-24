@@ -108,7 +108,7 @@ describe('狩りのゲージと報酬', () => {
     expect(y).toBeCloseTo(118 + deer.lane * 106 - 48 + 8);
   });
 
-  it('小物は1語で肉2、大物は3語で肉12を得る', () => {
+  it('小物は1語で肉3、大物は3語で肉12を得る', () => {
     const game = new HuntingGame(new Rng(7));
     for (let i = 0; i < 130; i++) game.update(1 / 60);
     for (const kind of ['rabbit', 'deer'] as const) {
@@ -118,7 +118,7 @@ describe('狩りのゲージと報酬', () => {
       for (let hit = 0; hit < HUNTING[kind].hp; hit++) {
         for (const key of new RomajiMatcher(prey.word.kana).remaining) game.key(key);
       }
-      expect((game.gains.meat ?? 0) - before).toBe(kind === 'rabbit' ? 2 : 12);
+      expect((game.gains.meat ?? 0) - before).toBe(kind === 'rabbit' ? 3 : 12);
     }
   });
 });
@@ -165,5 +165,19 @@ describe('連続操作中の文字表示', () => {
     shop.combo = 0;
     view.update(1 / 60, shop);
     expect(view.comboBurst).toBe(0);
+  });
+});
+
+
+describe('素材必要数の表示', () => {
+  it('大皿の魚・肉・野菜には×2を表示し、香辛料1個と区別できる', () => {
+    const shop = new Shop(new Rng(1)), view = new ShopView();
+    shop.seats[0] = { id: 100, dish: DISHES.find(d => d.id === 'feast')!, look: 0, wait: 30, maxWait: 30, state: 'wait', t: 0, lack: 0 };
+    const T = vi.fn();
+    const sc = { T, panel: vi.fn(), PR: vi.fn(), TB: vi.fn(), roma: vi.fn(), spr: vi.fn(),
+      fitSize: (_s: string, size: number) => size, W: (s: string, size: number) => s.length * size / 2 } as unknown as Screen;
+    view['drawOrders'](sc, shop);
+    expect(T.mock.calls.filter(call => call[0] === '×2')).toHaveLength(3);
+    expect(T.mock.calls.some(call => call[0] === '×1')).toBe(false);
   });
 });

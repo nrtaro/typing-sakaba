@@ -23,25 +23,25 @@ export const GAME_TITLE = 'タイピング酒場';
 export const GAME_SUBTITLE = '～おやじと女将と看板娘～';
 
 export const DISHES: Dish[] = [
-  // 朝：素材1つの軽い料理
-  { id: 'grilledFish', text: '焼き魚', kana: 'やきざかな', need: { fish: 1 }, price: 120, from: 0 },
-  { id: 'vegSoup', text: '野菜スープ', kana: 'やさいすーぷ', need: { veg: 1 }, price: 100, from: 0 },
+  // 朝：主材料を２個使う軽い料理（エールは１杯）
+  { id: 'grilledFish', text: '焼き魚', kana: 'やきざかな', need: { fish: 2 }, price: 120, from: 0 },
+  { id: 'vegSoup', text: '野菜スープ', kana: 'やさいすーぷ', need: { veg: 2 }, price: 100, from: 0 },
   { id: 'ale', text: 'エール', kana: 'えーる', need: { ale: 1 }, price: 80, from: 0 },
-  { id: 'mushSaute', text: 'きのこソテー', kana: 'きのこそてー', need: { mush: 1 }, price: 110, from: 0 },
-  { id: 'jerky', text: '干し肉', kana: 'ほしにく', need: { meat: 1 }, price: 120, from: 0 },
-  // 昼：素材2つ
-  { id: 'stirFry', text: '肉野菜炒め', kana: 'にくやさいいため', need: { meat: 1, veg: 1 }, price: 260, from: 1 },
-  { id: 'mushStew', text: 'きのこ煮込み', kana: 'きのこにこみ', need: { mush: 1, veg: 1 }, price: 240, from: 1 },
-  { id: 'karaage', text: '唐揚げ', kana: 'からあげ', need: { meat: 1, spice: 1 }, price: 230, from: 1 },
-  { id: 'fishFry', text: '魚フライ', kana: 'さかなふらい', need: { fish: 1, spice: 1 }, price: 230, from: 1 },
-  { id: 'herbFish', text: '香草焼き', kana: 'こうそうやき', need: { fish: 1, veg: 1 }, price: 250, from: 1 },
-  // 夜：素材3つ以上や酒を使う料理
-  { id: 'hunterStew', text: 'ハンターシチュー', kana: 'はんたーしちゅー', need: { meat: 1, veg: 1, mush: 1 }, price: 400, from: 2 },
-  { id: 'spicyPot', text: 'ピリ辛鍋', kana: 'ぴりからなべ', need: { fish: 1, mush: 1, spice: 1 }, price: 400, from: 2 },
-  { id: 'sakeFish', text: '魚の酒蒸し', kana: 'さかなのさかむし', need: { fish: 1, ale: 1 }, price: 260, from: 2 },
-  { id: 'aleBeef', text: '肉の黒エール煮', kana: 'にくのくろえーるに', need: { meat: 1, ale: 1 }, price: 280, from: 2 },
-  { id: 'spiceAle', text: 'スパイスエール', kana: 'すぱいすえーる', need: { ale: 1, spice: 1 }, price: 200, from: 2 },
-  { id: 'feast', text: '荒野の大皿', kana: 'こうやのおおざら', need: { meat: 1, fish: 1, veg: 1, spice: 1 }, price: 620, from: 2 },
+  { id: 'mushSaute', text: 'きのこソテー', kana: 'きのこそてー', need: { mush: 2 }, price: 110, from: 0 },
+  { id: 'jerky', text: '干し肉', kana: 'ほしにく', need: { meat: 2 }, price: 120, from: 0 },
+  // 昼：主材料２個＋付け合わせ・調味料
+  { id: 'stirFry', text: '肉野菜炒め', kana: 'にくやさいいため', need: { meat: 2, veg: 1 }, price: 260, from: 1 },
+  { id: 'mushStew', text: 'きのこ煮込み', kana: 'きのこにこみ', need: { mush: 2, veg: 1 }, price: 240, from: 1 },
+  { id: 'karaage', text: '唐揚げ', kana: 'からあげ', need: { meat: 2, spice: 1 }, price: 230, from: 1 },
+  { id: 'fishFry', text: '魚フライ', kana: 'さかなふらい', need: { fish: 2, spice: 1 }, price: 230, from: 1 },
+  { id: 'herbFish', text: '香草焼き', kana: 'こうそうやき', need: { fish: 2, veg: 1 }, price: 250, from: 1 },
+  // 夜：複数の主材料や酒を組み合わせる料理
+  { id: 'hunterStew', text: 'ハンターシチュー', kana: 'はんたーしちゅー', need: { meat: 2, veg: 2, mush: 1 }, price: 400, from: 2 },
+  { id: 'spicyPot', text: 'ピリ辛鍋', kana: 'ぴりからなべ', need: { fish: 2, mush: 1, spice: 1 }, price: 400, from: 2 },
+  { id: 'sakeFish', text: '魚の酒蒸し', kana: 'さかなのさかむし', need: { fish: 2, ale: 1 }, price: 260, from: 2 },
+  { id: 'aleBeef', text: '肉の黒エール煮', kana: 'にくのくろえーるに', need: { meat: 2, ale: 1 }, price: 280, from: 2 },
+  { id: 'spiceAle', text: 'スパイスエール', kana: 'すぱいすえーる', need: { ale: 2, spice: 1 }, price: 230, from: 2 },
+  { id: 'feast', text: '荒野の大皿', kana: 'こうやのおおざら', need: { meat: 2, fish: 2, veg: 2, spice: 1 }, price: 620, from: 2 },
 ];
 
 export interface Trip {
@@ -93,7 +93,7 @@ export const SHOP = {
   /** 旧セーブ・手動生成した客の表示用。通常の入店時間は経路長と歩速から決める。 */
   walkTime: 0.9,
   eatTime: 2.4,
-  startStock: { fish: 5, meat: 4, veg: 5, mush: 3, ale: 5, spice: 3 } as Record<IngredientId, number>,
+  startStock: { fish: 6, meat: 6, veg: 6, mush: 4, ale: 5, spice: 3 } as Record<IngredientId, number>,
   /** チップの最大額（待ち時間が満タンのとき） */
   tipMax: 60,
   /** 何コンボごとに倍率が上がるか・上がる量・上限 */
@@ -115,6 +115,8 @@ export interface Difficulty {
   name: string;
   kana: string;
   desc: string;
+  /** 注文成立までに許容するミス数。料理を出すと回復する。 */
+  comboMissAllowance: number;
   /** お客の来る間隔（大きいほど客が少ない） */
   everyMult: number;
   /** 待ってくれる時間 */
@@ -133,9 +135,9 @@ export interface Difficulty {
 }
 
 export const DIFFICULTIES: Difficulty[] = [
-  { id: 'easy', name: 'やさしい', kana: 'やさしい', desc: 'お客はのんびり、獲物もゆっくり。はじめての人に', everyMult: 2.1, waitMult: 2.2, hookMult: 2.4, preyMult: 0.55, sproutLifeMult: 1.8, poisonRate: 0.04, rivalMult: 0.5, rankMult: 0.6 },
-  { id: 'normal', name: 'ふつう', kana: 'ふつう', desc: '標準の忙しさ', everyMult: 1.2, waitMult: 1.2, hookMult: 1.3, preyMult: 0.9, sproutLifeMult: 1.15, poisonRate: 0.1, rivalMult: 0.85, rankMult: 1 },
-  { id: 'hard', name: 'むずかしい', kana: 'むずかしい', desc: 'お客が次々来て待ってくれない。腕に自信のある人に', everyMult: 0.9, waitMult: 0.9, hookMult: 1, preyMult: 1.1, sproutLifeMult: 0.95, poisonRate: 0.17, rivalMult: 1.1, rankMult: 1.2 },
+  { id: 'easy', comboMissAllowance: 2, name: 'やさしい', kana: 'やさしい', desc: 'お客はのんびり、獲物もゆっくり。はじめての人に', everyMult: 2.1, waitMult: 2.2, hookMult: 2.4, preyMult: 0.55, sproutLifeMult: 1.8, poisonRate: 0.04, rivalMult: 0.5, rankMult: 0.6 },
+  { id: 'normal', comboMissAllowance: 1, name: 'ふつう', kana: 'ふつう', desc: '標準の忙しさ', everyMult: 1.2, waitMult: 1.2, hookMult: 1.3, preyMult: 0.9, sproutLifeMult: 1.15, poisonRate: 0.1, rivalMult: 0.85, rankMult: 1 },
+  { id: 'hard', comboMissAllowance: 0, name: 'むずかしい', kana: 'むずかしい', desc: 'お客が次々来て待ってくれない。腕に自信のある人に', everyMult: 0.9, waitMult: 0.9, hookMult: 1, preyMult: 1.1, sproutLifeMult: 0.95, poisonRate: 0.17, rivalMult: 1.1, rankMult: 1.2 },
 ];
 
 export function difficultyOf(id: DifficultyId): Difficulty {

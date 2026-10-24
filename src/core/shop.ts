@@ -54,6 +54,7 @@ export class Shop {
   clock = 0;
   score = 0;
   combo = 0;
+  comboMistakes = 0;
   stock: Record<IngredientId, number> = { ...SHOP.startStock };
   seats: (Guest | null)[] = Array.from({ length: SHOP.seats }, () => null);
   queue: Guest[] = [];
@@ -88,6 +89,10 @@ export class Shop {
     return Math.min(SHOP.comboMaxMult, 1 + Math.floor(this.combo / SHOP.comboStep) * SHOP.comboBonus);
   }
 
+  get comboMissesLeft() {
+    return Math.max(0, this.difficulty.comboMissAllowance - this.comboMistakes);
+  }
+
   /** 今打てる候補：注文中の客と、調達の言葉（誰も出かけていないとき） */
   targets(): Target<TargetData>[] {
     const out: Target<TargetData>[] = [];
@@ -115,7 +120,10 @@ export class Shop {
     const r = this.input.key(ch);
     if (r.kind === 'miss') {
       this.stats.missKeys++;
-      this.combo = 0;
+      if (this.combo > 0 && ++this.comboMistakes > this.difficulty.comboMissAllowance) {
+        this.combo = 0;
+        this.comboMistakes = 0;
+      }
       this.events.push({ type: 'key', ok: false, count: 0 });
       return;
     }
@@ -155,6 +163,7 @@ export class Shop {
     }
     for (const [id, n] of Object.entries(g.dish.need)) this.stock[id as IngredientId] -= n!;
     this.combo++;
+    this.comboMistakes = 0;
     this.stats.maxCombo = Math.max(this.stats.maxCombo, this.combo);
     const tip = Math.round((g.wait / g.maxWait) * SHOP.tipMax);
     const gain = Math.round((g.dish.price + tip) * this.multiplier);
@@ -240,6 +249,7 @@ export class Shop {
           this.seats[i] = null;
           this.stats.angry++;
           this.combo = 0;
+          this.comboMistakes = 0;
           this.score = Math.max(0, this.score - SHOP.angryPenalty);
           this.events.push({ type: 'angry', seat: i });
         }

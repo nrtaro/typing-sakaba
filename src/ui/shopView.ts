@@ -375,6 +375,12 @@ export class ShopView {
       const label = `${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : '');
       if (this.comboBurst > 0) sc.panel(374, 3, 102, 21, 'rgba(85,45,31,0.4)', C.gold3, Math.min(1, this.comboBurst));
       sc.TB(label, 476, 5, sc.fitSize(label, 13, 100), this.comboBurst > 0 ? C.gold3 : mult > 1 ? C.pink : C.w, 'right');
+      if (shop.difficulty.comboMissAllowance > 0) {
+        const budget = `ミス猶予 あと${shop.comboMissesLeft}回`;
+        const width = sc.W(budget, 5.5);
+        sc.PR(473 - width, 18, width + 4, 7, C.ink);
+        sc.T(budget, 475, 19, 5.5, shop.comboMissesLeft ? C.cream : C.red3, 'right');
+      }
     }
   }
 
@@ -413,6 +419,10 @@ export class ShopView {
         const ok = shop.stock[ing] >= gst.dish.need[ing]!;
         this.icon(sc, ing, ix, y + (this.art ? 21 : 24), this.art ? 9 : 12, dim ? 0.35 : ok ? 1 : 0.4);
         if (!this.art) sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
+        if (gst.dish.need[ing]! > 1) {
+          sc.PR(ix + 5, y + 24, 9, 6, C.ink);
+          sc.T(`×${gst.dish.need[ing]}`, ix + 10, y + 24, 5.5, ok ? C.cream : C.red3, 'center');
+        }
         if (!ok) sc.TB('×', ix + 6, y + 21, 9, C.red3, 'center');
         ix += 14;
       }

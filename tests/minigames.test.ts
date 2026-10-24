@@ -185,6 +185,27 @@ describe('調達ミニゲーム', () => {
     expect(g.gains.veg).toBe(GATHER.perPick - GATHER.poisonLoss);
   });
 
+  it('採取：畑に片方しかないとき、次の安全な出題で不足側を補う', () => {
+    const g = new GatheringGame(new Rng(9), { ...DIFFICULTIES[1], poisonRate: 0 });
+    g.update(.2);
+    expect(g.sprouts.some(s => s.ing === 'veg')).toBe(true);
+    g.update(.9);
+    expect(g.sprouts.some(s => s.ing === 'mush')).toBe(true);
+    g.sprouts = g.sprouts.filter(s => s.ing === 'mush');
+    g.update(.9);
+    expect(g.sprouts.some(s => s.ing === 'veg')).toBe(true);
+  });
+
+  it('仕入れ：落札2個に、ノーミスのときだけ1個を追加する', () => {
+    for (const miss of [false, true]) {
+      const g = new TradingGame(new Rng(10));
+      const ing = g.lot.item;
+      if (miss) g.key('q');
+      for (const c of defaultRomaji(g.lot.word.kana)) g.key(c);
+      expect(g.gains[ing]).toBe(miss ? 2 : 3);
+    }
+  });
+
   it('仕入れ：ライバルより先に打てば落札、遅いと取られる', () => {
     const fast = new TradingGame(new Rng(10));
     for (const c of defaultRomaji(fast.lot.word.kana)) fast.key(c);

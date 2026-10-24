@@ -119,7 +119,7 @@ export const FISHING = {
   bigWords: 3,
   /** ミスでテンションが上がり、この回数で糸が切れる */
   breakAt: 3,
-  smallYield: 5,
+  smallYield: 4,
   bigYield: 11,
   /** 大物と勝負中なら、時間切れでもこの秒数まで延長する */
   overtimeMax: 5,
@@ -257,7 +257,7 @@ export const HUNTING_WORDS: Word[] = [
 ];
 
 export const HUNTING = {
-  rabbit: { hp: 1, crossTime: 6.0, yield: 2 },
+  rabbit: { hp: 1, crossTime: 6.0, yield: 3 },
   deer: { hp: 3, crossTime: 9.0, yield: 12 },
   /** 狩り：獲物の通り道（0=奥、1=手前）。大物は専用の通り道 */
   rabbitLanes: [0, 0.45],
@@ -402,7 +402,11 @@ export class GatheringGame extends Minigame<Sprout> {
         const used = new Set<string>();
         for (const s of this.sprouts) for (const k of firstKeys(s.word.kana)) used.add(k);
         const bad = this.rng.next() < this.difficulty.poisonRate;
-        const w = bad ? pickWord(this.rng, GATHER_BAD, used) : pickWord(this.rng, GATHER_GOOD, used);
+        // 片方だけの畑にしない。不足している食材を狙って摘めるように両方を出す。
+        const present = new Set(this.sprouts.map(s => s.ing));
+        const wanted = !present.has('veg') ? 'veg' : !present.has('mush') ? 'mush' : null;
+        const good = wanted ? GATHER_GOOD.filter(w => w.ing === wanted) : GATHER_GOOD;
+        const w = bad ? pickWord(this.rng, GATHER_BAD, used) : pickWord(this.rng, good, used);
         const life = this.rng.range(GATHER.life[0], GATHER.life[1]) * this.difficulty.sproutLifeMult;
         this.sprouts.push({ id: `s${this.n++}`, word: w, ing: bad ? null : (w as unknown as { ing: IngredientId }).ing, slot: this.rng.pick(free), life, maxLife: life });
       }
@@ -455,7 +459,7 @@ export const TRADE_PHRASES = [...ALE_GOODS, ...SPICE_GOODS];
 
 export const TRADING = {
   /** 落札したときの箱の数と、ミスなしのおまけ */
-  win: 3,
+  win: 2,
   bonus: 1,
   /** ライバルが打ち始めるまでの時間と速さ（打鍵/秒）。品物ごとに速くなる */
   rivalDelay: 0.5,
