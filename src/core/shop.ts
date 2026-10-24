@@ -1,3 +1,4 @@
+import { startingStock } from './startingStock';
 import { CandidateInput, type Target } from './candidates';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
@@ -54,7 +55,8 @@ export class Shop {
   clock = 0;
   score = 0;
   combo = 0;
-  stock: Record<IngredientId, number> = { ...SHOP.startStock };
+  comboMistakes = 0;
+  stock: Record<IngredientId, number>;
   seats: (Guest | null)[] = Array.from({ length: SHOP.seats }, () => null);
   queue: Guest[] = [];
   away: Trip | null = null;
@@ -68,6 +70,7 @@ export class Shop {
   private lastPhase = 0;
 
   constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1]) {
+    this.stock = startingStock(this.rng);
     this.input = new CandidateInput(() => this.targets());
   }
 
@@ -86,6 +89,10 @@ export class Shop {
 
   get multiplier() {
     return Math.min(SHOP.comboMaxMult, 1 + Math.floor(this.combo / SHOP.comboStep) * SHOP.comboBonus);
+  }
+
+  get comboMissesLeft() {
+    return Math.max(0, this.difficulty.comboMissAllowance - this.comboMistakes);
   }
 
   /** 今打てる候補：注文中の客と、調達の言葉（誰も出かけていないとき） */
@@ -115,7 +122,10 @@ export class Shop {
     const r = this.input.key(ch);
     if (r.kind === 'miss') {
       this.stats.missKeys++;
-      this.combo = 0;
+      if (this.combo > 0 && ++this.comboMistakes > this.difficulty.comboMissAllowance) {
+        this.combo = 0;
+        this.comboMistakes = 0;
+      }
       this.events.push({ type: 'key', ok: false, count: 0 });
       return;
     }
@@ -155,6 +165,7 @@ export class Shop {
     }
     for (const [id, n] of Object.entries(g.dish.need)) this.stock[id as IngredientId] -= n!;
     this.combo++;
+    this.comboMistakes = 0;
     this.stats.maxCombo = Math.max(this.stats.maxCombo, this.combo);
     const tip = Math.round((g.wait / g.maxWait) * SHOP.tipMax);
     const gain = Math.round((g.dish.price + tip) * this.multiplier);
@@ -175,13 +186,13 @@ export class Shop {
     this.events.push({ type: 'tripStart', trip });
   }
 
-  /** 調達のミニゲームが終わったら呼ぶ。最低量は必ず持ち帰る */
-  returnFromTrip(gains: Partial<Record<IngredientId, number>>) {
+  /** 途中帰還は獲得済みのみ。時間満了時は最低量を保証する。 */
+  returnFromTrip(gains: Partial<Record<IngredientId, number>>, earlyReturn = false) {
     const trip = this.away;
     if (!trip) return;
     const final: Partial<Record<IngredientId, number>> = {};
     for (const id of trip.gives) {
-      const n = Math.max(trip.minimum[id] ?? 0, Math.floor(gains[id] ?? 0));
+      const n = Math.max(earlyReturn ? 0 : trip.minimum[id] ?? 0, Math.floor(gains[id] ?? 0));
       this.stock[id] += n;
       final[id] = n;
     }
@@ -240,6 +251,7 @@ export class Shop {
           this.seats[i] = null;
           this.stats.angry++;
           this.combo = 0;
+          this.comboMistakes = 0;
           this.score = Math.max(0, this.score - SHOP.angryPenalty);
           this.events.push({ type: 'angry', seat: i });
         }

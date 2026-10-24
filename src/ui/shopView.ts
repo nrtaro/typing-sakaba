@@ -6,7 +6,7 @@ import { drawChair, drawLights, drawRoomLive, drawTable, pen, roomLayer, shadow 
 import { Shop, type Guest, type ShopEvent } from '../core/shop';
 import type { Art } from './amber/art';
 import { animLength, walkFrame } from './amber/manifest';
-import { entryPose, WALK_SPEED, SERVER_WALK_SPEED } from '../core/tavernNavigation';
+import { entryPose, WALK_SPEED, SERVER_WALK_SPEED, serverWalkSpeed } from '../core/tavernNavigation';
 import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/layout';
 import { RomajiMatcher } from '../core/romaji';
 import {
@@ -48,6 +48,8 @@ export class ShopView {
   art: Art | null = null;
   /** この画面の時計。一時停止中は進まない（update が呼ばれない）ので、アニメーションも止まる */
   time = 0;
+  /** 急な増減で歩きが跳ねないよう、客数に応じた目標歩速へ滑らかに近づける。 */
+  serverSpeed = SERVER_WALK_SPEED;
   /** おやじが鍋を混ぜ続ける時刻 */
   stirUntil = 0;
   /** 店を出ていく客（演出のみ） */
@@ -147,8 +149,10 @@ export class ShopView {
     const away = shop.away?.who;
     const pref: 'wife' | 'daughter' = seat % 2 ? 'wife' : 'daughter';
     const other = pref === 'wife' ? 'daughter' : 'wife';
-    if (away !== pref) return pref;
-    return away !== other ? other : null;
+    if (away === pref) return away !== other ? other : null;
+    if (away === other) return pref;
+    // 担当席は同数のときの優先順。配膳待ちが偏るときは空いている家族へ。
+    return this.servers[pref].jobs.length <= this.servers[other].jobs.length ? pref : other;
   }
 
   targetPos(id: string): { x: number; y: number } {
@@ -179,6 +183,8 @@ export class ShopView {
 
   update(dt: number, shop?: Shop) {
     this.time += dt;
+    const targetSpeed = serverWalkSpeed(shop?.seats.filter(g => g !== null).length ?? 0);
+    this.serverSpeed += (targetSpeed - this.serverSpeed) * (1 - Math.exp(-dt / 0.18));
     this.missFlash = Math.max(0, this.missFlash - dt);
     this.comboBurst = shop && shop.combo < 3 ? 0 : Math.max(0, this.comboBurst - dt);
     for (const p of this.pops) p.t += dt;
@@ -208,7 +214,7 @@ export class ShopView {
       if (s.moving) {
         if (!wasMoving) s.walkStart = this.time;
         if (Math.abs(dx) > 0.5) s.flip = dx < 0;
-        const sp = Math.min(d, SERVER_WALK_SPEED * dt);
+        const sp = Math.min(d, this.serverSpeed * dt);
         s.x += (dx / d) * sp;
         s.y += (dy / d) * sp;
         s.distance += sp;
@@ -375,6 +381,12 @@ export class ShopView {
       const label = `${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : '');
       if (this.comboBurst > 0) sc.panel(374, 3, 102, 21, 'rgba(85,45,31,0.4)', C.gold3, Math.min(1, this.comboBurst));
       sc.TB(label, 476, 5, sc.fitSize(label, 13, 100), this.comboBurst > 0 ? C.gold3 : mult > 1 ? C.pink : C.w, 'right');
+      if (shop.difficulty.comboMissAllowance > 0) {
+        const budget = `ミス猶予 あと${shop.comboMissesLeft}回`;
+        const width = sc.W(budget, 5.5);
+        sc.PR(473 - width, 18, width + 4, 7, C.ink);
+        sc.T(budget, 475, 19, 5.5, shop.comboMissesLeft ? C.cream : C.red3, 'right');
+      }
     }
   }
 
@@ -413,6 +425,10 @@ export class ShopView {
         const ok = shop.stock[ing] >= gst.dish.need[ing]!;
         this.icon(sc, ing, ix, y + (this.art ? 21 : 24), this.art ? 9 : 12, dim ? 0.35 : ok ? 1 : 0.4);
         if (!this.art) sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
+        if (gst.dish.need[ing]! > 1) {
+          sc.PR(ix + 5, y + 24, 9, 6, C.ink);
+          sc.T(`×${gst.dish.need[ing]}`, ix + 10, y + 24, 5.5, ok ? C.cream : C.red3, 'center');
+        }
         if (!ok) sc.TB('×', ix + 6, y + 21, 9, C.red3, 'center');
         ix += 14;
       }

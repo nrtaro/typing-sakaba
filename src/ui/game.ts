@@ -39,7 +39,7 @@ export class Game {
   mode: Mode = 'title';
   shop: Shop | null = null;
   view = new ShopView();
-  trip: { game: Minigame<unknown>; phase: 'intro' | 'game' | 'outro'; t: number } | null = null;
+  trip: { game: Minigame<unknown>; phase: 'intro' | 'game' | 'outro'; t: number; earlyReturn?: boolean } | null = null;
   tripView = new MinigameView();
   paused = false;
   result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string }) | null = null;
@@ -184,6 +184,12 @@ export class Game {
       }
       return;
     }
+    // 長押しや帰還演出中の連打で二重に帰還処理を始めない。
+    if (k === 'Enter') {
+      e.preventDefault();
+      if (!e.repeat) this.endTrip(true);
+      return;
+    }
     // 営業中・調達中
     const target = this.trip?.phase === 'game' ? this.trip.game : this.trip ? null : this.shop;
     if (!target) return;
@@ -232,6 +238,15 @@ export class Game {
     this.drainEvents();
   }
 
+  private endTrip(earlyReturn = false) {
+    const trip = this.trip;
+    if (!trip || trip.phase !== 'game') return;
+    trip.earlyReturn = earlyReturn && !trip.game.finished;
+    trip.phase = 'outro';
+    trip.t = SHOP.tripIntro;
+    this.sound.chord(5);
+  }
+
   private stepTrip(dt: number) {
     const trip = this.trip!;
     trip.t -= dt;
@@ -241,16 +256,12 @@ export class Game {
       this.sound.bgm('trip', 132);
     } else if (trip.phase === 'game') {
       trip.game.update(dt);
-      if (trip.game.finished) {
-        trip.phase = 'outro';
-        trip.t = SHOP.tripIntro;
-        this.sound.chord(5);
-      }
+      if (trip.game.finished) this.endTrip();
     } else if (trip.phase === 'outro' && trip.t <= 0) {
       const r = trip.game.result();
       this.shop!.stats.correctKeys += r.correctKeys;
       this.shop!.stats.missKeys += r.missKeys;
-      this.shop!.returnFromTrip(r.gains);
+      this.shop!.returnFromTrip(r.gains, trip.earlyReturn);
       this.trip = null;
       this.sound.bgm('shop', PHASES[this.shop!.phaseIndex].tempo);
     }
@@ -327,7 +338,7 @@ export class Game {
     }
     if (this.mode === 'play' && this.shop) {
       if (this.trip?.phase === 'game' || this.trip?.phase === 'outro') {
-        this.tripView.draw(sc, this.trip.game, this.shop, this.t);
+        this.tripView.draw(sc, this.trip.game, this.shop, this.t, this.trip.phase === 'game');
         if (this.trip.phase === 'outro') this.drawTripOutro();
       } else {
         this.view.draw(sc, this.shop, this.t, false);
@@ -459,8 +470,9 @@ export class Game {
       sc.T(['のんびり楽しむ','ほどよい忙しさ','次々くる注文に挑戦'][i], x + 12, 136, 9, C.cream2);
       const m = live?.matcher ?? new RomajiMatcher(d.kana);
       sc.roma(m.typed, m.remaining, x + 69, 154, 10, live ? 'active' : 'idle');
+      sc.T(d.comboMissAllowance ? `コンボ：${d.comboMissAllowance}ミスまでOK` : 'コンボ：ノーミスに挑戦', x + 12, 173, 7, C.gold3);
       if (this.art) for (let j = 0; j <= i; j++) this.art.drawFrame(sc, 'guests-seated', j * 4,
-        x + 23 + j * 33, 200, this.art.scaleFor('guests-seated', j * 4, 29));
+        x + 23 + j * 33, 204, this.art.scaleFor('guests-seated', j * 4, 23));
       for (let j = 0; j < 3; j++) sc.PR(x + 12 + j * 16, 208, 12, 2, j <= i ? C.gold3 : C.wood3);
     });
   }
@@ -469,7 +481,7 @@ export class Game {
     const sc = this.sc;
     sc.TB('遊び方は、３つだけ。', 24, 18, 22, C.gold3, 'left');
     const titles = ['料理名を打つ','減ったら調達','たくさん出そう'];
-    const lines = [['お客の頭上のローマ字を','打つと、料理を出せます。'],['画面下の言葉を打って、','食材を集めよう。'],['お客を待たせすぎず、','３分間の売上に挑戦！']];
+    const lines = [['お客の頭上のローマ字を','打つと、料理を出せます。'],['下の言葉を打って食材集め。','Enterで途中帰還できます。'],['お客を待たせすぎず、','３分間の売上に挑戦！']];
     titles.forEach((title, i) => {
       const x = 24 + i * 146;
       sc.panel(x, 61, 138, 139, 'rgba(55,37,23,0.94)', C.wood4);
@@ -531,8 +543,8 @@ export class Game {
     const gains = this.trip.game.result().gains;
     sc.cover(C.bg, 0.45);
     sc.panel(100, 90, 280, 62, 'rgba(42,27,38,0.96)', C.gold);
-    sc.TB(`${FAMILY_NAME[trip.who]}「ただいま！」`, LW / 2, 96, 14, C.gold3, 'center');
-    const text = trip.gives.map((id) => `${INGREDIENT_NAME[id]} +${Math.max(trip.minimum[id] ?? 0, gains[id] ?? 0)}`).join('　');
+    sc.TB(this.trip.earlyReturn ? `${FAMILY_NAME[trip.who]}が店に戻った！` : `${FAMILY_NAME[trip.who]}「ただいま！」`, LW / 2, 96, 14, C.gold3, 'center');
+    const text = trip.gives.map((id) => `${INGREDIENT_NAME[id]} +${Math.max(this.trip!.earlyReturn ? 0 : trip.minimum[id] ?? 0, gains[id] ?? 0)}`).join('　');
     sc.TB(text, LW / 2, 122, 14, C.w, 'center');
   }
 }

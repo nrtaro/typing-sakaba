@@ -4,7 +4,7 @@ import { Shop } from '../src/core/shop';
 import { createMinigame, GatheringGame, type Minigame } from '../src/core/minigames';
 import { Rng } from '../src/core/rng';
 import { RomajiMatcher } from '../src/core/romaji';
-import { DIFFICULTIES, SHOP, SOURCE, TRIPS, difficultyOf, rankFor, type DifficultyId } from '../src/core/shopConfig';
+import { DIFFICULTIES, SHOP, SOURCE, TRIPS, difficultyOf, rankFor, type DifficultyId, type TripId } from '../src/core/shopConfig';
 
 function nextKey(input: { active: { target: { id: string }; matcher: RomajiMatcher }[] }, targets: { id: string; kana: string }[], pick: (id: string) => boolean) {
   const live = input.active.find((l) => pick(l.target.id)) ?? input.active[0];
@@ -18,12 +18,16 @@ export function playDay(seed: number, kps: number, missRate = 0.04, diffId: Diff
   const shop = new Shop(new Rng(seed), diff);
   const rng = new Rng(seed + 99);
   let trip: { game: Minigame<unknown>; phase: 'intro' | 'game' | 'outro'; t: number } | null = null;
+  let firstTrip: TripId | null = null;
   let acc = 0;
   const dt = 1 / 60;
   while (!shop.ended) {
     shop.update(dt);
     for (const ev of shop.drainEvents()) {
-      if (ev.type === 'tripStart') trip = { game: createMinigame(ev.trip.id, new Rng(seed + shop.stats.trips), diff), phase: 'intro', t: SHOP.tripIntro };
+      if (ev.type === 'tripStart') {
+        firstTrip ??= ev.trip.id;
+        trip = { game: createMinigame(ev.trip.id, new Rng(seed + shop.stats.trips), diff), phase: 'intro', t: SHOP.tripIntro };
+      }
     }
     if (trip) {
       trip.t -= dt;
@@ -71,7 +75,7 @@ export function playDay(seed: number, kps: number, missRate = 0.04, diffId: Diff
       if (!k) { acc = 0; break; }
     }
   }
-  return { score: shop.score, ...shop.stats };
+  return { score: shop.score, ...shop.stats, firstTrip };
 }
 
 describe('一日のバランス', () => {
@@ -104,6 +108,22 @@ describe('一日のバランス', () => {
       expect(result.served).toBeGreaterThanOrEqual(10);
       expect(result.trips).toBeGreaterThan(0);
     }
+  });
+
+  it('初期在庫が変わっても初心者向け営業を維持し、最初に選ぶ調達先が変わる', () => {
+    const trips = new Set<TripId>();
+    const counts: Partial<Record<TripId, number>> = {};
+    for (let seed = 1; seed <= 30; seed++) {
+      const result = playDay(seed, 2.5, .04, 'easy');
+      expect(result.angry).toBeLessThanOrEqual(1);
+      expect(result.served).toBeGreaterThanOrEqual(10);
+      if (result.firstTrip) {
+        trips.add(result.firstTrip);
+        counts[result.firstTrip] = (counts[result.firstTrip] ?? 0) + 1;
+      }
+    }
+    expect(trips.size).toBe(4);
+    console.log('初期在庫30シード：最初の調達先', counts);
   });
 
   it('調達をしないと素材が尽きて売上が伸びない', () => {

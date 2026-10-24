@@ -1,6 +1,7 @@
 import { CandidateInput, type Target } from './candidates';
 import { defaultRomaji, firstKeys } from './romaji';
 import { Rng } from './rng';
+import { procurementReward, rewardKeys } from './procurementRewards';
 import { DIFFICULTIES, MINIGAME_SECONDS, type Difficulty, type IngredientId, type TripId } from './shopConfig';
 
 export interface Word {
@@ -119,8 +120,6 @@ export const FISHING = {
   bigWords: 3,
   /** ミスでテンションが上がり、この回数で糸が切れる */
   breakAt: 3,
-  smallYield: 5,
-  bigYield: 11,
   /** 大物と勝負中なら、時間切れでもこの秒数まで延長する */
   overtimeMax: 5,
 };
@@ -137,6 +136,8 @@ export class FishingGame extends Minigame<null> {
   hookLeft = 0;
   overtime = 0;
   private timer = 0.4;
+  /** 今の魚を釣るために打ち切った語の文字数（未捕獲なら報酬なし） */
+  catchKeys = 0;
 
   /** あわせの猶予（難易度で変わる） */
   get hookWindow() {
@@ -167,6 +168,7 @@ export class FishingGame extends Minigame<null> {
         // あわせ損ねた：魚に逃げられる（同じ大きさの魚がまた来る）
         this.events.push({ type: 'escape', id: 'hook' });
         this.word = null;
+        this.catchKeys = 0;
         this.phase = 'lost';
         this.timer = 0.5;
       }
@@ -199,6 +201,7 @@ export class FishingGame extends Minigame<null> {
       // 糸が切れた：次の魚へ
       this.events.push({ type: 'escape', id: 'line' });
       this.fishIndex++;
+      this.catchKeys = 0;
       this.word = null;
       this.input.reset();
       this.phase = 'lost';
@@ -211,8 +214,9 @@ export class FishingGame extends Minigame<null> {
     return pickWord(this.rng, REEL_WORDS.filter(w => defaultRomaji(w.kana).length <= maxKeys), new Set(), avoid);
   }
 
-  protected onWord() {
+  protected onWord(t: Target<null>) {
     if (this.phase === 'hook' || this.phase === 'land') {
+      this.catchKeys = rewardKeys(t.kana);
       this.big = this.isBigNext;
       this.phase = 'reel';
       this.tension = 0;
@@ -220,12 +224,13 @@ export class FishingGame extends Minigame<null> {
       this.word = this.reelWord();
       return;
     }
+    this.catchKeys += rewardKeys(t.kana);
     this.wordsLeft--;
     if (this.wordsLeft > 0) {
       this.word = this.reelWord(this.word ?? undefined);
       return;
     }
-    this.add('fish', this.big ? FISHING.bigYield : FISHING.smallYield, 0, 0);
+    this.add('fish', procurementReward('fishing', this.catchKeys, this.big), 0, 0);
     this.fishIndex++;
     // 次の合図は直ちに入力可能。水しぶきの演出と入力受付を分離する。
     this.word = this.rng.pick(HOOK_WORDS);
@@ -257,8 +262,8 @@ export const HUNTING_WORDS: Word[] = [
 ];
 
 export const HUNTING = {
-  rabbit: { hp: 1, crossTime: 6.0, yield: 2 },
-  deer: { hp: 3, crossTime: 9.0, yield: 12 },
+  rabbit: { hp: 1, crossTime: 6.0 },
+  deer: { hp: 3, crossTime: 9.0 },
   /** 狩り：獲物の通り道（0=奥、1=手前）。大物は専用の通り道 */
   rabbitLanes: [0, 0.45],
   deerLane: 0.95,
@@ -280,6 +285,8 @@ export interface Prey {
   maxHp: number;
   word: Word;
   flash: number;
+  /** この獲物への命中済みの語の文字数 */
+  rewardKeys?: number;
 }
 
 export class HuntingGame extends Minigame<Prey> {
@@ -341,10 +348,11 @@ export class HuntingGame extends Minigame<Prey> {
   protected onWord(t: Target<Prey>) {
     const p = this.prey.find((q) => q.id === t.id);
     if (!p) return;
+    p.rewardKeys = (p.rewardKeys ?? 0) + rewardKeys(t.kana);
     p.hp--;
     p.flash = 0.25;
     if (p.hp <= 0) {
-      this.add('meat', HUNTING[p.kind].yield, p.x, p.lane);
+      this.add('meat', procurementReward('hunting', p.rewardKeys, p.kind === 'deer'), p.x, p.lane);
       this.prey = this.prey.filter((q) => q !== p);
     } else {
       p.word = pickWord(this.rng, HUNTING_WORDS, this.usedFirst(p), p.word);
@@ -379,7 +387,7 @@ export interface Sprout {
 }
 
 export const GATHER_SLOTS = 6;
-export const GATHER = { perPick: 4, poisonLoss: 2, poisonRate: 0.14, life: [3.6, 4.6] as [number, number] };
+export const GATHER = { poisonLoss: 2, poisonRate: 0.14, life: [3.6, 4.6] as [number, number] };
 
 export class GatheringGame extends Minigame<Sprout> {
   readonly kind = 'gathering' as const;
@@ -402,7 +410,11 @@ export class GatheringGame extends Minigame<Sprout> {
         const used = new Set<string>();
         for (const s of this.sprouts) for (const k of firstKeys(s.word.kana)) used.add(k);
         const bad = this.rng.next() < this.difficulty.poisonRate;
-        const w = bad ? pickWord(this.rng, GATHER_BAD, used) : pickWord(this.rng, GATHER_GOOD, used);
+        // 片方だけの畑にしない。不足している食材を狙って摘めるように両方を出す。
+        const present = new Set(this.sprouts.map(s => s.ing));
+        const wanted = !present.has('veg') ? 'veg' : !present.has('mush') ? 'mush' : null;
+        const good = wanted ? GATHER_GOOD.filter(w => w.ing === wanted) : GATHER_GOOD;
+        const w = bad ? pickWord(this.rng, GATHER_BAD, used) : pickWord(this.rng, good, used);
         const life = this.rng.range(GATHER.life[0], GATHER.life[1]) * this.difficulty.sproutLifeMult;
         this.sprouts.push({ id: `s${this.n++}`, word: w, ing: bad ? null : (w as unknown as { ing: IngredientId }).ing, slot: this.rng.pick(free), life, maxLife: life });
       }
@@ -417,8 +429,9 @@ export class GatheringGame extends Minigame<Sprout> {
     const s = t.data;
     this.sprouts = this.sprouts.filter((q) => q.id !== s.id);
     if (s.ing) {
-      for (let i = 0; i < GATHER.perPick; i++) this.basket.push(s.ing);
-      this.add(s.ing, GATHER.perPick, s.slot, 0);
+      const amount = procurementReward('gathering', rewardKeys(t.kana));
+      for (let i = 0; i < amount; i++) this.basket.push(s.ing);
+      this.add(s.ing, amount, s.slot, 0);
     } else {
       // 毒きのこを摘んでしまった：かごからこぼれる
       let lostAny = false;
@@ -454,8 +467,7 @@ export const SPICE_GOODS: Word[] = [
 export const TRADE_PHRASES = [...ALE_GOODS, ...SPICE_GOODS];
 
 export const TRADING = {
-  /** 落札したときの箱の数と、ミスなしのおまけ */
-  win: 3,
+  /** ミスなしのおまけ（通常の箱数は文字数で決まる） */
   bonus: 1,
   /** ライバルが打ち始めるまでの時間と速さ（打鍵/秒）。品物ごとに速くなる */
   rivalDelay: 0.5,
@@ -534,7 +546,7 @@ export class TradingGame extends Minigame<null> {
     const lot = this.lot;
     lot.outcome = 'won';
     this.wins++;
-    this.add(lot.item, TRADING.win + (lot.missed ? 0 : TRADING.bonus), 0, 0);
+    this.add(lot.item, procurementReward('trading', rewardKeys(lot.word.kana)) + (lot.missed ? 0 : TRADING.bonus), 0, 0);
     // 落札したら間を置かずに次の品物を出し、すぐ打ち始められるようにする
     this.lots++;
     this.lot = this.newLot();

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CandidateInput } from '../src/core/candidates';
 import { Shop } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
-import { DAY_LENGTH, DISHES, SHOP, TRIPS } from '../src/core/shopConfig';
+import { DAY_LENGTH, DIFFICULTIES, DISHES, SHOP, TRIPS } from '../src/core/shopConfig';
 import { defaultRomaji } from '../src/core/romaji';
 import { SaveStore } from '../src/core/save';
 
@@ -74,7 +74,7 @@ describe('営業', () => {
     seat(shop, 0, 'grilledFish');
     const fish = shop.stock.fish;
     type(shop, 'やきざかな');
-    expect(shop.stock.fish).toBe(fish - 1);
+    expect(shop.stock.fish).toBe(fish - 2);
     expect(shop.seats[0]!.state).toBe('eat');
     expect(shop.score).toBeGreaterThan(0);
     expect(shop.stats.served).toBe(1);
@@ -112,8 +112,8 @@ describe('営業', () => {
     expect(fast.score).toBeGreaterThan(slow.score);
   });
 
-  it('ミスでコンボが切れ、10コンボで倍率が上がる', () => {
-    const shop = new Shop(new Rng(1));
+  it('むずかしいは1ミスでコンボが切れ、10コンボで倍率が上がる', () => {
+    const shop = new Shop(new Rng(1), DIFFICULTIES[2]);
     shop.stock.ale = 99;
     for (let i = 0; i < 10; i++) {
       seat(shop, 0, 'ale');
@@ -124,6 +124,59 @@ describe('営業', () => {
     expect(shop.multiplier).toBe(1 + SHOP.comboBonus);
     shop.key('q');
     expect(shop.combo).toBe(0);
+  });
+
+  it.each([['easy', 2], ['normal', 1], ['hard', 0]] as const)('%s：%iミスまで維持し、次のミスでコンボを切る', (id, allowance) => {
+    const shop = new Shop(new Rng(1), DIFFICULTIES.find(d => d.id === id)!);
+    shop.combo = 12;
+    for (let i = 0; i < allowance; i++) { shop.key('q'); expect(shop.combo).toBe(12); }
+    expect(shop.comboMissesLeft).toBe(0);
+    shop.key('q');
+    expect(shop.combo).toBe(0);
+    expect(shop.multiplier).toBe(1);
+    expect(shop.stats.missKeys).toBe(allowance + 1);
+  });
+
+  it.each(['easy', 'normal'] as const)('%s：正しい1打鍵や調達では回復せず、注文完了で回復する', id => {
+    const diff = DIFFICULTIES.find(d => d.id === id)!;
+    const shop = new Shop(new Rng(1), diff);
+    shop.combo = 8;
+    for (let i = 0; i < diff.comboMissAllowance; i++) shop.key('q');
+    shop.key('t');
+    expect(shop.comboMissesLeft).toBe(0);
+    for (const c of 'suri') shop.key(c);
+    expect(shop.away?.id).toBe('fishing');
+    shop.returnFromTrip({ fish: 4 });
+    expect(shop.comboMissesLeft).toBe(0);
+    seat(shop, 0, 'ale'); type(shop, 'えーる');
+    expect(shop.combo).toBe(9);
+    expect(shop.comboMissesLeft).toBe(diff.comboMissAllowance);
+    for (let i = 0; i < diff.comboMissAllowance; i++) shop.key('q');
+    expect(shop.combo).toBe(9);
+  });
+
+  it('材料不足の注文ではミス猶予を回復しない', () => {
+    const shop = new Shop(new Rng(1)); shop.combo = 5; shop.key('q');
+    shop.stock.fish = 1; seat(shop, 0, 'grilledFish'); type(shop, 'やきざかな');
+    expect(shop.comboMissesLeft).toBe(0);
+    expect(shop.combo).toBe(5);
+    expect(shop.stock.fish).toBe(1);
+  });
+
+  it('待ち時間切れでコンボとミス数をリセットする', () => {
+    const shop = new Shop(new Rng(1)); shop.combo = 5; shop.key('q');
+    seat(shop, 0, 'ale', .1); shop.update(.2);
+    expect(shop.combo).toBe(0);
+    expect(shop.comboMissesLeft).toBe(1);
+  });
+
+  it.each(DISHES.map(d => [d.id, d] as const))('%s：レシピの必要量を一度だけ差し引く', (_id, recipe) => {
+    const shop = new Shop(new Rng(1));
+    for (const id of Object.keys(shop.stock) as (keyof typeof shop.stock)[]) shop.stock[id] = 20;
+    seat(shop, 0, recipe.id); type(shop, recipe.kana);
+    for (const id of Object.keys(shop.stock) as (keyof typeof shop.stock)[]) expect(shop.stock[id]).toBe(20 - (recipe.need[id] ?? 0));
+    expect(shop.stats.served).toBe(1);
+    expect(shop.combo).toBe(1);
   });
 
   it('待たせすぎると客が怒って帰る', () => {
