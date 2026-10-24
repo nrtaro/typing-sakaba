@@ -1,3 +1,4 @@
+import { comboFx } from './comboFx';
 // 電子音系の効果音とBGM（Web Audio で生成。音声ファイルは使っていない）
 import type { Settings } from '../core/save';
 
@@ -99,6 +100,18 @@ export class Sound {
     const t = this.ac.currentTime;
     [0, 2, 4].forEach((s, i) => this.tone(this.note(s + Math.min(level, 8)), t + i * 0.045, 0.24, 'square', 0.05, this.sfx!));
     this.noise(t, 0.05, 0.06, this.sfx);
+  }
+
+  /** ６段階のファンファーレ。音量を急増させず、音数・音色・和音で厚みを出す。 */
+  combo(count: number) {
+    if (!this.ac || !this.sfx) return;
+    const t = this.ac.currentTime, fx = comboFx(count);
+    fx.notes.forEach((n, i) => this.tone(this.note(n), t + i * 0.04, fx.level ? 0.28 : 0.13, fx.level >= 4 ? 'square' : 'triangle', fx.level >= 4 ? 0.036 : 0.055, this.sfx!));
+    if (fx.level) this.noise(t, 0.06, 0.03, this.sfx);
+    if (fx.level >= 2) this.tone(this.note(2), t, 0.32, 'sine', 0.035, this.sfx);
+    if (fx.level >= 3) this.tone(this.note(4), t + 0.05, 0.34, 'sine', 0.03, this.sfx);
+    if (fx.level >= 5) this.tone(this.note(7), t + 0.09, 0.38, 'triangle', 0.03, this.sfx);
+    if (fx.level >= 6) this.tone(this.note(9), t + 0.13, 0.42, 'sine', 0.025, this.sfx);
   }
 
   coin() {

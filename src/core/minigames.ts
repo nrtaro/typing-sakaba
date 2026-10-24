@@ -155,7 +155,7 @@ export class FishingGame extends Minigame<null> {
   }
 
   targets(): Target<null>[] {
-    if ((this.phase === 'hook' || this.phase === 'reel') && this.word) return [{ id: this.phase, kana: this.word.kana, data: null }];
+    if ((this.phase === 'hook' || this.phase === 'reel' || this.phase === 'land') && this.word) return [{ id: this.phase === 'land' ? 'hook' : this.phase, kana: this.word.kana, data: null }];
     return [];
   }
 
@@ -181,7 +181,12 @@ export class FishingGame extends Minigame<null> {
       this.hookLeft = this.hookWindow;
       this.word = this.rng.pick(HOOK_WORDS);
       this.events.push({ type: 'bite', big: this.big });
-    } else if (this.phase === 'land' || this.phase === 'lost') {
+    } else if (this.phase === 'land') {
+      this.big = this.isBigNext;
+      this.phase = 'hook';
+      this.hookLeft = this.hookWindow;
+      this.events.push({ type: 'bite', big: this.big });
+    } else if (this.phase === 'lost') {
       this.phase = 'wait';
       this.timer = this.rng.range(0.15, 0.3);
     }
@@ -201,24 +206,32 @@ export class FishingGame extends Minigame<null> {
     }
   }
 
+  private reelWord(avoid?: Word) {
+    const maxKeys = this.difficulty.id === 'easy' ? 5 : this.difficulty.id === 'normal' ? 6 : 8;
+    return pickWord(this.rng, REEL_WORDS.filter(w => defaultRomaji(w.kana).length <= maxKeys), new Set(), avoid);
+  }
+
   protected onWord() {
-    if (this.phase === 'hook') {
+    if (this.phase === 'hook' || this.phase === 'land') {
+      this.big = this.isBigNext;
       this.phase = 'reel';
       this.tension = 0;
       this.wordsLeft = this.big ? FISHING.bigWords : 1;
-      this.word = pickWord(this.rng, REEL_WORDS, new Set());
+      this.word = this.reelWord();
       return;
     }
     this.wordsLeft--;
     if (this.wordsLeft > 0) {
-      this.word = pickWord(this.rng, REEL_WORDS, new Set(), this.word ?? undefined);
+      this.word = this.reelWord(this.word ?? undefined);
       return;
     }
     this.add('fish', this.big ? FISHING.bigYield : FISHING.smallYield, 0, 0);
     this.fishIndex++;
-    this.word = null;
+    // 次の合図は直ちに入力可能。水しぶきの演出と入力受付を分離する。
+    this.word = this.rng.pick(HOOK_WORDS);
     this.phase = 'land';
-    this.timer = 0.25;
+    this.hookLeft = this.hookWindow;
+    this.timer = 0.08;
   }
 }
 

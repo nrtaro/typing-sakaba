@@ -218,16 +218,17 @@ export class MinigameView {
     // 次の魚の大きさと、何匹目か
     sc.panel(10, 44, 150, 30, 'rgba(42,27,38,0.9)', C.blue);
     sc.T(`${game.fishIndex + 1}匹目`, 18, 48, 9, C.cream);
-    sc.TB(game.big || (game.phase === 'wait' && game.isBigNext) ? '大物（ヌシ）！' : '小さい魚', 18, 59, 10, game.big || game.isBigNext ? C.gold3 : C.w, 'left');
-    if (game.phase === 'hook' && game.word) {
+    const nextBig = game.phase === 'wait' || game.phase === 'land' ? game.isBigNext : game.big;
+    sc.TB(nextBig ? '大物（ヌシ）！' : '小さい魚', 18, 59, 10, nextBig ? C.gold3 : C.w, 'left');
+    if ((game.phase === 'hook' || game.phase === 'land') && game.word) {
       sc.TB('あわせろ！', LW / 2, 84, 16, C.gold3, 'center');
-      this.bigWord(sc, game.word.text, game.word.kana, game, 106, C.gold);
-      sc.PR(LW / 2 - 80, 162, 160, 5, C.ink);
-      sc.PR(LW / 2 - 80, 162, 160 * Math.max(0, game.hookLeft / game.hookWindow), 5, C.gold);
+      this.bigWord(sc, game.word.text, game.word.kana, game, 112, C.gold);
+      sc.PR(LW / 2 - 80, 178, 160, 5, C.ink);
+      sc.PR(LW / 2 - 80, 178, 160 * Math.max(0, game.hookLeft / game.hookWindow), 5, C.gold);
     } else if (game.phase === 'reel' && game.word) {
       const total = game.big ? FISHING.bigWords : 1;
-      sc.TB(`巻き上げ ${total - game.wordsLeft + 1}/${total}`, LW / 2, 162, 12, C.w, 'center');
-      this.bigWord(sc, game.word.text, game.word.kana, game, 182, C.blue);
+      sc.TB(`巻き上げ ${total - game.wordsLeft + 1}/${total}`, LW / 2, 84, 12, C.w, 'center');
+      this.bigWord(sc, game.word.text, game.word.kana, game, 112, C.blue);
       // テンション：ミスでたまり、満タンで糸が切れる
       sc.panel(340, 44, 130, 30, 'rgba(42,27,38,0.9)', game.tension >= 2 ? C.red : C.blue);
       sc.T('糸のテンション', 348, 48, 9, C.cream);
@@ -235,7 +236,7 @@ export class MinigameView {
     } else if (game.phase === 'wait') {
       sc.TB('浮きを見つめている…', LW / 2, 196, 13, C.cream, 'center');
     }
-    if (game.phase !== 'reel') sc.TB('浮きが沈んだら、表示された言葉を素早く打つ。巻き上げ中のミスで糸が傷む', LW / 2, 236, 9, C.cream, 'center');
+    sc.TB('釣れたらすぐ次の言葉！ 速く打つほど大漁。巻き上げ中は３ミスで糸が切れる', LW / 2, 236, 9, C.cream, 'center');
   }
 
   // ---------- かり ----------

@@ -1,3 +1,4 @@
+import { comboFx } from './comboFx';
 import { C, TRIP_COLOR, type Color } from './palette';
 import { Screen, LW } from './screen';
 import { FAM, guestSprite, ICON, PORTRAIT, WALKERS } from './sprites';
@@ -33,8 +34,9 @@ interface Server {
 }
 interface Exit { look: number; x: number; y: number; start: number; distance: number; path: { x: number; y: number }[] }
 interface Fx { anim: string; x: number; y: number; h: number; start: number }
-interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean }
-interface Spark { x: number; y: number; vx: number; vy: number; t: number; col: Color }
+interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean; slot?: string; count?: number }
+interface FxBounds { x: number; y: number; w: number; h: number }
+interface Spark { bounds?: FxBounds; x: number; y: number; vx: number; vy: number; t: number; col: Color }
 
 /** 営業画面の見た目の状態（演出用。ゲームの計算には影響しない） */
 export class ShopView {
@@ -56,10 +58,18 @@ export class ShopView {
   pops: Pop[] = [];
   sparks: Spark[] = [];
   missFlash = 0;
+  comboBurst = 0;
+  comboAnchor = { x: 0, y: 0 };
+  comboCount = 0;
   lackTrip: { id: TripId; t: number } | null = null;
   gotTrip: { id: TripId; t: number; gains: Partial<Record<IngredientId, number>> } | null = null;
   /** 出かけている／帰ってきた家族のひとこと */
   banner: { text: string; t: number; col: Color } | null = null;
+
+  private pop(slot: string, p: Pop) {
+    this.pops = this.pops.filter(old => old.slot !== slot);
+    this.pops.push({ ...p, slot });
+  }
 
   handle(ev: ShopEvent, shop: Shop) {
     switch (ev.type) {
@@ -83,21 +93,31 @@ export class ShopView {
             s.serveStart = null;
           }
         }
+        if (ev.combo >= 3) {
+          const fx = comboFx(ev.combo);
+          const y = seat.ty - (this.art ? ORDER_CARD.offset : 70);
+          this.comboCount = ev.combo;
+          this.comboAnchor = { x: seat.x, y: y + 20 };
+          this.comboBurst = fx.duration;
+          const col = fx.color;
+          const bounds = { x: seat.x - 30, y, w: 60, h: 58 };
+          this.sparkAt({ x: seat.x, y: y + 28 }, col, Math.ceil(fx.particles / 2), fx.spread, bounds);
+          this.sparkAt({ x: seat.x, y: y + 28 }, C.gold3, Math.floor(fx.particles / 2), fx.spread * 0.8, bounds);
+          this.pop('combo', { x: seat.x, y, t: 0, text: `${ev.combo} COMBO`, col, count: ev.combo });
+        }
         this.stirUntil = this.time + 2.4;
         this.fxs.push({ anim: 'きらめき', x: seat.x, y: seat.ty - 8, h: 22, start: this.time });
-        this.pops.push({ x: seat.x, y: seat.ty - 60, t: 0, text: `+${ev.gain}`, col: C.gold });
+        this.pop('income', { x: 78, y: 180, t: 0, text: `+${ev.gain}円`, col: C.gold });
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, C.gold, 10, 80);
         break;
       }
       case 'lack': {
-        const seat = SEATS[ev.seat];
-        this.pops.push({ x: seat.x, y: seat.ty - 56, t: 0, text: '素材が足りない！', col: C.red3 });
+        this.pop('warning', { x: 78, y: 115, t: 0, text: '素材が足りない！', col: C.red3 });
         this.lackTrip = { id: SOURCE[ev.missing[0]], t: 1.4 };
         break;
       }
       case 'angry': {
-        const seat = SEATS[ev.seat];
-        this.pops.push({ x: seat.x, y: seat.ty - 40, t: 0, text: 'プンプン！', col: C.red3 });
+        this.pop('warning', { x: 78, y: 115, t: 0, text: 'プンプン！', col: C.red3 });
         break;
       }
       case 'tripStart':
@@ -116,7 +136,7 @@ export class ShopView {
         this.gotTrip = { id: ev.trip.id, t: 1.4, gains: ev.gains };
         break;
       case 'phase':
-        this.pops.push({ x: LW / 2, y: 70, t: 0, text: `― ${PHASES[ev.index].name}の部 ―`, col: C.gold3, big: true });
+        this.banner = { text: `― ${PHASES[ev.index].name}の部 ―`, t: 1.6, col: C.gold3 };
         break;
       default:
         break;
@@ -140,9 +160,9 @@ export class ShopView {
     return { x: 60 + i * 118, y: 222 };
   }
 
-  private sparkAt(p: { x: number; y: number }, col: Color, n: number, spread = 30) {
+  private sparkAt(p: { x: number; y: number }, col: Color, n: number, spread = 30, bounds?: FxBounds) {
     for (let i = 0; i < n; i++) {
-      this.sparks.push({ x: p.x + (Math.random() - 0.5) * 20, y: p.y, vx: (Math.random() - 0.5) * spread, vy: -20 - Math.random() * spread / 2, t: 0, col });
+      this.sparks.push({ bounds, x: p.x + (Math.random() - 0.5) * 20, y: p.y, vx: (Math.random() - 0.5) * spread, vy: -20 - Math.random() * spread / 2, t: 0, col });
     }
   }
 
@@ -160,6 +180,7 @@ export class ShopView {
   update(dt: number, shop?: Shop) {
     this.time += dt;
     this.missFlash = Math.max(0, this.missFlash - dt);
+    this.comboBurst = shop && shop.combo < 3 ? 0 : Math.max(0, this.comboBurst - dt);
     for (const p of this.pops) p.t += dt;
     this.pops = this.pops.filter((p) => p.t < 1.3);
     for (const p of this.sparks) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 140 * dt; }
@@ -347,10 +368,13 @@ export class ShopView {
     const left = shop.timeLeft;
     sc.TB(`残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 184, 6, 12, left < 20 ? C.red3 : C.w, 'left');
     sc.T('売上', 262, 9, 9, C.cream, 'left', 0.85);
-    sc.TB(shop.score.toLocaleString(), 288, 4, 15, C.gold, 'left');
+    const sales = `${shop.score.toLocaleString()}円`;
+    sc.TB(sales, 288, 5, sc.fitSize(sales, 14, 82), C.gold, 'left');
     if (shop.combo > 1) {
       const mult = shop.multiplier;
-      sc.TB(`${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : ''), 476, 5, 13, mult > 1 ? C.pink : C.w, 'right');
+      const label = `${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : '');
+      if (this.comboBurst > 0) sc.panel(374, 3, 102, 21, 'rgba(85,45,31,0.4)', C.gold3, Math.min(1, this.comboBurst));
+      sc.TB(label, 476, 5, sc.fitSize(label, 13, 100), this.comboBurst > 0 ? C.gold3 : mult > 1 ? C.pink : C.w, 'right');
     }
   }
 
@@ -562,8 +586,58 @@ export class ShopView {
   }
 
   private drawFx(sc: Screen, shop: Shop) {
-    for (const p of this.sparks) sc.PR(p.x, p.y, 1.5, 1.5, p.col, 1 - p.t / 0.7);
-    for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 16, p.big ? 18 : 11, p.col, 'center', C.ink, Math.min(1, (1.3 - p.t) * 3));
+    for (const p of this.sparks) {
+      const draw = () => sc.PR(p.x, p.y, 1.5, 1.5, p.col, 1 - p.t / 0.7);
+      if (p.bounds) sc.clip(p.bounds.x, p.bounds.y, p.bounds.w, p.bounds.h, draw);
+      else draw();
+    }
+    if (this.comboBurst > 0) {
+      const fx = comboFx(this.comboCount);
+      const age = fx.duration - this.comboBurst;
+      const a = Math.min(1, this.comboBurst * 2);
+      const { x, y } = this.comboAnchor;
+      const col = fx.color;
+      sc.clip(x - 30, y - 20, 60, 58, () => {
+        // 柱状の光・多重リング・星形の放射光。完了した席の幅で切り、隣の注文を守る。
+        if (fx.level) {
+          const pulse = 0.7 + Math.sin(age * 12) * 0.3;
+          sc.PR(x - 28, y - 18, 56, 48, col, a * (0.05 + fx.level * 0.018) * pulse);
+          for (let band = 0; band < fx.level; band++) {
+            const xx = x - 25 + (band + 0.5) * 50 / fx.level;
+            sc.PR(xx, y - 18, 1.5, 48, col, a * 0.15 * pulse);
+          }
+        }
+        for (let ring = 0; ring < fx.rings; ring++) {
+          const r = 8 + ((age * 26 + ring * 9) % 27);
+          for (let i = 0; i < 24; i++) {
+            const angle = i * Math.PI / 12 - age * 0.8;
+            sc.PR(x + Math.cos(angle) * r, y + Math.sin(angle) * r * 0.75, 1.5, 1.5, ring % 2 ? C.gold3 : col, a * 0.7);
+          }
+        }
+        for (let i = 0; i < fx.rays; i++) {
+          const angle = i * Math.PI * 2 / fx.rays + age * 0.8;
+          const r = 13 + ((age * 18 + i * 3) % 17);
+          for (let j = 0; j < 2 + Math.ceil(fx.level / 2); j++) {
+            const radius = r + j * 1.7;
+            sc.PR(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius * 0.75, 1.5, 1.5, col, a * (1 - j * 0.12));
+          }
+          if (fx.level >= 3 && i % 3 === 0) {
+            const xx = x + Math.cos(angle) * r, yy = y + Math.sin(angle) * r * 0.75;
+            sc.PR(xx - 3, yy, 7, 1, C.w, a);
+            sc.PR(xx, yy - 3, 1, 7, C.w, a);
+          }
+        }
+      });
+    }
+    for (const p of this.pops) {
+      const a = Math.min(1, (1.3 - p.t) * 3);
+      if (p.slot === 'combo' && p.count !== undefined) {
+        const fx = comboFx(p.count);
+        // 完了して空いた注文枠内に収め、隣の未完了の注文を隠さない。
+        sc.TB(String(p.count), p.x, p.y + 1, sc.fitSize(String(p.count), Math.min(24, 16 + fx.level * 2) + Math.max(0, 1 - p.t * 6) * 4, 54), p.col, 'center', C.ink, a);
+        sc.TB('COMBO' + (fx.level >= 5 ? '!!' : fx.level ? '!' : ''), p.x, p.y + 31, 8, p.col, 'center', C.ink, a);
+      } else sc.TB(p.text, p.x, p.y - p.t * 16, p.big ? 12 : 11, p.col, 'center', C.ink, a);
+    }
     if (this.banner) {
       const tw = sc.W(this.banner.text, 11) + 24;
       sc.panel(LW / 2 - tw / 2, 30, tw, 20, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));

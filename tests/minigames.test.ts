@@ -5,7 +5,7 @@ import {
 } from '../src/core/minigames';
 import { Rng } from '../src/core/rng';
 import { defaultRomaji, RomajiMatcher } from '../src/core/romaji';
-import { DISHES, TRIPS } from '../src/core/shopConfig';
+import { DIFFICULTIES, DISHES, TRIPS } from '../src/core/shopConfig';
 
 /** 候補を打ち続けるボット。pick で打つ候補を選べる。missEvery 打鍵ごとに1回ミス */
 export function play(g: Minigame<unknown>, kps: number, missEvery = 0, pick?: (ids: string[]) => string | undefined) {
@@ -46,7 +46,7 @@ describe('調達ミニゲーム', () => {
   it('釣り：あわせを打てば掛かり、遅れると逃げる', () => {
     const g = new FishingGame(new Rng(2));
     while (g.phase !== 'hook') g.update(1 / 60);
-    for (let t = 0; t < FISHING.hookWindow + 0.1; t += 1 / 60) g.update(1 / 60);
+    for (let t = 0; t < g.hookWindow + 0.1; t += 1 / 60) g.update(1 / 60);
     expect(g.phase).toBe('lost');
     while (g.phase !== 'hook') g.update(1 / 60);
     for (const c of defaultRomaji(g.word!.kana)) g.key(c);
@@ -113,6 +113,47 @@ describe('調達ミニゲーム', () => {
     const slow = play(new FishingGame(new Rng(6)), 2.5);
     const fast = play(new FishingGame(new Rng(6)), 7);
     expect(fast.gains.fish ?? 0).toBeGreaterThan(slow.gains.fish ?? 0);
+  });
+
+  it('釣り：釣り上げ後、更新や演出待ちなしで次の魚を入力できる', () => {
+    const g = new FishingGame(new Rng(3));
+    while (g.phase !== 'hook') g.update(1 / 60);
+    const word = () => { for (const c of defaultRomaji(g.word!.kana)) g.key(c); };
+    word(); word();
+    expect(g.phase).toBe('land');
+    expect(g.targets()).toHaveLength(1);
+    word();
+    expect(g.phase).toBe('reel');
+    expect(g.big).toBe(true);
+    for (let i = 0; i < FISHING.bigWords; i++) word();
+    expect(g.gains.fish).toBe(FISHING.smallYield + FISHING.bigYield);
+    word(); word();
+    expect(g.gains.fish).toBe(FISHING.smallYield * 2 + FISHING.bigYield);
+  });
+
+  it('釣り：次の合図を入力途中でも、釣り上げ演出の終了で入力が消えない', () => {
+    const g = new FishingGame(new Rng(12));
+    while (g.phase !== 'hook') g.update(1 / 60);
+    for (let i = 0; i < 2; i++) for (const c of defaultRomaji(g.word!.kana)) g.key(c);
+    const next = defaultRomaji(g.word!.kana);
+    g.key(next[0]);
+    expect(g.input.typed).toBe(next[0]);
+    g.update(0.1);
+    expect(g.phase).toBe('hook');
+    expect(g.input.typed).toBe(next[0]);
+    for (const c of next.slice(1)) g.key(c);
+    expect(g.phase).toBe('reel');
+    expect(g.missKeys).toBe(0);
+  });
+
+  it('釣り：複数の出題と難易度で、速い人は２匹の上限を超えて調達できる', () => {
+    for (const diff of DIFFICULTIES) for (const seed of [1, 2, 3, 4, 5]) {
+      const slow = play(new FishingGame(new Rng(seed), diff), 3);
+      const g = new FishingGame(new Rng(seed), diff);
+      const fast = play(g, 12);
+      expect(g.fishIndex).toBeGreaterThan(2);
+      expect(fast.gains.fish).toBeGreaterThan(slow.gains.fish ?? 0);
+    }
   });
 
   it('狩り：速く打つほど多く仕留め、大物は12個', () => {

@@ -97,6 +97,15 @@ describe('一日のバランス', () => {
     expect(angry('normal')).toBeGreaterThanOrEqual(angry('easy'));
   });
 
+  it('やさしい：毎秒2.5打鍵・4%のミスでも、３分間をほぼ怒らせずに遊べる', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const result = playDay(seed, 2.5, 0.04, 'easy');
+      expect(result.angry).toBeLessThanOrEqual(1);
+      expect(result.served).toBeGreaterThanOrEqual(10);
+      expect(result.trips).toBeGreaterThan(0);
+    }
+  });
+
   it('調達をしないと素材が尽きて売上が伸びない', () => {
     const lazy = new Shop(new Rng(1));
     while (!lazy.ended) lazy.update(1 / 60);

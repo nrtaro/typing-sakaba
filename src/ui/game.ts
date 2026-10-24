@@ -263,7 +263,7 @@ export class Game {
       this.view.handle(ev, shop);
       switch (ev.type) {
         case 'key': if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); break;
-        case 'serve': this.sound.chord(Math.floor(ev.combo / 3)); this.sound.coin(); break;
+        case 'serve': this.sound.chord(Math.floor(ev.combo / 3)); this.sound.coin(); if (ev.combo >= 3) this.sound.combo(ev.combo); break;
         case 'lack': case 'angry': this.sound.bad(); break;
         case 'tripStart':
           this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
@@ -497,7 +497,7 @@ export class Game {
     const r = this.result;
     if (!r) return;
     sc.TB('本日の営業終了', LW / 2, 8, 18, C.gold3, 'center');
-    sc.TB(`売上 ${r.score.toLocaleString()}`, LW / 2, 32, 26, C.w, 'center');
+    sc.TB(`売上 ${r.score.toLocaleString()}円`, LW / 2, 32, 26, C.w, 'center');
     sc.TB(`${r.difficulty}　ランク ${r.rank}　${r.title}`, LW / 2, 66, 14, C.pink, 'center');
     if (r.best) sc.TB('自己ベスト更新！', LW / 2, 86, 12, C.gold, 'center');
     const stats = [

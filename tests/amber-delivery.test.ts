@@ -122,3 +122,48 @@ describe('狩りのゲージと報酬', () => {
     }
   });
 });
+
+
+describe('連続操作中の文字表示', () => {
+  it('連続提供の売上・コンボ通知を同じ場所に重ねず、最新値に更新する', () => {
+    const shop = new Shop(new Rng(1));
+    const view = new ShopView();
+    for (let combo = 3; combo <= 20; combo++) view.handle({ type: 'serve', seat: 0, gain: 120, combo }, shop);
+    expect(view.pops).toHaveLength(2);
+    expect(view.pops.find(p => p.slot === 'combo')?.text).toBe('20 COMBO');
+    expect(view.pops.find(p => p.slot === 'income')?.text).toBe('+120円');
+    expect(view.pops.find(p => p.slot === 'combo')?.x).toBe(TAVERN_SEATS[0].x);
+    expect(view.pops.find(p => p.slot === 'income')?.x).toBeLessThan(140);
+  });
+
+  it('コンボは直前に完了した注文の位置へ移動する', () => {
+    const shop = new Shop(new Rng(1)), view = new ShopView();
+    view.art = {} as Art;
+    shop.seats = TAVERN_SEATS.map((_, i) => ({ id: i, dish: DISHES[0], look: 0, wait: 30, maxWait: 30, state: 'eat', t: 4, lack: 0 }));
+    for (const seat of [0, 7, 2, 4]) {
+      view.handle({ type: 'serve', seat, gain: 120, combo: 11 }, shop);
+      const p = view.pops.find(p => p.slot === 'combo')!;
+      expect(p.x).toBe(TAVERN_SEATS[seat].x);
+      expect(p.y).toBe(TAVERN_SEATS[seat].ty - ORDER_CARD.offset);
+      expect(view.pops.filter(p => p.slot === 'combo')).toHaveLength(1);
+    }
+  });
+
+  it('時間帯の通知はHUDへ浮き上がらず、固定の通知欄に表示する', () => {
+    const shop = new Shop(new Rng(1));
+    const view = new ShopView();
+    view.handle({ type: 'phase', index: 1 }, shop);
+    expect(view.pops).toHaveLength(0);
+    expect(view.banner?.text).toContain('昼');
+  });
+
+  it('コンボが途切れた直後は強調を消し、ゼロコンボの演出を残さない', () => {
+    const shop = new Shop(new Rng(1));
+    const view = new ShopView();
+    view.handle({ type: 'serve', seat: 0, gain: 120, combo: 10 }, shop);
+    expect(view.comboBurst).toBeGreaterThan(0);
+    shop.combo = 0;
+    view.update(1 / 60, shop);
+    expect(view.comboBurst).toBe(0);
+  });
+});
