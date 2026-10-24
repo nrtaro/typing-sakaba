@@ -97,11 +97,12 @@ export class ShopView {
           const fx = comboFx(ev.combo);
           const y = seat.ty - (this.art ? ORDER_CARD.offset : 70);
           this.comboCount = ev.combo;
-          this.comboAnchor = { x: seat.x, y: y + 17 };
+          this.comboAnchor = { x: seat.x, y: y + 20 };
           this.comboBurst = fx.duration;
-          const col = fx.level >= 3 ? C.w : fx.level === 2 ? C.pink : C.gold3;
-          this.sparkAt({ x: seat.x, y: y + 28 }, col, fx.particles, fx.spread,
-            { x: seat.x - 30, y, w: 60, h: 58 });
+          const col = fx.color;
+          const bounds = { x: seat.x - 30, y, w: 60, h: 58 };
+          this.sparkAt({ x: seat.x, y: y + 28 }, col, Math.ceil(fx.particles / 2), fx.spread, bounds);
+          this.sparkAt({ x: seat.x, y: y + 28 }, C.gold3, Math.floor(fx.particles / 2), fx.spread * 0.8, bounds);
           this.pop('combo', { x: seat.x, y, t: 0, text: `${ev.combo} COMBO`, col, count: ev.combo });
         }
         this.stirUntil = this.time + 2.4;
@@ -595,13 +596,36 @@ export class ShopView {
       const age = fx.duration - this.comboBurst;
       const a = Math.min(1, this.comboBurst * 2);
       const { x, y } = this.comboAnchor;
-      const col = fx.level >= 3 ? C.w : fx.level === 2 ? C.pink : C.gold3;
-      sc.clip(x - 30, y - 17, 60, 34, () => {
+      const col = fx.color;
+      sc.clip(x - 30, y - 20, 60, 58, () => {
+        // 柱状の光・多重リング・星形の放射光。完了した席の幅で切り、隣の注文を守る。
+        if (fx.level) {
+          const pulse = 0.7 + Math.sin(age * 12) * 0.3;
+          sc.PR(x - 28, y - 18, 56, 48, col, a * (0.05 + fx.level * 0.018) * pulse);
+          for (let band = 0; band < fx.level; band++) {
+            const xx = x - 25 + (band + 0.5) * 50 / fx.level;
+            sc.PR(xx, y - 18, 1.5, 48, col, a * 0.15 * pulse);
+          }
+        }
+        for (let ring = 0; ring < fx.rings; ring++) {
+          const r = 8 + ((age * 26 + ring * 9) % 27);
+          for (let i = 0; i < 24; i++) {
+            const angle = i * Math.PI / 12 - age * 0.8;
+            sc.PR(x + Math.cos(angle) * r, y + Math.sin(angle) * r * 0.75, 1.5, 1.5, ring % 2 ? C.gold3 : col, a * 0.7);
+          }
+        }
         for (let i = 0; i < fx.rays; i++) {
           const angle = i * Math.PI * 2 / fx.rays + age * 0.8;
-          const r = 14 + age * 9;
-          const xx = x + Math.cos(angle) * r, yy = y + Math.sin(angle) * r * 0.65;
-          sc.PR(xx - 1, yy - 1, fx.level >= 3 ? 3 : 2, fx.level >= 2 ? 3 : 2, col, a);
+          const r = 13 + ((age * 18 + i * 3) % 17);
+          for (let j = 0; j < 2 + Math.ceil(fx.level / 2); j++) {
+            const radius = r + j * 1.7;
+            sc.PR(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius * 0.75, 1.5, 1.5, col, a * (1 - j * 0.12));
+          }
+          if (fx.level >= 3 && i % 3 === 0) {
+            const xx = x + Math.cos(angle) * r, yy = y + Math.sin(angle) * r * 0.75;
+            sc.PR(xx - 3, yy, 7, 1, C.w, a);
+            sc.PR(xx, yy - 3, 1, 7, C.w, a);
+          }
         }
       });
     }
@@ -610,8 +634,8 @@ export class ShopView {
       if (p.slot === 'combo' && p.count !== undefined) {
         const fx = comboFx(p.count);
         // 完了して空いた注文枠内に収め、隣の未完了の注文を隠さない。
-        sc.TB(String(p.count), p.x, p.y + 1, sc.fitSize(String(p.count), Math.min(22, 16 + fx.level * 2) + Math.max(0, 1 - p.t * 7) * 2, 54), p.col, 'center', C.ink, a);
-        sc.TB('COMBO' + (fx.level ? '!' : ''), p.x, p.y + 27, 7, p.col, 'center', C.ink, a);
+        sc.TB(String(p.count), p.x, p.y + 1, sc.fitSize(String(p.count), Math.min(24, 16 + fx.level * 2) + Math.max(0, 1 - p.t * 6) * 4, 54), p.col, 'center', C.ink, a);
+        sc.TB('COMBO' + (fx.level >= 5 ? '!!' : fx.level ? '!' : ''), p.x, p.y + 31, 8, p.col, 'center', C.ink, a);
       } else sc.TB(p.text, p.x, p.y - p.t * 16, p.big ? 12 : 11, p.col, 'center', C.ink, a);
     }
     if (this.banner) {
