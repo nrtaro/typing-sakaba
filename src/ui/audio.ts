@@ -102,16 +102,21 @@ export class Sound {
     this.noise(t, 0.05, 0.06, this.sfx);
   }
 
-  /** ６段階のファンファーレ。音量を急増させず、音数・音色・和音で厚みを出す。 */
+  /**
+   * コンボのファンファーレ。段階が上がるほど音数が増え、駆け上がる音が高く・速くなる。
+   * 音量は上げずに、和音とキラキラした高音で厚みを足す（15 で最大）。
+   */
   combo(count: number) {
     if (!this.ac || !this.sfx) return;
     const t = this.ac.currentTime, fx = comboFx(count);
-    fx.notes.forEach((n, i) => this.tone(this.note(n), t + i * 0.04, fx.level ? 0.28 : 0.13, fx.level >= 4 ? 'square' : 'triangle', fx.level >= 4 ? 0.036 : 0.055, this.sfx!));
-    if (fx.level) this.noise(t, 0.06, 0.03, this.sfx);
-    if (fx.level >= 2) this.tone(this.note(2), t, 0.32, 'sine', 0.035, this.sfx);
-    if (fx.level >= 3) this.tone(this.note(4), t + 0.05, 0.34, 'sine', 0.03, this.sfx);
-    if (fx.level >= 5) this.tone(this.note(7), t + 0.09, 0.38, 'triangle', 0.03, this.sfx);
-    if (fx.level >= 6) this.tone(this.note(9), t + 0.13, 0.42, 'sine', 0.025, this.sfx);
+    const step = Math.max(0.026, 0.045 - fx.level * 0.002);
+    fx.notes.forEach((n, i) => this.tone(this.note(n), t + i * step, fx.level ? 0.22 : 0.12, fx.level >= 5 ? 'square' : 'triangle', fx.level >= 5 ? 0.032 : 0.05, this.sfx!));
+    const end = t + fx.notes.length * step;
+    if (fx.level >= 1) this.tone(this.note(fx.notes[fx.notes.length - 1] + 2), end, 0.3, 'sine', 0.04, this.sfx);
+    if (fx.level >= 2) this.noise(t, 0.05, 0.025 + fx.level * 0.002, this.sfx);
+    if (fx.level >= 4) [0, 2, 4].forEach((s) => this.tone(this.note(Math.min(fx.level, 6) + s), end, 0.4, 'sine', 0.022, this.sfx!));
+    if (fx.level >= 7) for (let i = 0; i < 4; i++) this.tone(this.note(10 + i * 2), end + 0.04 + i * 0.03, 0.12, 'square', 0.018, this.sfx);
+    if (fx.max) [0, 2, 4, 5].forEach((s, i) => this.tone(this.note(8 + s), end + 0.12 + i * 0.02, 0.6, 'triangle', 0.028, this.sfx!));
   }
 
   coin() {

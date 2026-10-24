@@ -266,7 +266,10 @@ export class Shop {
 
   private makeGuest(): Guest {
     const ph = this.phaseIndex;
-    const menu = DISHES.filter((d) => d.from <= ph);
+    // 今テーブルにある注文・並んでいる客と同じ料理は出さない（全部出ている時だけ重複を許す）
+    const taken = new Set([...this.seats, ...this.queue].filter((g): g is Guest => !!g).map((g) => g.dish.id));
+    const open = DISHES.filter((d) => d.from <= ph && !taken.has(d.id));
+    const menu = open.length ? open : DISHES.filter((d) => d.from <= ph);
     // 新しく出る料理と、夜のエールを少し多めに
     // 出やすさはレシピ（仲間）ごとに決め、同じレシピの料理で等分する
     const size = new Map<string, number>();

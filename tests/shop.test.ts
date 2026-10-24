@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CandidateInput } from '../src/core/candidates';
 import { Shop } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
-import { DAY_LENGTH, DIFFICULTIES, DISHES, SHOP, TRIPS } from '../src/core/shopConfig';
+import { DAY_LENGTH, DIFFICULTIES, DISHES, SHOP, TRIPS, dishGroup } from '../src/core/shopConfig';
 import { defaultRomaji } from '../src/core/romaji';
 import { SaveStore } from '../src/core/save';
 
@@ -84,7 +84,7 @@ describe('営業', () => {
     const shop = new Shop(new Rng(1));
     shop.stock.meat = 0;
     seat(shop, 0, 'karaage');
-    type(shop, 'からあげ');
+    type(shop, 'とりのからあげ');
     expect(shop.seats[0]!.state).toBe('wait');
     expect(shop.stock.meat).toBe(0);
     const ev = shop.drainEvents().find((e) => e.type === 'lack');
@@ -270,5 +270,38 @@ describe('保存', () => {
     const broken = new SaveStore({ getItem: () => '{x', setItem: () => { throw new Error(); }, removeItem: () => {} });
     expect(broken.loadBest()).toBeNull();
     expect(() => broken.record(rec)).not.toThrow();
+  });
+});
+
+describe('料理の出題', () => {
+  /** 読みの最初の音（小さい「ゃゅょ」などは前の文字と一緒に数える） */
+  const firstMora = (kana: string) => (/^.[ぁぃぅぇぉゃゅょ]/.test(kana) ? kana.slice(0, 2) : kana.slice(0, 1));
+
+  it('料理の読みの最初の音は重ならず、調達の言葉とも重ならない', () => {
+    const seen = new Map<string, string>();
+    for (const d of DISHES) {
+      const m = firstMora(d.kana);
+      expect(seen.get(m), `${d.text} と ${seen.get(m)}`).toBeUndefined();
+      seen.set(m, d.text);
+    }
+    for (const t of TRIPS) expect(seen.has(firstMora(t.kana)), t.text).toBe(false);
+  });
+
+  it('同じレシピの料理は材料・値段・時間帯が同じ', () => {
+    for (const d of DISHES) {
+      const lead = DISHES.find((x) => x.id === dishGroup(d))!;
+      expect([d.need, d.price, d.from]).toEqual([lead.need, lead.price, lead.from]);
+    }
+  });
+
+  it('同じ時に同じ料理の注文は出ない', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const shop = new Shop(new Rng(seed));
+      for (let i = 0; i < 60 * 150; i++) {
+        shop.update(1 / 60);
+        const ids = [...shop.seats, ...shop.queue].filter((g) => g).map((g) => g!.dish.id);
+        expect(new Set(ids).size).toBe(ids.length);
+      }
+    }
   });
 });
