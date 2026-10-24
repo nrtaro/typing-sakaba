@@ -6,6 +6,10 @@ import type { Settings } from '../core/save';
 const SCALE = [0, 2, 4, 7, 9]; // ハ長調のペンタトニック（打鍵音・コンボに使う）
 const BASE = 261.63;
 
+/** 音量の段階（なし・小・中・大） */
+export const VOLUME_LEVELS = [0, 0.35, 0.65, 1];
+export const VOLUME_NAMES = ['なし', '小', '中', '大'];
+
 export type Track = 'title' | 'morning' | 'noon' | 'night' | 'fishing' | 'hunting' | 'gathering' | 'trading' | 'result';
 
 /** 1 小節は 8 拍（8 分音符）。数字は C4 からの半音。null は休み */
@@ -133,8 +137,10 @@ export class Sound {
     this.settings = s;
     if (!this.ac || !this.sfx || !this.music) return;
     const t = this.ac.currentTime;
-    this.sfx.gain.setTargetAtTime(s.muted ? 0 : s.seVolume * 0.6, t, 0.02);
-    this.music.gain.setTargetAtTime(s.muted ? 0 : s.bgmVolume * 0.6, t, 0.05);
+    // 段階ごとの音量。「大」は以前の約2.5倍
+    const level = s.muted ? 0 : VOLUME_LEVELS[Math.max(0, Math.min(3, s.volume ?? 3))];
+    this.sfx.gain.setTargetAtTime(level * 1.1, t, 0.02);
+    this.music.gain.setTargetAtTime(level * 0.95, t, 0.05);
   }
 
   // ---------- 音の部品 ----------

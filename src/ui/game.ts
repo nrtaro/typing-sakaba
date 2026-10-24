@@ -1,6 +1,6 @@
 import { C } from './palette';
 import { Screen, LW } from './screen';
-import { Sound } from './audio';
+import { Sound, VOLUME_NAMES } from './audio';
 import { SEATS, ShopView } from './shopView';
 import { MinigameView } from './minigameView';
 import { FAM, PORTRAIT } from './sprites';
@@ -23,6 +23,8 @@ type Mode = 'title' | 'help' | 'difficulty' | 'play' | 'result';
 const PHASE_TRACK = ['morning', 'noon', 'night'] as const;
 /** 結果画面の演出が終わるまでの秒数（この後にメニューを出す） */
 const RESULT_READY = 2.6;
+/** 結果画面に来てから、キーを受け付けない秒数（打ちながら来ても演出を飛ばさない） */
+const RESULT_LOCK = 1.2;
 interface MenuItem { text: string; kana: string; act: () => void }
 
 const TYPABLE = /^[a-z\-]$/;
@@ -67,6 +69,8 @@ export class Game {
   /** 結果画面の演出の開始時刻と、鳴らした音の記録 */
   private resultAt = 0;
   private resultFx = { tick: 0, stamped: false, sparkled: false };
+  /** 音量を変えたときの表示の残り時間 */
+  private volumeShown = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.sc = new Screen(canvas);
@@ -105,7 +109,7 @@ export class Game {
         return [
           { text: 'はじめる', kana: 'はじめる', act: () => { this.mode = 'difficulty'; } },
           { text: 'あそびかた', kana: 'あそびかた', act: () => { this.mode = 'help'; } },
-          { text: this.settings.muted ? 'おと：なし' : 'おと：あり', kana: 'おと', act: () => this.toggleMute() },
+          { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
         ];
       case 'help':
         // 遊び方の画面では、例の言葉を実際に打って試せる（打ち切ると演出が出て、また打てる）
@@ -130,11 +134,21 @@ export class Game {
     }
   }
 
-  private toggleMute() {
-    this.settings.muted = !this.settings.muted;
+  /** 今の音量の段階（以前の「おと：なし」の保存も読めるようにする） */
+  get volume() {
+    return this.settings.muted ? 0 : this.settings.volume ?? 3;
+  }
+
+  /** 音量を変えて保存し、右上に小さく出す */
+  private setVolume(v: number) {
+    this.settings.volume = Math.max(0, Math.min(3, v));
+    this.settings.muted = this.settings.volume === 0;
+    this.volumeShown = 1.4;
     this.store.saveSettings(this.settings);
     this.sound.apply(this.settings);
+    if (this.settings.volume > 0) this.sound.select();
   }
+
 
   private toTitle() {
     this.mode = 'title';
@@ -191,10 +205,17 @@ export class Game {
       return;
     }
     const inMenu = this.mode !== 'play' || this.paused;
-    // 結果の演出中にキーを押したら、演出を飛ばして最後の状態にする
-    if (this.mode === 'result' && this.t - this.resultAt < RESULT_READY && k !== 'Escape') {
+    // ←→ でいつでも音量を変えられる
+    if (k === 'ArrowLeft' || k === 'ArrowRight') {
       e.preventDefault();
-      this.resultAt = this.t - RESULT_READY;
+      this.setVolume(this.volume + (k === 'ArrowRight' ? 1 : -1));
+      return;
+    }
+    // 結果の演出中：打ち続けたまま来ても飛ばされないよう、最初の少しはキーを受け付けない。
+    // そのあとはキーで演出を飛ばして最後の状態にする
+    if (this.mode === 'result' && this.t - this.resultAt < RESULT_READY) {
+      e.preventDefault();
+      if (this.t - this.resultAt > RESULT_LOCK) this.resultAt = this.t - RESULT_READY;
       return;
     }
     if (k === 'Escape' && (this.mode === 'help' || this.mode === 'difficulty' || this.mode === 'result')) {
@@ -267,7 +288,8 @@ export class Game {
   step(dt: number) {
     this.t += dt;
     this.missFlash = Math.max(0, this.missFlash - dt);
-    if (this.mode === 'title') this.demoStep(dt);
+    this.volumeShown = Math.max(0, this.volumeShown - dt);
+    if (this.mode === 'title' || this.mode === 'difficulty') this.demoStep(dt);
     if (this.mode === 'result') this.resultStep();
     if (this.mode === 'play' && this.shop) this.view.guide = this.settings.guided ? null : this.guideFor(this.shop);
     if (this.mode !== 'play' || !this.shop || this.paused) return;
@@ -464,12 +486,13 @@ export class Game {
         if (this.trip?.phase === 'intro') this.drawTripIntro();
       }
       if (this.paused) this.drawMenuScreen('一時停止中', '');
+      this.drawVolume();
       return;
     }
     // タイトル・遊び方・結果：店内を背景に
     const g = sc.g;
     const ph = this.mode === 'result' ? 2 : 1;
-    if (this.mode === 'title' && this.art && this.demo) {
+    if ((this.mode === 'title' || this.mode === 'difficulty') && this.art && this.demo) {
       sc.clearScreen();
       this.demo.view.drawTavern(sc, this.demo.shop);
       this.drawCheers();
@@ -489,6 +512,9 @@ export class Game {
       // 店の様子は見せたまま、上だけ少し沈めて看板と黒板を読みやすくする
       sc.cover(C.bg, 0.08);
       sc.fade(sc.ext.x0, sc.ext.y0, sc.ext.w, 100 - sc.ext.y0, '#120a06', 0.55, 0, 'y');
+    } else if (this.mode === 'difficulty' && this.demo) {
+      // タイトルと同じ店を背景に、少し暗くして札を引き立てる
+      sc.cover(C.bg, 0.4);
     } else sc.cover(C.bg, 0.7);
     if (this.mode === 'title') this.drawTitle();
     else if (this.mode === 'help') this.drawHelp();
@@ -496,13 +522,27 @@ export class Game {
     else this.drawResult();
     if (this.mode !== 'result' || this.t - this.resultAt > RESULT_READY - 0.3) this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 200 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);
+    this.drawVolume();
+  }
+
+  /** 音量を変えた直後だけ、右上に4段のメーターを出す */
+  private drawVolume() {
+    if (this.volumeShown <= 0) return;
+    const sc = this.sc;
+    const a = Math.min(1, this.volumeShown * 3);
+    const x = sc.ext.x1 - 92;
+    const y = sc.ext.y0 + 30;
+    sc.panel(x, y, 84, 20, 'rgba(42,27,38,0.95)', C.gold, a);
+    sc.T(`音量 ${VOLUME_NAMES[this.volume]}`, x + 6, y + 5, 9, C.cream, 'left', a);
+    for (let i = 0; i < 3; i++) sc.PR(x + 52 + i * 9, y + 13 - i * 3, 6, 4 + i * 3, i < this.volume ? C.gold : C.ink, a);
   }
 
   private drawMenu(y: number) {
     const sc = this.sc;
     const items = this.menuItems();
     if (this.mode === 'title') return;
-    if (this.mode === 'difficulty' || this.mode === 'help') {
+    if (this.mode === 'difficulty') return;
+    if (this.mode === 'help') {
       this.button(items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
       return;
     }
@@ -619,7 +659,10 @@ export class Game {
     sc.panel(LW / 2 - tw / 2, 205, tw, 13, '#2a1a10', '#a8743f');
     sc.T(tag, LW / 2, 207.5, 8, C.gold3, 'center');
     sc.shifted(0, (e.y1 - 270) / 2, () => {
-      if (!this.sound.ready && !this.settings.muted) sc.T('♪ キーかクリックで音楽が流れます', 470, 207, 7, C.cream2, 'right', 0.8);
+      if (!this.sound.ready && this.volume > 0) sc.T('♪ キーかクリックで音楽が流れます', 470, 205, 7, C.cream2, 'right', 0.8);
+      // 音量は ←→ でも変えられる
+      const aw = sc.keycap('←→', 410, 216, 6, 0.85);
+      sc.T('音量', 410 + aw + 3, 217, 7, C.cream2, 'left', 0.85);
       const [start, help, sound] = this.menuItems();
       this.button(start, 30, 224, 180, 38, 'primary', 'Enter');
       this.button(help, 218, 228, 130, 30, 'plain');
@@ -650,38 +693,67 @@ export class Game {
     });
   }
 
+  /**
+   * 難易度：タイトルと同じ店を背景に、吊り看板と同じ木の札を3枚下げる。
+   * 下はタイトルと同じ木のカウンター。打てる札は次のキーが光り、キーが押される絵が動く。
+   */
   private drawDifficulty() {
     const sc = this.sc;
-    sc.TB('難易度をえらぶ', 24, 18, 20, C.gold3, 'left');
-    sc.T('打った難易度で開店します', 24, 46, 9, C.cream2);
+    const e = sc.ext;
     const typing = this.menu.typed.length > 0;
-    DIFFICULTIES.forEach((d, i) => {
-      const x = 24 + i * 146;
-      const live = this.menu.active.find((l) => l.target.id === d.kana);
-      const last = d.id === this.settings.difficulty;
-      const chosen = typing ? !!live : last;
-      const dim = typing && !live;
-      const a = 1;
-      const y = live ? 62 : 64;
-      if (live) sc.glow(x, y, 138, 148, C.gold3);
-      sc.panel(x, y, 138, 148, chosen ? '#513824' : '#2a1b12', chosen ? C.gold3 : C.wood4, a);
-      if (!i) {
-        sc.PR(x + 10, y + 10, 65, 13, '#a7c99d', a);
-        sc.T('はじめての人に', x + 14, y + 13, 7, '#203321', 'left', a);
-      }
-      if (last && !typing) sc.keycap('Enter', x + 138 - 40, y + 9, 7);
-      sc.T(d.name, x + 12, y + 32, 18, C.cream, 'left', a);
-      sc.T(['のんびり楽しむ', 'ほどよい忙しさ', '次々くる注文に挑戦'][i], x + 12, y + 58, 9, C.cream2, 'left', a);
-      const m = live?.matcher ?? new RomajiMatcher(d.kana);
-      sc.roma(m.typed, m.remaining, x + 69, y + 78, 11, live ? 'active' : dim ? 'dim' : 'idle');
-      const total = m.typed.length + m.remaining.length;
-      if (live && total) sc.PR(x + 3, y + 145, 132 * (m.typed.length / total), 2, C.teal3);
-      if (this.art) for (let j = 0; j <= i; j++) {
-        this.art.drawFrame(sc, 'guests-seated', j * 4, x + 23 + j * 33, y + 124, this.art.scaleFor('guests-seated', j * 4, 23), false, a);
-      }
-      const best = this.store.loadBest(d.id);
-      sc.T(best ? `ベスト ${best.score.toLocaleString()}` : 'ベスト ―', x + 126, y + 131, 8, C.gold3, 'right', a);
-      if (dim) sc.PR(x, y, 138, 148, '#0e0805', 0.62);
+    const crowds = ['のんびり', 'ほどよく忙しい', '次々に注文'];
+    sc.shifted(0, e.y0 / 2, () => {
+      this.drawSignboard(160, 6, 160, 34);
+      sc.TB('難易度をえらぶ', LW / 2, 13, 16, '#ffd98a', 'center', '#3a1408');
+      DIFFICULTIES.forEach((d, i) => {
+        const live = this.menu.active.find((l) => l.target.id === d.kana);
+        const last = d.id === this.settings.difficulty;
+        const dim = typing && !live;
+        const x = 26 + i * 146;
+        const y = (live ? 50 : 52) + Math.sin(this.t * 1.6 + i * 1.3) * (typing ? 0 : 0.8);
+        const w = 136;
+        const h = 150;
+        if (live) sc.glow(x, y, w, h, C.gold3);
+        else if (last && !typing) sc.glow(x, y, w, h, C.gold3, 0.35 + 0.25 * Math.sin(this.t * 3));
+        this.drawSignboard(x, y, w, h);
+        if (!i) {
+          sc.panel(x + 10, y + 10, 66, 13, '#a7c99d', '#4c6b43');
+          sc.T('はじめての人に', x + 14, y + 13, 7, '#203321');
+        }
+        sc.TB(d.name, x + w / 2, y + 28, 20, '#ffe7b0', 'center', '#3a1408');
+        sc.T(crowds[i], x + w / 2, y + 55, 9, '#f3dcb0', 'center');
+        // ローマ字の札：遊び方と同じく、次に打つ文字が光り、キーが押される絵が動く
+        const m = live?.matcher ?? new RomajiMatcher(d.kana);
+        const rw = sc.W(m.typed + m.remaining, 11) + 14;
+        sc.panel(x + w / 2 - rw / 2, y + 70, rw, 18, '#211712', live ? C.gold : C.gold2);
+        sc.roma(m.typed, m.remaining, x + w / 2, y + 73, 11, dim ? 'dim' : 'active');
+        if (!dim) {
+          const down = Math.floor(this.t * 2.5 + i) % 2 === 0;
+          const kx = x + w / 2 + rw / 2 - 5;
+          const ky = y + 64 + (down ? 1.5 : 0);
+          sc.panel(kx, ky, 12, 12, down ? '#e3c890' : '#f6e2b8', '#8a6232');
+          sc.T((m.remaining[0] ?? '').toUpperCase(), kx + 6, ky + 2, 8, '#3a2414', 'center');
+        }
+        // お客の多さ：並ぶ客の数で見せる
+        if (this.art) for (let j = 0; j <= i; j++) {
+          this.art.drawFrame(sc, 'guests-seated', j * 4, x + w / 2 - i * 17 + j * 34, y + 122, this.art.scaleFor('guests-seated', j * 4, 24));
+        }
+        // ベスト：黒板の帯
+        const best = this.store.loadBest(d.id);
+        sc.panel(x + 12, y + 127, w - 24, 15, '#22322a', '#6b4422');
+        sc.T(best ? `ベスト ${best.score.toLocaleString()}` : 'ベスト ―', x + w / 2, y + 130, 8, '#f2efe2', 'center');
+        if (last && !typing) sc.keycap('Enter', x + w - 38, y + 10, 7);
+        if (dim) sc.PR(x, y, w, h, '#0e0805', 0.6);
+      });
+    });
+    // 下：タイトルと同じ木のカウンター
+    sc.PR(e.x0, 212, e.w, e.y1 - 212, '#2a1a10');
+    sc.PR(e.x0, 212, e.w, 2, '#a8743f');
+    sc.PR(e.x0, 214, e.w, 1, '#5a3a1c');
+    for (let yy = 232; yy < e.y1; yy += 18) sc.PR(e.x0, yy, e.w, 0.6, '#3a2414', 0.8);
+    sc.shifted(0, (e.y1 - 270) / 2, () => {
+      const items = this.menuItems();
+      this.button(items[items.length - 1], 26, 228, 120, 30, 'plain', 'Esc', '◀');
     });
   }
 

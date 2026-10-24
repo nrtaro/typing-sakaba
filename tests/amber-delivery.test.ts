@@ -137,7 +137,10 @@ describe('連続操作中の文字表示', () => {
     expect(view.pops.find(p => p.slot === 'combo')?.text).toBe('20 COMBO');
     expect(view.pops.find(p => p.slot === 'income')?.text).toBe('+120円');
     expect(view.pops.find(p => p.slot === 'combo')?.x).toBe(TAVERN_SEATS[0].x);
-    expect(view.pops.find(p => p.slot === 'income')?.x).toBeLessThan(140);
+    // 売上は出した注文の席に出す（目線の先で読めるように）。コンボの数字とは高さをずらす
+    const income = view.pops.find(p => p.slot === 'income')!;
+    expect(income.x).toBe(TAVERN_SEATS[0].x);
+    expect(income.y).toBeGreaterThan(view.pops.find(p => p.slot === 'combo')!.y + 20);
   });
 
   it('コンボは直前に完了した注文の位置へ移動する', () => {

@@ -132,17 +132,19 @@ export class ShopView {
         }
         this.stirUntil = this.time + 2.4;
         this.fxs.push({ anim: 'きらめき', x: seat.x, y: seat.ty - 8, h: 22, start: this.time });
-        this.pop('income', { x: 78, y: 180, t: 0, text: `+${ev.gain}円`, col: C.gold });
+        this.pop('income', { x: seat.x, y: seat.ty - 18, t: 0, text: `+${ev.gain}円`, col: C.gold, big: true });
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, C.gold, 10, 80);
         break;
       }
       case 'lack': {
-        this.pop('warning', { x: 78, y: 115, t: 0, text: '素材が足りない！', col: C.red3 });
+        const ls = SEATS[ev.seat];
+        this.pop('warning', { x: ls.x, y: ls.ty - (this.art ? ORDER_CARD.offset : 70) - 6, t: 0, text: '素材が足りない！', col: '#ff6a5a', big: true });
         this.lackTrip = { id: SOURCE[ev.missing[0]], t: 1.4 };
         break;
       }
       case 'angry': {
-        this.pop('warning', { x: 78, y: 115, t: 0, text: 'プンプン！', col: C.red3 });
+        const as = SEATS[ev.seat];
+        this.pop('angry', { x: as.x, y: as.ty - 22, t: 0, text: 'プンプン！', col: '#ff6a5a', big: true });
         break;
       }
       case 'tripStart':
@@ -436,7 +438,18 @@ export class ShopView {
       const mult = shop.multiplier;
       const label = `${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : '');
       const fx = comboFx(shop.combo);
-      if (this.comboBurst > 0) sc.panel(374, 3, 102, 21, 'rgba(85,45,31,0.4)', fx.color, Math.min(1, this.comboBurst));
+      // 増えた瞬間：文字の後ろに丸い光が広がって消え、火花が散る（四角い背景は使わない）
+      if (this.comboBurst > 0) {
+        const age = fx.duration - this.comboBurst;
+        const tw = sc.W(label, 13);
+        const gx = 476 - tw / 2;
+        sc.radialGlow(gx, 12, 16 + age * 40 + fx.level * 2, fx.color, Math.max(0, 0.7 - age * 0.9), 0.45);
+        for (let n = 0; n < 6 + fx.level; n++) {
+          const ang = n * 2.399 + age;
+          const r = 6 + age * (50 + fx.level * 4);
+          sc.PR(gx + Math.cos(ang) * r * 1.4, 12 + Math.sin(ang) * r * 0.5, 1.5, 1.5, n % 2 ? fx.color : C.gold3, Math.max(0, 1 - age * 1.4));
+        }
+      }
       // 7 からは色が巡り、増えた瞬間に少し大きく弾む
       const hot = fx.level >= 2;
       const col = fx.max ? CONFETTI[Math.floor(this.time * 10) % CONFETTI.length] : hot ? fx.color : this.comboBurst > 0 ? C.gold3 : mult > 1 ? C.pink : C.w;
@@ -454,15 +467,12 @@ export class ShopView {
   private drawOrders(sc: Screen, shop: Shop) {
     const typing = shop.input.typed.length > 0;
     const active = shop.input.active;
-    // 1つに絞り込めたら、その札を大きく手前に出して読みやすくする
+    // 1つに絞り込めた札には、コンボを付ける（大きさは変えず、隣の注文を隠さない）
     const focus = typing && active.length === 1 && active[0].target.data.kind === 'order' ? active[0].target.id : null;
-    let big: number | null = null;
     shop.seats.forEach((gst, i) => {
       if (!gst || gst.state !== 'wait') return;
-      if (`seat:${i}` === focus) { big = i; return; }
-      this.drawOrderCard(sc, shop, i, false);
+      this.drawOrderCard(sc, shop, i, `seat:${i}` === focus);
     });
-    if (big !== null) this.drawOrderCard(sc, shop, big, true);
   }
 
   /** 注文の札。big は打っている札を大きく描く（コンボもこの札に付ける） */
@@ -479,16 +489,18 @@ export class ShopView {
       .sort((a, b) => shop.urgency(a.target.data) - shop.urgency(b.target.data));
     const first = !!live && twins.length > 1 && twins[0] === live;
     const second = !!live && twins.length > 1 && !first;
-    const k = big ? 1.4 : 1;
+    const k = 1;
     const bw = 62 * k;
     const bh = (this.art ? ORDER_CARD.height : 42) * k;
     const bottom = seat.ty - (this.art ? ORDER_CARD.offset : 70) + (this.art ? ORDER_CARD.height : 42);
     const x = Math.max(2, Math.min(LW - bw - 2, seat.x - bw / 2));
-    const y = bottom - bh;
+    // 打っている札は少しだけ浮かせる
+    const y = bottom - bh - (live ? 2 : 0);
     const cx = x + bw / 2;
-    const edge = second ? C.cream2 : live ? C.gold : gst.lack > 0 ? C.red : C.wood4;
+    const short = Object.entries(gst.dish.need).some(([id, n]) => shop.stock[id as IngredientId] < n!);
+    const edge = second ? C.cream2 : live ? C.gold : short ? (Math.sin(this.time * 8) > 0 ? '#ff5a4a' : C.red2) : C.wood4;
     const a = dim ? 0.5 : 1;
-    if (big) sc.PR(x + 2, y + 3, bw, bh, '#0c0604', 0.5);
+    if (live) sc.PR(x + 1, y + 3, bw, bh, '#0c0604', 0.45);
     if (live) sc.glow(x, y, bw, bh, second ? C.cream2 : C.gold);
     sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
     sc.PR(seat.x - 2, bottom, 4, 2, edge, a);
@@ -505,14 +517,20 @@ export class ShopView {
     const iy = y + (this.art ? 23 : 24) * k;
     for (const ing of ids) {
       const ok = shop.stock[ing] >= gst.dish.need[ing]!;
-      this.icon(sc, ing, ix, iy, isz, dim ? 0.35 : ok ? 1 : 0.4);
+      if (!ok) {
+        // 足りない素材：赤い丸が脈打ち、素材の絵は暗く沈む
+        const pulse = 0.55 + 0.35 * Math.sin(this.time * 8);
+        sc.radialGlow(ix + isz / 2, iy + isz / 2, isz * 0.95, '#ff4a3a', (dim ? 0.3 : 0.9) * pulse);
+        sc.PR(ix - 1, iy - 1, isz + 2, isz + 2, '#5a1018', dim ? 0.3 : 0.75);
+      }
+      this.icon(sc, ing, ix, iy, isz, dim ? 0.35 : ok ? 1 : 0.55);
       if (!this.art) sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
       // 数量や不足の印も、ほかの言葉を打っている間は札と同じだけ弱める
       if (gst.dish.need[ing]! > 1) {
         sc.PR(ix + 5 * k, iy + 3 * k, 9 * k, 6 * k, C.ink, dim ? 0.4 : 1);
         sc.T(`×${gst.dish.need[ing]}`, ix + 10 * k, iy + 3 * k, 5.5 * k, ok ? C.cream : C.red3, 'center', dim ? 0.35 : 1);
       }
-      if (!ok) sc.TB('×', ix + 6 * k, iy, 9 * k, C.red3, 'center', C.ink, dim ? 0.35 : 1);
+      if (!ok) sc.TB('×', ix + isz / 2, iy - 1, 11 * k, '#ff6a5a', 'center', C.ink, dim ? 0.35 : 1);
       ix += step;
     }
     const p = gst.wait / gst.maxWait;
@@ -614,9 +632,20 @@ export class ShopView {
         const ex = x + 6 + k * Math.max(54, (w - 12) / 2);
         const ey = y + 21;
         const n = shop.stock[ing];
-        if (n <= 1 && Math.floor(t * 3) % 2 === 0) sc.PR(ex - 2, ey - 1, 50, 22, C.red2, 0.7);
-        this.icon(sc, ing, ex - 1, ey - 1, 24, dim ? 0.5 : 1);
-        sc.TB(`×${n}`, ex + 24, ey + 4, 13, n <= 1 ? C.red3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
+        const low = n <= 2;
+        const shake = low && n <= 1 ? Math.sin(t * 30) * 1 : 0;
+        if (low) {
+          // 残りわずか：赤い光が脈打ち、0〜1個では素材の絵が小刻みに揺れる
+          const pulse = 0.5 + 0.5 * Math.sin(t * (n === 0 ? 10 : 6));
+          sc.radialGlow(ex + 11, ey + 11, 22, '#ff3a2a', (dim ? 0.35 : 0.85) * pulse);
+          sc.panel(ex - 3, ey - 2, 50, 24, 'rgba(90,16,24,0.55)', n === 0 ? '#ff5a4a' : C.red2, dim ? 0.5 : 0.6 + 0.4 * pulse);
+        }
+        this.icon(sc, ing, ex - 1 + shake, ey - 1, 24, dim ? 0.5 : n === 0 ? 0.55 : 1);
+        sc.TB(`×${n}`, ex + 24, ey + 4, 13, low ? '#ff7a6a' : C.w, 'left', C.ink, dim ? 0.5 : 1);
+        if (low && !dim) {
+          sc.panel(ex - 4, ey - 4, 9, 10, '#ff5a4a', C.ink);
+          sc.T('!', ex + 0.5, ey - 3, 8, C.w, 'center');
+        }
         const got = this.gotTrip?.id === tr.id ? this.gotTrip : null;
         if (got && got.gains[ing]) sc.TB(`+${got.gains[ing]}`, ex + 44, ey - 2 - (1.4 - got.t) * 5, 8, C.gold3, 'center');
       });
@@ -829,9 +858,11 @@ export class ShopView {
       sc.TB(c.text, LW / 2 + 40, 150 - size / 2, size, col, 'center', C.ink, a);
     }
     if (this.banner) {
-      const tw = sc.W(this.banner.text, 11) + 24;
-      sc.panel(LW / 2 - tw / 2, 30, tw, 20, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));
-      sc.TB(this.banner.text, LW / 2, 34, 11, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
+      // 家族のひとことは、注文の札がない厨房の上に出す
+      const tw = sc.W(this.banner.text, 10) + 20;
+      const bx = Math.max(4, 82 - tw / 2);
+      sc.panel(bx, 64, tw, 18, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));
+      sc.TB(this.banner.text, bx + tw / 2, 68, 10, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
     }
     // 絞り込み中だけ、打った途中のローマ字を薄く出す
     if (this.missFlash > 0) {
