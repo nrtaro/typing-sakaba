@@ -95,7 +95,7 @@ export class MinigameView {
     this.pops = this.pops.filter((p) => p.t < 1.2);
   }
 
-  draw(sc: Screen, game: Minigame<unknown>, shop: Shop, t: number) {
+  draw(sc: Screen, game: Minigame<unknown>, shop: Shop, t: number, canReturn = true) {
     const g = sc.g;
     const e = sc.ext;
     const art = this.art;
@@ -128,6 +128,10 @@ export class MinigameView {
     for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 18, 12, p.col, 'center', C.ink, Math.min(1, (1.2 - p.t) * 3));
     if (this.shout) sc.TB(this.shout.text, LW / 2, 64, 18, this.shout.col, 'center', C.ink, Math.min(1, this.shout.t * 3));
     if (game.input.typed) sc.TB(game.input.typed, LW / 2, 252, 12, C.w, 'center', C.ink, 0.55);
+    if (canReturn) {
+      sc.panel(379, 249, 94, 16, C.ink, C.gold);
+      sc.T('Enter：店へ戻る', 426, 253, 8, C.gold3, 'center');
+    }
     if (this.missFlash > 0) {
       sc.PR(e.x0, e.y0, e.w, 2, C.red, this.missFlash * 3);
       sc.PR(e.x0, e.y1 - 2, e.w, 2, C.red, this.missFlash * 3);
@@ -297,7 +301,7 @@ export class MinigameView {
       for (let i = 0; i < p.maxHp; i++) sc.PR(cx - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
       if (p.kind === 'deer') sc.TB('大物 肉×12', cx, box.y - 16, 9, C.gold3, 'center');
     }
-    sc.TB('最初の文字で狙いが決まる。左の柵を越えられると逃げられる', LW / 2, 240, 9, C.ink, 'center', C.sand3);
+    sc.TB('最初の文字で狙いが決まる。左の柵を越えられると逃げられる', LW / 2, 236, 9, C.ink, 'center', C.sand3);
   }
 
   // ---------- さいしゅ ----------
@@ -341,9 +345,8 @@ export class MinigameView {
       sc.roma(m.typed, m.remaining, pos.x, top + 17, 10, live ? 'active' : dim ? 'dim' : 'idle');
       sc.PR(pos.x - w / 2 + 4, top + 28, (w - 8) * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
     }
-    sc.panel(100, 234, 370, 26, 'rgba(42,27,38,0.88)', C.green);
+    sc.panel(100, 234, 370, 15, 'rgba(42,27,38,0.88)', C.green);
     sc.T(`食べられるものだけ打つ（1回で${GATHER.perPick}つ）。☠ は${GATHER.poisonLoss}つ失う`, 285, 238, 8, C.cream, 'center');
-    sc.T('絵は食材の種類（野菜／きのこ）を表します', 285, 250, 7, C.cream2, 'center');
   }
 
   // ---------- しいれ：早い者勝ちの競り ----------
@@ -398,7 +401,7 @@ export class MinigameView {
       sc.PR(160, 155, 200 * lot.rival, 8, C.red);
     }
     sc.TB(`落札 ${game.wins}　取られた ${game.losses}`, 380, 82, 10, C.w, 'left');
-    sc.TB('ライバルより先に品物の名前を打ち切れば落札。ミスなしならおまけ1箱', LW / 2, this.art ? 250 : 226, 9, C.w, 'center');
+    sc.TB('ライバルより先に品物の名前を打ち切れば落札。ミスなしならおまけ1箱', LW / 2, this.art ? 236 : 226, 9, C.w, 'center');
   }
 
   // ---------- 画像素材（A案）で描く ----------

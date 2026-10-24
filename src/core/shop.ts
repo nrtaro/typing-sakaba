@@ -184,13 +184,13 @@ export class Shop {
     this.events.push({ type: 'tripStart', trip });
   }
 
-  /** 調達のミニゲームが終わったら呼ぶ。最低量は必ず持ち帰る */
-  returnFromTrip(gains: Partial<Record<IngredientId, number>>) {
+  /** 途中帰還は獲得済みのみ。時間満了時は最低量を保証する。 */
+  returnFromTrip(gains: Partial<Record<IngredientId, number>>, earlyReturn = false) {
     const trip = this.away;
     if (!trip) return;
     const final: Partial<Record<IngredientId, number>> = {};
     for (const id of trip.gives) {
-      const n = Math.max(trip.minimum[id] ?? 0, Math.floor(gains[id] ?? 0));
+      const n = Math.max(earlyReturn ? 0 : trip.minimum[id] ?? 0, Math.floor(gains[id] ?? 0));
       this.stock[id] += n;
       final[id] = n;
     }
