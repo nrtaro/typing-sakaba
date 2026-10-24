@@ -313,9 +313,8 @@ export class ShopView {
   private drawScene(sc: Screen, shop: Shop, t: number, reduce: boolean) {
     if (this.art) {
       this.drawAmber(sc, shop, this.art);
-      this.drawHud(sc, shop);
       this.drawOrders(sc, shop);
-      this.drawSupply(sc, shop, t);
+      this.drawEdges(sc, shop, t);
       this.drawFx(sc, shop);
       return;
     }
@@ -328,10 +327,22 @@ export class ShopView {
     this.drawActors(sc, shop, t);
     drawLights(g, ph, sc);
     sc.present();
-    this.drawHud(sc, shop);
     this.drawOrders(sc, shop);
-    this.drawSupply(sc, shop, t);
+    this.drawEdges(sc, shop, t);
     this.drawFx(sc, shop);
+  }
+
+  /** 上の帯はウィンドウの上端に、調達欄は下端に付ける（縦に長いウィンドウでも画面の端に揃う） */
+  private drawEdges(sc: Screen, shop: Shop, t: number) {
+    const e = sc.ext;
+    // 縦に長いウィンドウでは、店内の絵の上下（暗い部分）を帯の地の色で覆い、画面の枠として見せる
+    if (e.y0 < 0) {
+      sc.PR(e.x0, e.y0, e.w, 26 - e.y0, C.ink);
+      sc.PR(e.x0, 26, e.w, 1, C.wood3);
+      sc.PR(e.x0, 210, e.w, e.y1 - 210, C.ink);
+    }
+    sc.shifted(0, e.y0, () => this.drawHud(sc, shop));
+    sc.shifted(0, e.y1 - 270, () => this.drawSupply(sc, shop, t));
   }
 
   private drawActors(sc: Screen, shop: Shop, t: number) {
@@ -494,10 +505,12 @@ export class ShopView {
     sc.PR(e.x0, 210, e.w, e.y1 - 210, C.ink);
     sc.PR(e.x0, 210, e.w, 1, C.wood3);
     const typing = shop.input.typed.length > 0;
+    // 4つの欄をウィンドウの幅いっぱいに広げる（広すぎるときは間をあけて中央に寄せる）
+    const w = Math.min(150, (e.w - 8 - 12) / 4);
+    const left = e.x0 + (e.w - (w * 4 + 12)) / 2;
     TRIPS.forEach((tr, i) => {
-      const x = 4 + i * 118;
+      const x = left + i * (w + 4);
       const y = 214;
-      const w = 114;
       const h = 52;
       const col = TRIP_COLOR[tr.id];
       const live = shop.input.active.find((l) => l.target.id === `trip:${tr.id}`);
@@ -516,7 +529,7 @@ export class ShopView {
       const rx = x + 23 + sc.W(tr.text, 13);
       sc.roma(m.typed, m.remaining, rx + sc.W(m.typed + m.remaining, 9) / 2, y + 6, 9, live ? 'active' : dim ? 'dim' : 'idle');
       tr.gives.forEach((ing, k) => {
-        const ex = x + 6 + k * 54;
+        const ex = x + 6 + k * Math.max(54, (w - 12) / 2);
         const ey = y + 21;
         const n = shop.stock[ing];
         if (n <= 1 && Math.floor(t * 3) % 2 === 0) sc.PR(ex - 2, ey - 1, 50, 22, C.red2, 0.7);

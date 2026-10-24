@@ -126,14 +126,17 @@ export class MinigameView {
     else if (game instanceof HuntingGame) this.drawHuntingUi(sc, game);
     else if (game instanceof GatheringGame) this.drawGatheringUi(sc, game);
     else if (game instanceof TradingGame) this.drawTradingUi(sc, game);
-    this.drawHud(sc, game, shop);
+    sc.shifted(0, e.y0, () => this.drawHud(sc, game, shop));
     for (const p of this.pops) sc.TB(p.text, p.x, p.y - p.t * 18, 12, p.col, 'center', C.ink, Math.min(1, (1.2 - p.t) * 3));
     // 結果の一言は、打つ札のすぐ上に出す（目線を動かさずに読めるように）
     if (this.shout) sc.TB(this.shout.text, LW / 2, game instanceof FishingGame ? 84 : 68, 16, this.shout.col, 'center', C.ink, Math.min(1, this.shout.t * 3));
     if (canReturn) {
       // 途中帰還：キーの絵と短い言葉だけを右下に小さく
-      const kw = sc.keycap('Enter', 416, 251, 7, 0.85);
-      sc.T('戻る', 416 + kw + 3, 252, 8, C.cream, 'left', 0.85);
+      // ウィンドウの右下の角に付ける
+      const kw = sc.W('Enter', 7) + 7.7;
+      const rx = e.x1 - 12 - kw - 3 - sc.W('戻る', 8);
+      sc.keycap('Enter', rx, e.y1 - 19, 7, 0.85);
+      sc.T('戻る', rx + kw + 3, e.y1 - 18, 8, C.cream, 'left', 0.85);
     }
     if (this.missFlash > 0) {
       sc.PR(e.x0, e.y0, e.w, 2, C.red, this.missFlash * 3);

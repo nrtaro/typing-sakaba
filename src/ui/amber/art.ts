@@ -148,13 +148,42 @@ export class Art {
    * 16:9 の背景を基準の範囲（0..480, 0..270）に描き、
    * 外周は無地の陰影で補う。家具や窓を複製・反転しない。
    */
+  /** 余白を埋める、ぼかした背景（絵ごとに一度だけ小さく縮めて作る） */
+  private soft = new Map<string, HTMLCanvasElement>();
+
+  private softOf(id: string) {
+    let c = this.soft.get(id);
+    if (!c) {
+      const { img } = this.sheet(id);
+      c = document.createElement('canvas');
+      c.width = 64;
+      c.height = 36;
+      const g = c.getContext('2d')!;
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, 0, 0, c.width, c.height);
+      this.soft.set(id, c);
+    }
+    return c;
+  }
+
+  /**
+   * 背景：16:9 の絵を基準の範囲（0..480, 0..270）にくっきり描く。
+   * ウィンドウが 16:9 と違うときは、同じ絵をぼかして拡大したもので周りを埋め、黒い帯を出さない。
+   */
   drawBackground(sc: Screen, id: string) {
     const { img } = this.sheet(id);
-    const W = 480;
-    const H = 270;
     const e = sc.ext;
-    sc.PR(e.x0, e.y0, e.w, e.h, '#211713');
-    sc.blit(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, W, H);
+    if (e.w > 480 || e.h > 270) {
+      const soft = this.softOf(id);
+      sc.coverImage(soft, soft.width, soft.height, 0.28);
+      // くっきりした絵との境目を少し沈めて、目線を中央へ
+      if (e.x0 < 0) {
+        sc.fade(0, 0, e.x0, 270, '#0e0806', 0.1, 0.45, 'x');
+        sc.fade(480, 0, e.x1 - 480, 270, '#0e0806', 0.1, 0.45, 'x');
+      }
+    }
+    sc.blit(img, 0, 0, img.naturalWidth, img.naturalHeight, 0, 0, 480, 270);
   }
 
   drawMenuBackground(sc: Screen) {
