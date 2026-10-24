@@ -97,6 +97,8 @@ function pickWord<W extends Word>(rng: Rng, list: W[], avoidFirst: Set<string>, 
 export const HOOK_WORDS: Word[] = [
   { text: 'いま！', kana: 'いま' }, { text: 'それ！', kana: 'それ' }, { text: 'ほい！', kana: 'ほい' }, { text: 'よし！', kana: 'よし' },
   { text: 'きた！', kana: 'きた' }, { text: 'えい！', kana: 'えい' }, { text: 'ほら！', kana: 'ほら' }, { text: 'せい！', kana: 'せい' },
+  { text: 'そら！', kana: 'そら' }, { text: 'ほれ！', kana: 'ほれ' }, { text: 'おっと！', kana: 'おっと' },
+  { text: 'ぐい！', kana: 'ぐい' }, { text: 'ひけ！', kana: 'ひけ' },
 ];
 
 /** 巻き上げの語句（短め） */
@@ -109,6 +111,10 @@ export const REEL_WORDS: Word[] = [
   { text: '水しぶき', kana: 'みずしぶき' }, { text: '跳ねた', kana: 'はねた' }, { text: '暴れるな', kana: 'あばれるな' }, { text: 'そっと', kana: 'そっと' },
   { text: '一気に', kana: 'いっきに' }, { text: '今だ', kana: 'いまだ' }, { text: '寄ってきた', kana: 'よってきた' }, { text: '見えた', kana: 'みえた' },
   { text: '網を出せ', kana: 'あみをだせ' }, { text: '釣れるぞ', kana: 'つれるぞ' }, { text: '銀色の背', kana: 'ぎんいろのせ' }, { text: '水面が光る', kana: 'みなもがひかる' },
+  { text: '耐えろ', kana: 'たえろ' }, { text: '離すな', kana: 'はなすな' }, { text: '波を読め', kana: 'なみをよめ' }, { text: '寄せて', kana: 'よせて' },
+  { text: 'もう一息', kana: 'もうひといき' }, { text: '引き寄せろ', kana: 'ひきよせろ' }, { text: '糸を張れ', kana: 'いとをはれ' }, { text: 'もっと', kana: 'もっと' },
+  { text: 'いける', kana: 'いける' }, { text: '落ち着いて', kana: 'おちついて' }, { text: '巻き取れ', kana: 'まきとれ' }, { text: '夕焼け', kana: 'ゆうやけ' },
+  { text: 'ぐいっと', kana: 'ぐいっと' }, { text: '釣り上げろ', kana: 'つりあげろ' },
 ];
 /** 互換のための別名（出題データの確認に使う） */
 export const FISHING_PHRASES = REEL_WORDS;
@@ -254,17 +260,25 @@ export const HUNTING_WORDS: Word[] = [
   { text: '待て', kana: 'まて' }, { text: '伏せろ', kana: 'ふせろ' }, { text: '回れ', kana: 'まわれ' }, { text: '追い込め', kana: 'おいこめ' },
   { text: '仕留めろ', kana: 'しとめろ' }, { text: '弾倉', kana: 'だんそう' }, { text: '狩人', kana: 'かりゅうど' }, { text: '獣道', kana: 'けものみち' },
   { text: '草むら', kana: 'くさむら' }, { text: '岩場', kana: 'いわば' }, { text: '夜明け', kana: 'よあけ' }, { text: '双眼鏡', kana: 'そうがんきょう' },
+  { text: '風下', kana: 'かざしも' }, { text: '砂嵐', kana: 'すなあらし' }, { text: '遠吠え', kana: 'とおぼえ' }, { text: '足止め', kana: 'あしどめ' },
+  { text: '蹄', kana: 'ひづめ' }, { text: '物陰', kana: 'ものかげ' }, { text: '地平線', kana: 'ちへいせん' }, { text: '追跡', kana: 'ついせき' },
+  { text: '狩場', kana: 'かりば' }, { text: '夕暮れ', kana: 'ゆうぐれ' }, { text: '気配', kana: 'けはい' }, { text: '急げ', kana: 'いそげ' },
+  { text: '仕掛け', kana: 'しかけ' }, { text: '枯れ草', kana: 'かれくさ' }, { text: '砂利', kana: 'じゃり' }, { text: '鉄くず', kana: 'てつくず' },
+  { text: '廃線', kana: 'はいせん' }, { text: '線路', kana: 'せんろ' }, { text: '見張り', kana: 'みはり' }, { text: '一撃', kana: 'いちげき' },
 ];
 
 export const HUNTING = {
   rabbit: { hp: 1, crossTime: 6.0, yield: 3 },
   deer: { hp: 3, crossTime: 9.0, yield: 12 },
-  /** 狩り：獲物の通り道（0=奥、1=手前）。大物は専用の通り道 */
-  rabbitLanes: [0, 0.45],
-  deerLane: 0.95,
+  /**
+   * 獲物の通り道（0=奥、1=手前）。3つの帯の中で毎回少しずつ高さを変える。
+   * 大物もどの帯から出るか、いつ出るかは毎回変わる。
+   */
+  bands: [[0, 0.12], [0.42, 0.56], [0.86, 1]] as [number, number][],
   spawn: [1.3, 1.9] as [number, number],
   maxRabbits: 3,
-  deerAt: 2.0,
+  /** 大物が出てくる時刻（秒）の幅 */
+  deerAt: [1.2, 4.2] as [number, number],
   /** 同じ通り道で前の獲物がこの位置より左に進むまで次を出さない（文字の重なり防止） */
   laneGap: 0.7,
   startle: 1.1,
@@ -274,7 +288,10 @@ export interface Prey {
   id: string;
   kind: 'rabbit' | 'deer';
   x: number;
+  /** 画面上の高さ（0=奥、1=手前） */
   lane: number;
+  /** どの帯を通るか（HUNTING.bands の番号） */
+  band: number;
   speed: number;
   hp: number;
   maxHp: number;
@@ -288,6 +305,9 @@ export class HuntingGame extends Minigame<Prey> {
   private spawn = 0.3;
   private deerSpawned = false;
   private n = 0;
+  /** 今回の大物が出る時刻と帯（毎回変わる） */
+  readonly deerAt = this.rng.range(HUNTING.deerAt[0], HUNTING.deerAt[1]);
+  readonly deerBand = this.rng.int(0, HUNTING.bands.length - 1);
 
   targets(): Target<Prey>[] {
     return this.prey.map((p) => ({ id: p.id, kana: p.word.kana, data: p }));
@@ -299,19 +319,21 @@ export class HuntingGame extends Minigame<Prey> {
     return s;
   }
 
-  private laneFree(lane: number) {
-    return !this.prey.some((p) => p.lane === lane && p.x > HUNTING.laneGap);
+  private bandFree(band: number) {
+    // 大物がいる帯には小物を入れない（追い越して重ならないように）
+    return !this.prey.some((p) => p.band === band && (p.kind === 'deer' || p.x > HUNTING.laneGap));
   }
 
   protected step(dt: number) {
     this.spawn -= dt;
     const elapsed = this.duration - this.timeLeft;
-    if (!this.deerSpawned && elapsed > HUNTING.deerAt) {
+    if (!this.deerSpawned && elapsed > this.deerAt && !this.prey.some((p) => p.band === this.deerBand && p.x > HUNTING.laneGap)) {
       this.deerSpawned = true;
-      this.addPrey('deer', HUNTING.deerLane);
+      this.addPrey('deer', this.deerBand);
     }
     if (this.spawn <= 0 && this.prey.filter((p) => p.kind === 'rabbit').length < HUNTING.maxRabbits && this.timeLeft > 1.5) {
-      const free = HUNTING.rabbitLanes.filter((l) => this.laneFree(l));
+      // 大物がまだ出ていなければ、その帯は空けておく
+      const free = HUNTING.bands.map((_, i) => i).filter((b) => this.bandFree(b) && (this.deerSpawned || b !== this.deerBand));
       if (free.length) {
         this.spawn = this.rng.range(HUNTING.spawn[0], HUNTING.spawn[1]);
         this.addPrey('rabbit', this.rng.pick(free));
@@ -325,10 +347,11 @@ export class HuntingGame extends Minigame<Prey> {
     this.prey = this.prey.filter((p) => p.x >= -0.05);
   }
 
-  private addPrey(kind: 'rabbit' | 'deer', lane: number) {
+  private addPrey(kind: 'rabbit' | 'deer', band: number) {
     const def = HUNTING[kind];
+    const [lo, hi] = HUNTING.bands[band];
     this.prey.push({
-      id: `p${this.n++}`, kind, x: 1.05, lane, speed: (1.1 / def.crossTime) * this.difficulty.preyMult,
+      id: `p${this.n++}`, kind, x: 1.05, band, lane: this.rng.range(lo, hi), speed: (1.1 / def.crossTime) * this.difficulty.preyMult,
       hp: def.hp, maxHp: def.hp, word: pickWord(this.rng, HUNTING_WORDS, this.usedFirst()), flash: 0,
     });
   }
@@ -363,10 +386,15 @@ export const GATHER_GOOD: (Word & { ing: IngredientId })[] = [
   { text: 'しいたけ', kana: 'しいたけ', ing: 'mush' }, { text: 'まいたけ', kana: 'まいたけ', ing: 'mush' }, { text: 'えのき', kana: 'えのき', ing: 'mush' },
   { text: 'しめじ', kana: 'しめじ', ing: 'mush' }, { text: 'なめこ', kana: 'なめこ', ing: 'mush' }, { text: 'エリンギ', kana: 'えりんぎ', ing: 'mush' },
   { text: 'マッシュルーム', kana: 'まっしゅるーむ', ing: 'mush' }, { text: 'きくらげ', kana: 'きくらげ', ing: 'mush' },
+  { text: 'ブロッコリー', kana: 'ぶろっこりー', ing: 'veg' }, { text: 'レタス', kana: 'れたす', ing: 'veg' }, { text: 'きゅうり', kana: 'きゅうり', ing: 'veg' }, { text: 'オクラ', kana: 'おくら', ing: 'veg' },
+  { text: 'セロリ', kana: 'せろり', ing: 'veg' }, { text: 'とうもろこし', kana: 'とうもろこし', ing: 'veg' }, { text: 'はくさい', kana: 'はくさい', ing: 'veg' }, { text: 'アスパラ', kana: 'あすぱら', ing: 'veg' },
+  { text: 'ひらたけ', kana: 'ひらたけ', ing: 'mush' }, { text: 'ポルチーニ', kana: 'ぽるちーに', ing: 'mush' }, { text: 'トリュフ', kana: 'とりゅふ', ing: 'mush' }, { text: 'くりたけ', kana: 'くりたけ', ing: 'mush' },
+  { text: 'はなびらたけ', kana: 'はなびらたけ', ing: 'mush' },
 ];
 export const GATHER_BAD: Word[] = [
   { text: 'べにてんぐたけ', kana: 'べにてんぐたけ' }, { text: 'つきよたけ', kana: 'つきよたけ' }, { text: 'かえんたけ', kana: 'かえんたけ' },
   { text: 'どくつるたけ', kana: 'どくつるたけ' }, { text: 'にがくりたけ', kana: 'にがくりたけ' }, { text: 'てんぐたけ', kana: 'てんぐたけ' },
+  { text: 'どくささこ', kana: 'どくささこ' }, { text: 'かきしめじ', kana: 'かきしめじ' }, { text: 'にせくろはつ', kana: 'にせくろはつ' }, { text: 'ひかげしびれたけ', kana: 'ひかげしびれたけ' },
 ];
 
 export interface Sprout {
@@ -446,6 +474,8 @@ export const ALE_GOODS: Word[] = [
   { text: '米の酒', kana: 'こめのさけ' }, { text: 'ラム酒', kana: 'らむしゅ' }, { text: '白ワイン', kana: 'しろわいん' },
   { text: '赤ワイン', kana: 'あかわいん' }, { text: 'ウイスキー', kana: 'ういすきー' }, { text: '果実酒', kana: 'かじつしゅ' },
   { text: '地ビール', kana: 'じびーる' }, { text: '古酒', kana: 'こしゅ' }, { text: '梅酒', kana: 'うめしゅ' },
+  { text: 'シードル', kana: 'しーどる' }, { text: 'ポートワイン', kana: 'ぽーとわいん' }, { text: 'どぶろく', kana: 'どぶろく' }, { text: 'スタウト', kana: 'すたうと' },
+  { text: '桃の酒', kana: 'もものさけ' }, { text: '薬草酒', kana: 'やくそうしゅ' }, { text: '麦の酒', kana: 'むぎのさけ' },
 ];
 export const SPICE_GOODS: Word[] = [
   { text: '胡椒', kana: 'こしょう' }, { text: '唐辛子', kana: 'とうがらし' }, { text: '山椒', kana: 'さんしょう' },
@@ -453,6 +483,8 @@ export const SPICE_GOODS: Word[] = [
   { text: '黒胡椒', kana: 'くろこしょう' }, { text: 'ナツメグ', kana: 'なつめぐ' }, { text: 'サフラン', kana: 'さふらん' },
   { text: 'わさび', kana: 'わさび' }, { text: 'からし', kana: 'からし' }, { text: 'バジル', kana: 'ばじる' },
   { text: 'ローズマリー', kana: 'ろーずまりー' }, { text: 'クミン', kana: 'くみん' }, { text: '八角', kana: 'はっかく' },
+  { text: 'ターメリック', kana: 'たーめりっく' }, { text: 'カルダモン', kana: 'かるだもん' }, { text: 'クローブ', kana: 'くろーぶ' }, { text: 'パプリカ', kana: 'ぱぷりか' },
+  { text: 'オレガノ', kana: 'おれがの' }, { text: '岩塩', kana: 'がんえん' }, { text: '柚子胡椒', kana: 'ゆずこしょう' },
 ];
 /** 互換のための別名（出題データの確認に使う） */
 export const TRADE_PHRASES = [...ALE_GOODS, ...SPICE_GOODS];

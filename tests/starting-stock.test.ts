@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Shop } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
-import { DISHES, INGREDIENT_ORDER, SHOP } from '../src/core/shopConfig';
+import { DISHES, INGREDIENT_ORDER, SHOP, dishGroup } from '../src/core/shopConfig';
 
 describe('開店時の素材配分', () => {
   it('1000シードで総量・上下限・朝の全料理を作れる最低量を守る', () => {
@@ -19,7 +19,9 @@ describe('開店時の素材配分', () => {
       const tight = (['fish', 'meat', 'veg', 'mush'] as const).filter(id => shop.stock[id] <= 3);
       expect(tight.length).toBeLessThanOrEqual(1);
       expect(tight.length > 0 || shop.stock.ale <= 3).toBe(true);
-      const morningServings = DISHES.filter(d => d.from === 0).reduce((sum, dish) => {
+      // 同じレシピの料理は1つとして数える（名前違いで皿数を水増ししない）
+      const morningRecipes = DISHES.filter(d => d.from === 0 && dishGroup(d) === d.id);
+      const morningServings = morningRecipes.reduce((sum, dish) => {
         const [[id, amount]] = Object.entries(dish.need);
         return sum + Math.floor(shop.stock[id as keyof typeof shop.stock] / amount!);
       }, 0);

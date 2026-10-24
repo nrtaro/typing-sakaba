@@ -3,7 +3,7 @@ import { CandidateInput, type Target } from './candidates';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
 import {
-  DAY_LENGTH, DIFFICULTIES, DISHES, INGREDIENT_ORDER, PHASES, SHOP, TRIPS,
+  DAY_LENGTH, DIFFICULTIES, DISHES, INGREDIENT_ORDER, PHASES, SHOP, TRIPS, dishGroup,
   type Difficulty, type Dish, type IngredientId, type Trip,
 } from './shopConfig';
 
@@ -268,7 +268,10 @@ export class Shop {
     const ph = this.phaseIndex;
     const menu = DISHES.filter((d) => d.from <= ph);
     // 新しく出る料理と、夜のエールを少し多めに
-    const weights = menu.map((d) => (ph === 2 && d.id === 'ale' ? 3 : d.from === ph ? 2 : 1));
+    // 出やすさはレシピ（仲間）ごとに決め、同じレシピの料理で等分する
+    const size = new Map<string, number>();
+    for (const d of menu) size.set(dishGroup(d), (size.get(dishGroup(d)) ?? 0) + 1);
+    const weights = menu.map((d) => (ph === 2 && dishGroup(d) === 'ale' ? 3 : d.from === ph ? 2 : 1) / size.get(dishGroup(d))!);
     let r = this.rng.next() * weights.reduce((a, b) => a + b, 0);
     let dish = menu[0];
     for (let i = 0; i < menu.length; i++) {

@@ -96,7 +96,7 @@ describe('狩りのゲージと報酬', () => {
 
   it('大物の文字枠は中段の小物の走路を覆わず、頭の横に留まる', () => {
     const game = new HuntingGame(new Rng(7));
-    for (let i = 0; i < 200; i++) game.update(1 / 60);
+    for (let i = 0; i < 600 && !game.prey.some((p) => p.kind === 'deer'); i++) game.update(1 / 60);
     const deer = game.prey.find((p) => p.kind === 'deer')!;
     deer.x = 0.5;
     game.prey = [deer];
@@ -111,7 +111,7 @@ describe('狩りのゲージと報酬', () => {
 
   it('小物は1語で肉3、大物は3語で肉12を得る', () => {
     const game = new HuntingGame(new Rng(7));
-    for (let i = 0; i < 130; i++) game.update(1 / 60);
+    for (let i = 0; i < 600 && !(game.prey.some((p) => p.kind === 'deer') && game.prey.some((p) => p.kind === 'rabbit')); i++) game.update(1 / 60);
     for (const kind of ['rabbit', 'deer'] as const) {
       const prey = game.prey.find((p) => p.kind === kind)!;
       expect(prey.maxHp).toBe(kind === 'rabbit' ? 1 : 3);

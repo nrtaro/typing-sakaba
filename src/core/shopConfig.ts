@@ -17,6 +17,11 @@ export interface Dish {
   price: number;
   /** この時間帯（0=朝,1=昼,2=夜）から注文される */
   from: number;
+  /**
+   * 同じレシピ（材料・値段）の仲間をまとめる名前。省略時は id。
+   * 注文の出やすさはレシピ単位で決め、仲間の間で等分する（名前を増やしても難しさは変わらない）。
+   */
+  group?: string;
 }
 
 export const GAME_TITLE = 'タイピング酒場';
@@ -42,7 +47,29 @@ export const DISHES: Dish[] = [
   { id: 'aleBeef', text: '肉の黒エール煮', kana: 'にくのくろえーるに', need: { meat: 2, ale: 1 }, price: 280, from: 2 },
   { id: 'spiceAle', text: 'スパイスエール', kana: 'すぱいすえーる', need: { ale: 2, spice: 1 }, price: 230, from: 2 },
   { id: 'feast', text: '荒野の大皿', kana: 'こうやのおおざら', need: { meat: 2, fish: 2, veg: 2, spice: 1 }, price: 620, from: 2 },
+  // 同じレシピの別の料理（材料・値段・時間帯は上の料理と同じ）
+  { id: 'saltFish', group: 'grilledFish', text: '魚の塩焼き', kana: 'さかなのしおやき', need: { fish: 2 }, price: 120, from: 0 },
+  { id: 'beanSoup', group: 'vegSoup', text: '豆のスープ', kana: 'まめのすーぷ', need: { veg: 2 }, price: 100, from: 0 },
+  { id: 'lager', group: 'ale', text: 'ラガー', kana: 'らがー', need: { ale: 1 }, price: 80, from: 0 },
+  { id: 'butterMush', group: 'mushSaute', text: 'きのこバター', kana: 'きのこばたー', need: { mush: 2 }, price: 110, from: 0 },
+  { id: 'smokedMeat', group: 'jerky', text: '燻製肉', kana: 'くんせいにく', need: { meat: 2 }, price: 120, from: 0 },
+  { id: 'meatRoll', group: 'stirFry', text: '野菜の肉巻き', kana: 'やさいのにくまき', need: { meat: 2, veg: 1 }, price: 260, from: 1 },
+  { id: 'mushGratin', group: 'mushStew', text: 'きのこグラタン', kana: 'きのこぐらたん', need: { mush: 2, veg: 1 }, price: 240, from: 1 },
+  { id: 'spiceSkewer', group: 'karaage', text: 'スパイス串', kana: 'すぱいすくし', need: { meat: 2, spice: 1 }, price: 230, from: 1 },
+  { id: 'tempura', group: 'fishFry', text: '魚の天ぷら', kana: 'さかなのてんぷら', need: { fish: 2, spice: 1 }, price: 230, from: 1 },
+  { id: 'meuniere', group: 'herbFish', text: 'ムニエル', kana: 'むにえる', need: { fish: 2, veg: 1 }, price: 250, from: 1 },
+  { id: 'potAuFeu', group: 'hunterStew', text: '猟師のポトフ', kana: 'りょうしのぽとふ', need: { meat: 2, veg: 2, mush: 1 }, price: 400, from: 2 },
+  { id: 'fishCurry', group: 'spicyPot', text: '魚のカレー煮', kana: 'さかなのかれーに', need: { fish: 2, mush: 1, spice: 1 }, price: 400, from: 2 },
+  { id: 'wineFish', group: 'sakeFish', text: '魚のワイン煮', kana: 'さかなのわいんに', need: { fish: 2, ale: 1 }, price: 260, from: 2 },
+  { id: 'wineBeef', group: 'aleBeef', text: '肉のぶどう酒煮', kana: 'にくのぶどうしゅに', need: { meat: 2, ale: 1 }, price: 280, from: 2 },
+  { id: 'hotWine', group: 'spiceAle', text: 'ホットワイン', kana: 'ほっとわいん', need: { ale: 2, spice: 1 }, price: 230, from: 2 },
+  { id: 'banquet', group: 'feast', text: '宴の大皿', kana: 'うたげのおおざら', need: { meat: 2, fish: 2, veg: 2, spice: 1 }, price: 620, from: 2 },
 ];
+
+/** 料理のレシピの仲間の名前 */
+export function dishGroup(d: Dish) {
+  return d.group ?? d.id;
+}
 
 export interface Trip {
   id: TripId;

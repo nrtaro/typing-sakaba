@@ -243,17 +243,78 @@ export class Screen {
     ctx.globalAlpha = 1;
   }
 
-  /** ローマ字：打った部分・次の1文字・残りを色分け */
+  /** 描画に使う時計（秒）。Game が毎フレーム進める。点滅や打鍵の跳ねに使う */
+  now = 0;
+  /** 打った文字の跳ね：ローマ字を描いた位置ごとに、最後に文字数が増えた時刻を覚える */
+  private hops = new Map<string, { len: number; at: number }>();
+
+  /**
+   * ローマ字：打った部分・次の1文字・残りを描き分ける。
+   * active では次に打つ文字に光る枠を付け、打った部分に下線を引き、打った直後の文字を少し跳ねさせる。
+   */
   roma(typed: string, rest: string, x: number, y: number, size: number, state: 'active' | 'idle' | 'dim', alpha = 1, dark = false) {
     const w = this.W(typed + rest, size);
+    const key = `${Math.round(x)}|${Math.round(y)}`;
+    const hop = this.hops.get(key);
+    if (!hop || typed.length !== hop.len) {
+      this.hops.set(key, { len: typed.length, at: hop && typed.length > hop.len ? this.now : -1 });
+      if (this.hops.size > 200) this.hops.clear();
+    }
+    const since = this.now - (this.hops.get(key)?.at ?? -1);
+    const popping = state === 'active' && typed.length > 0 && since >= 0 && since < 0.14;
     let cx = x - w / 2;
-    const seg = (s: string, col: Color, a: number) => {
-      if (!s) return;
-      this.T(s, cx, y, size, col, 'left', a * alpha);
-      cx += this.W(s, size);
-    };
-    seg(typed, dark ? '#215a4a' : C.teal3, 1);
-    seg(rest.slice(0, 1), dark ? '#382215' : state === 'active' ? C.gold : C.cream, state === 'dim' ? 0.4 : 1);
-    seg(rest.slice(1), dark ? '#674526' : C.cream, state === 'dim' ? 0.35 : 0.8);
+    const active = state === 'active';
+    const dimA = state === 'dim' ? 0.3 : 1;
+    // 打った部分：色を変え、下線で「ここまで打った」を見せる
+    if (typed) {
+      const tw = this.W(typed, size);
+      const head = popping ? typed.slice(0, -1) : typed;
+      this.T(head, cx, y, size, dark ? '#1f5a48' : C.teal3, 'left', alpha * dimA);
+      if (popping) {
+        const last = typed.slice(-1);
+        const lift = (1 - since / 0.14) * size * 0.22;
+        this.T(last, cx + this.W(head, size), y - lift, size, dark ? '#0f3d30' : C.w, 'left', alpha);
+      }
+      if (active) this.PR(cx, y + size + 0.6, tw, Math.max(0.8, size * 0.1), dark ? '#1f5a48' : C.teal3, alpha * 0.9);
+      cx += tw;
+    }
+    const next = rest.slice(0, 1);
+    if (next) {
+      const nw = this.W(next, size);
+      if (active) {
+        // 次に打つ文字：ゆっくり明滅する枠で囲む
+        const pulse = 0.78 + 0.22 * Math.sin(this.now * 9);
+        this.PR(cx - size * 0.08, y - size * 0.08, nw + size * 0.16, size * 1.16, dark ? '#3a2414' : C.gold, alpha * pulse);
+        this.T(next, cx, y, size, dark ? '#ffe9b8' : C.ink, 'left', alpha);
+      } else {
+        this.T(next, cx, y, size, dark ? '#382215' : C.cream, 'left', alpha * (state === 'dim' ? 0.35 : 1));
+      }
+      cx += nw;
+    }
+    const tail = rest.slice(1);
+    if (tail) this.T(tail, cx, y, size, dark ? '#674526' : C.cream, 'left', alpha * (state === 'dim' ? 0.3 : active ? 0.95 : 0.8));
+  }
+
+  /** 打っている最中の枠：外側に明滅する光の縁を付ける */
+  glow(x: number, y: number, w: number, h: number, col: Color = C.gold, alpha = 1) {
+    const a = (0.35 + 0.25 * Math.sin(this.now * 7)) * alpha;
+    this.PR(x - 1, y - 1, w + 2, 1, col, a);
+    this.PR(x - 1, y + h, w + 2, 1, col, a);
+    this.PR(x - 1, y, 1, h, col, a);
+    this.PR(x + w, y, 1, h, col, a);
+    this.PR(x - 2, y + 1, 1, h - 2, col, a * 0.5);
+    this.PR(x + w + 1, y + 1, 1, h - 2, col, a * 0.5);
+    this.PR(x + 1, y - 2, w - 2, 1, col, a * 0.5);
+    this.PR(x + 1, y + h + 1, w - 2, 1, col, a * 0.5);
+  }
+
+  /** キーの形の小さな札（Enter・Esc など） */
+  keycap(label: string, x: number, y: number, size: number, alpha = 1) {
+    const w = this.W(label, size) + size * 1.1;
+    const h = size * 1.7;
+    this.PR(x, y + 1.5, w, h, '#2a1a0e', alpha * 0.9);
+    this.panel(x, y, w, h, '#f1dcae', '#8a6232', alpha);
+    this.T(label, x + w / 2, y + h * 0.18, size, '#3a2414', 'center', alpha);
+    return w;
   }
 }

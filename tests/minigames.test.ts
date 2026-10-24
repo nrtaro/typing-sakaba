@@ -168,7 +168,7 @@ describe('調達ミニゲーム', () => {
     for (let i = 0; i < 60 * 10; i++) {
       g.update(1 / 60);
       for (const a of g.prey) for (const b of g.prey) {
-        if (a !== b && a.lane === b.lane) expect(Math.abs(a.x - b.x)).toBeGreaterThan(0.2);
+        if (a !== b && a.band === b.band) expect(Math.abs(a.x - b.x)).toBeGreaterThan(0.2);
       }
     }
   });
@@ -294,5 +294,34 @@ describe('調整（デプロイ前の見直し）', () => {
       meat += play(new HuntingGame(new Rng(s)), 5).gains.meat ?? 0;
     }
     expect(fish / meat).toBeGreaterThan(0.75);
+  });
+});
+
+describe('狩りの出現位置', () => {
+  it('大物の出る時刻と通り道、小物の高さが毎回変わる', () => {
+    const deerTimes = new Set<string>();
+    const deerBands = new Set<number>();
+    const lanes = new Set<string>();
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = new HuntingGame(new Rng(seed));
+      deerTimes.add(g.deerAt.toFixed(1));
+      deerBands.add(g.deerBand);
+      for (let i = 0; i < 60 * 6; i++) {
+        g.update(1 / 60);
+        for (const p of g.prey) if (p.kind === 'rabbit') lanes.add(p.lane.toFixed(2));
+      }
+    }
+    expect(deerTimes.size).toBeGreaterThan(5);
+    expect(deerBands.size).toBe(HUNTING.bands.length);
+    expect(lanes.size).toBeGreaterThan(10);
+  });
+
+  it('大物は毎回出てくる', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const g = new HuntingGame(new Rng(seed));
+      let saw = false;
+      for (let i = 0; i < 60 * 8 && !saw; i++) { g.update(1 / 60); saw = g.prey.some((p) => p.kind === 'deer'); }
+      expect(saw).toBe(true);
+    }
   });
 });

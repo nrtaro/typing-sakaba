@@ -166,6 +166,13 @@ export class Game {
       return;
     }
     const inMenu = this.mode !== 'play' || this.paused;
+    if (k === 'Escape' && (this.mode === 'help' || this.mode === 'difficulty')) {
+      e.preventDefault();
+      this.sound.chord(2);
+      this.mode = 'title';
+      this.menu.reset();
+      return;
+    }
     if (inMenu) {
       if (k === 'Enter') {
         e.preventDefault();
@@ -208,6 +215,7 @@ export class Game {
     const dt = Math.max(0, Math.min(0.05, (now - this.last) / 1000));
     this.last = now;
     this.step(dt);
+    this.sc.now = this.t;
     this.draw();
     requestAnimationFrame((n) => this.frame(n));
   }
@@ -344,7 +352,7 @@ export class Game {
         this.view.draw(sc, this.shop, this.t, false);
         if (this.trip?.phase === 'intro') this.drawTripIntro();
       }
-      if (this.paused) this.drawMenuScreen('一時停止中', 'さいかい／やめる を打って選ぶ（Enter・Esc でも再開）');
+      if (this.paused) this.drawMenuScreen('一時停止中', '');
       return;
     }
     // タイトル・遊び方・結果：店内を背景に
@@ -352,7 +360,7 @@ export class Game {
     const ph = this.mode === 'result' ? 2 : 1;
     if (this.art) {
       sc.clearScreen();
-      if (this.mode === 'result') this.art.drawBackground(sc, 'bg-tavern-night');
+      if (this.mode === 'result' || this.mode === 'title') this.art.drawBackground(sc, 'bg-tavern-night');
       else this.art.drawMenuBackground(sc);
     } else {
       sc.begin();
@@ -362,8 +370,13 @@ export class Game {
       drawLights(g, ph, sc);
       sc.present();
     }
-    sc.cover(C.bg, this.mode === 'title' ? 0.18 : 0.7);
-    if (this.mode === 'title') sc.fade(sc.ext.x0, sc.ext.y0, sc.ext.w * 0.72, sc.ext.h, '#190f09', 0.9, 0, 'x');
+    sc.cover(C.bg, this.mode === 'title' ? 0.3 : 0.7);
+    if (this.mode === 'title') {
+      // 左から右へ暗さを抜き、看板と札を読みやすくする。下も少し沈める
+      sc.fade(sc.ext.x0, sc.ext.y0, 300 - sc.ext.x0, sc.ext.h, '#120a06', 0.82, 0, 'x');
+      sc.fade(sc.ext.x0, 200, sc.ext.w, sc.ext.y1 - 200, '#120a06', 0, 0.7, 'y');
+      this.drawEmbers();
+    }
     if (this.mode === 'title') this.drawTitle();
     else if (this.mode === 'help') this.drawHelp();
     else if (this.mode === 'difficulty') this.drawDifficulty();
@@ -376,38 +389,14 @@ export class Game {
     const sc = this.sc;
     const items = this.menuItems();
     if (this.mode === 'title') {
-      items.forEach((it, i) => {
-        const live = this.menu.active.find(l => l.target.id === it.kana);
-        const m = live?.matcher ?? new RomajiMatcher(it.kana);
-        const x = 24 + (i === 2 ? 112 : 0), yy = i === 0 ? 150 : 208, w = i === 0 ? 216 : 104;
-        const primary = i === 0, dim = this.menu.typed.length > 0 && !live;
-        sc.PR(x, yy + 3, w, primary ? 44 : 34, '#68401f', dim ? 0.4 : 1);
-        sc.panel(x, yy, w, primary ? 44 : 34, primary ? (live ? '#ffe2a0' : '#e3b86e') : '#332419', live ? C.w : C.gold3, dim ? 0.45 : 1);
-        sc.T(it.text, primary ? x + 12 : x + w / 2, yy + 5, primary ? 17 : 11, primary ? '#302014' : C.cream, primary ? 'left' : 'center');
-        sc.roma(m.typed, m.remaining, x + w / 2, yy + (primary ? 28 : 21), primary ? 10 : 9, live ? 'active' : dim ? 'dim' : 'idle', 1, primary);
-        if (primary) {
-          sc.panel(x + w - 56, yy + 9, 44, 17, '#edc686', '#a67a3c');
-          sc.T('Enter ↵', x + w - 34, yy + 14, 7, '#4b301e', 'center');
-        }
-      });
-      sc.T('言葉を打って選ぶ ／ Enter：はじめる', 24, 252, 8, C.cream2);
+      const [start, help, sound] = items;
+      this.button(start, 22, 128, 232, 38, 'primary', 'Enter');
+      this.button(help, 22, 176, 140, 30, 'plain');
+      this.button(sound, 170, 176, 84, 30, 'plain');
       return;
     }
-    if (this.mode === 'difficulty') {
-      sc.T('Enter：前回の難易度で開店', 24, 242, 9, C.gold3);
-      const back = items[items.length - 1], live = this.menu.active.find(l => l.target.id === back.kana);
-      const m = live?.matcher ?? new RomajiMatcher(back.kana);
-      sc.T('もどる', 410, 235, 9, C.cream);
-      sc.roma(m.typed, m.remaining, 429, 251, 8, live ? 'active' : 'idle');
-      return;
-    }
-    if (this.mode === 'help') {
-      const m = this.menu.active[0]?.matcher ?? new RomajiMatcher('もどる');
-      sc.PR(340, 215, 112, 34, '#68401f');
-      sc.panel(340, 212, 112, 34, '#e3b86e', C.gold3);
-      sc.T('もどる', 396, 216, 12, '#302014', 'center');
-      sc.roma(m.typed, m.remaining, 396, 234, 9, this.menu.typed ? 'active' : 'idle', 1, true);
-      sc.T('Enter でも戻れます', 396, 252, 7, C.cream2, 'center');
+    if (this.mode === 'difficulty' || this.mode === 'help') {
+      this.button(items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
       return;
     }
     const iw = items.length >= 4 ? 108 : 124;
@@ -420,88 +409,209 @@ export class Game {
       const live = this.menu.active.find((l) => l.target.id === it.kana);
       const dim = typing && !live;
       const isDefault = !typing && def === it && this.mode === 'difficulty';
-      sc.panel(x, y, iw, 40, live ? '#4a2c3c' : 'rgba(42,27,38,0.95)', live || isDefault ? C.gold : C.wood4, dim ? 0.5 : 1);
-      sc.T(it.text, x + iw / 2, y + 3, 14, dim ? C.gray : C.w, 'center');
+      const yy = live ? y - 2 : y;
+      if (live) sc.glow(x, yy, iw, 40);
+      sc.panel(x, yy, iw, 40, live ? '#4a2c3c' : 'rgba(42,27,38,0.95)', live || isDefault ? C.gold : C.wood4, dim ? 0.4 : 1);
+      sc.T(it.text, x + iw / 2, yy + 3, 14, dim ? C.gray : C.w, 'center', dim ? 0.5 : 1);
       const m = live?.matcher ?? new RomajiMatcher(it.kana);
-      sc.roma(m.typed, m.remaining, x + iw / 2, y + 23, 11, live ? 'active' : dim ? 'dim' : 'idle');
+      sc.roma(m.typed, m.remaining, x + iw / 2, yy + 23, 11, live ? 'active' : dim ? 'dim' : 'idle');
+      if (k === 0 && !typing) sc.keycap('Enter', x + iw - 30, yy - 7, 6);
     });
-    const enterHint = this.mode === 'result' ? 'Enter：もういちど' : 'Enter：さいかい';
-    sc.TB(`メニューも打って選ぶ　${enterHint}`, LW / 2, y + 46, 9, C.cream, 'center');
   }
 
   private drawMenuScreen(title: string, sub: string) {
     const sc = this.sc;
     sc.cover(C.bg, 0.6);
     sc.TB(title, LW / 2, 92, 20, C.gold3, 'center');
-    sc.TB(sub, LW / 2, 122, 10, C.cream, 'center');
+    if (sub) sc.TB(sub, LW / 2, 122, 10, C.cream, 'center');
+    else {
+      const w = sc.W('Esc', 8) + 8.8;
+      const x0 = LW / 2 - (w + 4 + sc.W('で再開', 9)) / 2;
+      sc.keycap('Esc', x0, 118, 8);
+      sc.T('で再開', x0 + w + 4, 120, 9, C.cream);
+    }
     this.drawMenu(146);
+  }
+
+  /**
+   * 打って選ぶ札。打ち始めると合う札が浮き上がって光り、下の帯が打った分だけ伸びる。
+   * 合わない札は暗く沈む。primary は明るい木札、plain は暗い札。
+   */
+  private button(it: MenuItem, x: number, y: number, w: number, h: number, style: 'primary' | 'plain', key?: string, mark?: string) {
+    const sc = this.sc;
+    const live = this.menu.active.find((l) => l.target.id === it.kana);
+    const typing = this.menu.typed.length > 0;
+    const dim = typing && !live;
+    const m = live?.matcher ?? new RomajiMatcher(it.kana);
+    const a = 1;
+    const yy = live ? y - 2 : y;
+    const primary = style === 'primary';
+    sc.PR(x + 1, y + 3, w, h, '#0c0604', 0.55 * a);
+    if (live) sc.glow(x, yy, w, h, C.gold3);
+    sc.panel(x, yy, w, h, primary ? (live ? '#ffe9b4' : '#ebc47e') : (live ? '#4d3020' : 'rgba(36,23,14,0.94)'),
+      primary ? (live ? C.w : '#b9883f') : (live ? C.gold3 : '#8a6232'), a);
+    if (primary) sc.PR(x + 2, yy + 2, w - 4, 1, '#fff3d4', 0.6 * a);
+    const label = (mark ? `${mark} ` : '') + it.text;
+    const size = primary ? 16 : 12;
+    const romaSize = primary ? 10 : 8;
+    const left = !!key;
+    sc.T(label, left ? x + 12 : x + w / 2, yy + (primary ? 4 : 3), size, primary ? '#3a2414' : C.cream, left ? 'left' : 'center', a);
+    const romaW = sc.W(m.typed + m.remaining, romaSize);
+    const romaX = left ? x + 12 + (mark ? sc.W(`${mark} `, size) : 0) + romaW / 2 : x + w / 2;
+    sc.roma(m.typed, m.remaining, romaX, yy + (primary ? 23 : 17), romaSize, live ? 'active' : dim ? 'dim' : 'idle', 1, primary);
+    // 打った分だけ伸びる帯（どの札に向かって打っているかを一目で見せる）
+    const total = m.typed.length + m.remaining.length;
+    if (live && total) sc.PR(x + 3, yy + h - 3, (w - 6) * (m.typed.length / total), 2, primary ? '#3f8a6c' : C.teal3);
+    if (key && !typing) {
+      const kw = sc.W(key, 7) + 7.7;
+      sc.keycap(key, x + w - kw - 8, yy + h / 2 - 6, 7, a);
+    }
+    // 合わない札は、透かさずに暗い幕をかけて沈める
+    if (dim) sc.PR(x, yy, w, h, '#0e0805', 0.62);
+  }
+
+  /** タイトル：ゆっくり立ちのぼる火の粉 */
+  private drawEmbers() {
+    const sc = this.sc;
+    for (let i = 0; i < 22; i++) {
+      const life = (this.t * (0.05 + (i % 5) * 0.012) + i * 0.137) % 1;
+      const x = ((i * 97) % 480) + Math.sin(this.t * 0.8 + i) * 6;
+      const y = 262 - life * 230;
+      const a = Math.sin(life * Math.PI) * 0.55;
+      const size = i % 3 ? 1 : 1.5;
+      sc.PR(x, y, size, size, i % 2 ? C.gold3 : '#ffb45a', a);
+    }
+  }
+
+  /** 吊り看板：鎖で下がった木の板に店名を彫る */
+  private drawSignboard(x: number, y: number, w: number, h: number) {
+    const sc = this.sc;
+    for (const cx of [x + 28, x + w - 28]) for (let cy = sc.ext.y0; cy < y; cy += 4) {
+      sc.PR(cx - 1.5, cy, 3, 2.5, '#8a6a44');
+      sc.PR(cx - 0.5, cy + 2.5, 1, 1.5, '#5a4128');
+    }
+    sc.PR(x + 3, y + 4, w, h, '#0c0604', 0.6);
+    sc.panel(x, y, w, h, '#6b4422', '#2e1a0c');
+    sc.PR(x + 2, y + 2, w - 4, 1.5, '#a8743f', 0.8);
+    sc.PR(x + 2, y + h - 3, w - 4, 1.5, '#3c220f', 0.9);
+    sc.panel(x + 5, y + 5, w - 10, h - 10, '#5e3b1d', '#c79a52');
+    for (let k = 1; k < 4; k++) sc.PR(x + 7, y + 6 + k * (h - 12) / 4, w - 14, 0.8, '#4f3117', 0.7);
+    for (const [nx, ny] of [[x + 9, y + 9], [x + w - 11, y + 9], [x + 9, y + h - 11], [x + w - 11, y + h - 11]]) {
+      sc.PR(nx, ny, 2, 2, '#d8b06a');
+      sc.PR(nx + 1, ny + 1, 1, 1, '#4a2c12');
+    }
   }
 
   private drawTitle() {
     const sc = this.sc;
-    sc.T('３分間のタイピング営業', 24, 32, 9, C.gold3);
-    sc.TB(GAME_TITLE, 24, 51, 31, C.gold3, 'left', C.red2);
-    sc.T(GAME_SUBTITLE, 24, 91, 10, C.cream);
-    sc.T('打つほど、酒場がにぎわう。', 24, 116, 12, C.cream);
+    this.drawSignboard(18, 14, 240, 78);
+    sc.TB(GAME_TITLE, 138, 24, 30, '#ffd98a', 'center', '#3a1408');
+    sc.T(GAME_SUBTITLE, 138, 66, 10, '#f3dcb0', 'center');
+    // 店の合言葉：看板の下に、細い線で挟んで小さく添える
+    sc.PR(42, 105, 40, 0.8, C.gold3, 0.6);
+    sc.PR(194, 105, 40, 0.8, C.gold3, 0.6);
+    sc.T('打つほどに、店がにぎわう', 138, 100, 9, C.gold3, 'center', 0.95);
     if (this.art) {
-      for (const [id, x, h] of [['master', 314, 116], ['wife', 374, 106], ['daughter', 432, 90]] as const) {
-        sc.PR(x - 18, 222, 36, 3, '#170d08', 0.4);
-        this.art.drawAnim(sc, `family-${id}`, '待機', this.t, x, 222, this.art.scaleFor(`family-${id}`, 0, h));
+      for (const [id, x, h] of [['master', 318, 112], ['wife', 376, 102], ['daughter', 432, 88]] as const) {
+        sc.PR(x - 18, 236, 36, 3, '#170d08', 0.45);
+        this.art.drawAnim(sc, `family-${id}`, '待機', this.t, x, 236, this.art.scaleFor(`family-${id}`, 0, h));
       }
     } else {
-      sc.spr(FAM.master[0], 295, 130, 3);
-      sc.spr(FAM.wife[0], 350, 140, 3);
-      sc.spr(FAM.daughter[0], 405, 150, 3);
+      sc.spr(FAM.master[0], 295, 140, 3);
+      sc.spr(FAM.wife[0], 350, 150, 3);
+      sc.spr(FAM.daughter[0], 405, 160, 3);
     }
-    const diff = difficultyOf(this.settings.difficulty), best = this.store.loadBest(diff.id);
-    sc.T(best ? `自己ベスト ${best.score.toLocaleString()}` : '自己ベスト ―', 456, 250, 8, C.cream2, 'right');
+    this.drawBestBoard(298, 12, 166, 74);
+  }
+
+  /** 黒板：難易度ごとの自己ベストとランク。前回選んだ難易度に印を付ける */
+  private drawBestBoard(x: number, y: number, w: number, h: number) {
+    const sc = this.sc;
+    sc.PR(x + 3, y + 4, w, h, '#0c0604', 0.55);
+    sc.panel(x, y, w, h, '#22322a', '#6b4422');
+    sc.PR(x + 3, y + 3, w - 6, h - 6, '#1d2b24');
+    sc.T('自己ベスト', x + w / 2, y + 6, 10, '#f2efe2', 'center');
+    sc.PR(x + 14, y + 20, w - 28, 0.8, '#f2efe2', 0.35);
+    DIFFICULTIES.forEach((d, i) => {
+      const rowY = y + 26 + i * 15;
+      const cur = d.id === this.settings.difficulty;
+      const best = this.store.loadBest(d.id);
+      const col = cur ? '#ffe7a6' : '#e8e4d4';
+      if (cur) sc.T('▶', x + 8, rowY + 1, 7, col);
+      sc.T(d.name, x + 18, rowY, 9, col, 'left', cur ? 1 : 0.85);
+      if (best) {
+        const rank = rankFor(best.score, d);
+        sc.T(best.score.toLocaleString(), x + w - 26, rowY, 10, col, 'right', cur ? 1 : 0.85);
+        sc.T(rank.name, x + w - 13, rowY, 10, rank.name === 'S' ? '#ffd27a' : col, 'center');
+      } else sc.T('―', x + w - 26, rowY, 10, col, 'right', 0.6);
+    });
   }
 
   private drawDifficulty() {
     const sc = this.sc;
-    sc.TB('今日は、どんなにぎわいにする？', 24, 18, 20, C.gold3, 'left');
-    sc.T('初めてなら「やさしい」がおすすめ。言葉を打つと開店！', 24, 47, 9, C.cream);
+    sc.TB('難易度をえらぶ', 24, 18, 20, C.gold3, 'left');
+    sc.T('打った難易度で開店します', 24, 46, 9, C.cream2);
+    const typing = this.menu.typed.length > 0;
     DIFFICULTIES.forEach((d, i) => {
-      const x = 24 + i * 146, live = this.menu.active.find(l => l.target.id === d.kana);
-      const chosen = this.menu.typed ? !!live : d.id === this.settings.difficulty;
-      sc.panel(x, 74, 138, 145, chosen ? '#513824' : 'rgba(42,27,18,0.92)', chosen ? C.gold3 : C.wood4);
-      if (!i) { sc.PR(x + 10, 84, 65, 13, '#a7c99d'); sc.T('はじめての人に', x + 14, 87, 7, '#203321'); }
-      sc.T(d.name, x + 12, 108, 18, C.cream);
-      sc.T(['のんびり楽しむ','ほどよい忙しさ','次々くる注文に挑戦'][i], x + 12, 136, 9, C.cream2);
+      const x = 24 + i * 146;
+      const live = this.menu.active.find((l) => l.target.id === d.kana);
+      const last = d.id === this.settings.difficulty;
+      const chosen = typing ? !!live : last;
+      const dim = typing && !live;
+      const a = 1;
+      const y = live ? 62 : 64;
+      if (live) sc.glow(x, y, 138, 148, C.gold3);
+      sc.panel(x, y, 138, 148, chosen ? '#513824' : '#2a1b12', chosen ? C.gold3 : C.wood4, a);
+      if (!i) {
+        sc.PR(x + 10, y + 10, 65, 13, '#a7c99d', a);
+        sc.T('はじめての人に', x + 14, y + 13, 7, '#203321', 'left', a);
+      }
+      if (last && !typing) sc.keycap('Enter', x + 138 - 40, y + 9, 7);
+      sc.T(d.name, x + 12, y + 32, 18, C.cream, 'left', a);
+      sc.T(['のんびり楽しむ', 'ほどよい忙しさ', '次々くる注文に挑戦'][i], x + 12, y + 58, 9, C.cream2, 'left', a);
       const m = live?.matcher ?? new RomajiMatcher(d.kana);
-      sc.roma(m.typed, m.remaining, x + 69, 154, 10, live ? 'active' : 'idle');
-      sc.T(d.comboMissAllowance ? `コンボ：${d.comboMissAllowance}ミスまでOK` : 'コンボ：ノーミスに挑戦', x + 12, 173, 7, C.gold3);
-      if (this.art) for (let j = 0; j <= i; j++) this.art.drawFrame(sc, 'guests-seated', j * 4,
-        x + 23 + j * 33, 204, this.art.scaleFor('guests-seated', j * 4, 23));
-      for (let j = 0; j < 3; j++) sc.PR(x + 12 + j * 16, 208, 12, 2, j <= i ? C.gold3 : C.wood3);
+      sc.roma(m.typed, m.remaining, x + 69, y + 78, 11, live ? 'active' : dim ? 'dim' : 'idle');
+      const total = m.typed.length + m.remaining.length;
+      if (live && total) sc.PR(x + 3, y + 145, 132 * (m.typed.length / total), 2, C.teal3);
+      if (this.art) for (let j = 0; j <= i; j++) {
+        this.art.drawFrame(sc, 'guests-seated', j * 4, x + 23 + j * 33, y + 124, this.art.scaleFor('guests-seated', j * 4, 23), false, a);
+      }
+      const best = this.store.loadBest(d.id);
+      sc.T(best ? `ベスト ${best.score.toLocaleString()}` : 'ベスト ―', x + 126, y + 131, 8, C.gold3, 'right', a);
+      if (dim) sc.PR(x, y, 138, 148, '#0e0805', 0.62);
     });
   }
 
   private drawHelp() {
     const sc = this.sc;
-    sc.TB('遊び方は、３つだけ。', 24, 18, 22, C.gold3, 'left');
-    const titles = ['料理名を打つ','減ったら調達','たくさん出そう'];
-    const lines = [['お客の頭上のローマ字を','打つと、料理を出せます。'],['下の言葉を打って食材集め。','Enterで途中帰還できます。'],['お客を待たせすぎず、','３分間の売上に挑戦！']];
+    sc.TB('遊び方', 24, 18, 22, C.gold3, 'left');
+    const titles = ['料理名を打つ', '減ったら調達', 'たくさん出そう'];
+    const lines = [['お客の頭上のローマ字を', '打つと、料理を出せます。'], ['下の言葉を打って食材集め。', 'Enterで途中帰還できます。'], ['お客を待たせすぎず、', '３分間の売上に挑戦！']];
     titles.forEach((title, i) => {
       const x = 24 + i * 146;
-      sc.panel(x, 61, 138, 139, 'rgba(55,37,23,0.94)', C.wood4);
-      sc.T(`0${i + 1}`, x + 12, 72, 9, C.gold3);
+      sc.panel(x, 54, 138, 128, 'rgba(55,37,23,0.94)', C.wood4);
+      sc.T(`0${i + 1}`, x + 12, 63, 9, C.gold3);
       if (i === 0) {
-        this.art?.drawIcon(sc, 'icons-dishes', 7, x + 12, 92, 36);
-        sc.panel(x + 55, 91, 73, 35, '#211712', C.wood4);
-        sc.T('焼き魚', x + 91, 95, 10, C.cream, 'center');
-        sc.T('yakizakana', x + 91, 112, 7, C.gold3, 'center');
+        this.art?.drawIcon(sc, 'icons-dishes', 7, x + 12, 80, 34);
+        sc.panel(x + 55, 80, 73, 33, '#211712', C.wood4);
+        sc.T('焼き魚', x + 91, 84, 10, C.cream, 'center');
+        sc.roma('yaki', 'zakana', x + 91, 99, 7, 'active');
       } else if (i === 1) {
-        this.art?.drawIcon(sc, 'icons-dishes', 0, x + 24, 94, 25);
-        this.art?.drawIcon(sc, 'icons-dishes', 1, x + 88, 94, 25);
-        sc.T('つり', x + 36.5, 125, 10, C.cream, 'center');
-        sc.T('かり', x + 100.5, 125, 10, C.cream, 'center');
-      } else sc.T('3:00', x + 69, 98, 25, C.gold3, 'center');
-      sc.T(title, x + 12, 145, 13, C.cream);
-      lines[i].forEach((line, j) => sc.T(line, x + 12, 169 + j * 13, 8, C.cream2));
+        this.art?.drawIcon(sc, 'icons-dishes', 0, x + 24, 82, 25);
+        this.art?.drawIcon(sc, 'icons-dishes', 1, x + 88, 82, 25);
+        sc.T('つり', x + 36.5, 111, 10, C.cream, 'center');
+        sc.T('かり', x + 100.5, 111, 10, C.cream, 'center');
+      } else sc.T('3:00', x + 69, 86, 25, C.gold3, 'center');
+      sc.T(title, x + 12, 130, 13, C.cream);
+      lines[i].forEach((line, j) => sc.T(line, x + 12, 152 + j * 13, 8, C.cream2));
     });
-    sc.T('半角英字で入力。shi / si どちらでもOK。', 24, 216, 8, C.cream2);
-    sc.T('Backspace：１文字戻す　Space：打ち直し　Esc：一時停止', 24, 230, 7, C.cream2);
+    // 操作キー：キーの形の札で並べる
+    let kx = 24;
+    for (const [key, label] of [['Backspace', '1文字戻す'], ['Space', '打ち直し'], ['Esc', '一時停止']] as const) {
+      kx += sc.keycap(key, kx, 194, 9) + 5;
+      sc.T(label, kx, 196, 10, C.cream);
+      kx += sc.W(label, 10) + 18;
+    }
   }
 
   private drawResult() {

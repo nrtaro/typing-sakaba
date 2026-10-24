@@ -411,6 +411,7 @@ export class ShopView {
       const y = seat.ty - (this.art ? ORDER_CARD.offset : 70);
       const edge = second ? C.cream2 : live ? C.gold : gst.lack > 0 ? C.red : C.wood4;
       const a = dim ? 0.5 : 1;
+      if (live) sc.glow(x, y, bw, bh, second ? C.cream2 : C.gold);
       sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
       sc.PR(seat.x - 2, y + bh, 4, 2, edge, a);
       sc.PR(seat.x - 1, y + bh + 2, 2, 1, edge, a);
@@ -425,18 +426,19 @@ export class ShopView {
         const ok = shop.stock[ing] >= gst.dish.need[ing]!;
         this.icon(sc, ing, ix, y + (this.art ? 21 : 24), this.art ? 9 : 12, dim ? 0.35 : ok ? 1 : 0.4);
         if (!this.art) sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
+        // 数量や不足の印も、ほかの言葉を打っている間は札と同じだけ弱める
         if (gst.dish.need[ing]! > 1) {
-          sc.PR(ix + 5, y + 24, 9, 6, C.ink);
-          sc.T(`×${gst.dish.need[ing]}`, ix + 10, y + 24, 5.5, ok ? C.cream : C.red3, 'center');
+          sc.PR(ix + 5, y + 24, 9, 6, C.ink, dim ? 0.4 : 1);
+          sc.T(`×${gst.dish.need[ing]}`, ix + 10, y + 24, 5.5, ok ? C.cream : C.red3, 'center', dim ? 0.35 : 1);
         }
-        if (!ok) sc.TB('×', ix + 6, y + 21, 9, C.red3, 'center');
+        if (!ok) sc.TB('×', ix + 6, y + 21, 9, C.red3, 'center', C.ink, dim ? 0.35 : 1);
         ix += 14;
       }
       const p = gst.wait / gst.maxWait;
       sc.PR(x + 4, y + bh - 3, bw - 8, 2, C.ink, a);
       sc.PR(x + 4, y + bh - 3, (bw - 8) * p, 2, p > 0.5 ? C.green : p > 0.25 ? C.gold : C.red, a);
       if (first) sc.TB('▼先に出す', seat.x, y - 10, 8, C.gold3, 'center');
-      if (shop.away) sc.TB('待ってるよ', seat.x, y - 10, 8, C.pink3, 'center');
+      if (shop.away) sc.TB('待ってるよ', seat.x, y - 10, 8, C.pink3, 'center', C.ink, dim ? 0.4 : 1);
     });
   }
 
@@ -458,6 +460,7 @@ export class ShopView {
       const dim = blocked || (typing && !live);
       const lackHere = this.lackTrip?.id === tr.id && Math.floor(t * 6) % 2 === 0;
       const a = dim ? 0.55 : 1;
+      if (live) sc.glow(x, y, w, h);
       sc.panel(x, y, w, h, col.dark, live ? C.gold : lackHere ? C.red3 : col.main, a);
       sc.PR(x + 1, y + 1, w - 2, 18, col.main, dim ? 0.35 : 0.55);
       if (this.art) this.art.drawHead(sc, `family-${tr.who}`, 0, x + 3, y + 3, 14, 0.42, a);
@@ -465,8 +468,7 @@ export class ShopView {
       sc.TB(tr.text, x + 20, y + 2, 13, live ? C.gold3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
       const m = live?.matcher ?? new RomajiMatcher(tr.kana);
       const rx = x + 23 + sc.W(tr.text, 13);
-      sc.T(m.typed, rx, y + 6, 9, C.teal3, 'left', dim ? 0.4 : 1);
-      sc.T(m.remaining, rx + sc.W(m.typed, 9), y + 6, 9, C.cream, 'left', dim ? 0.3 : 0.8);
+      sc.roma(m.typed, m.remaining, rx + sc.W(m.typed + m.remaining, 9) / 2, y + 6, 9, live ? 'active' : dim ? 'dim' : 'idle');
       tr.gives.forEach((ing, k) => {
         const ex = x + 6 + k * 54;
         const ey = y + 21;

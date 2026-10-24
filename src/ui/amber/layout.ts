@@ -1,5 +1,5 @@
 // A案素材の配置。座標は基準の 480x270。背景画像（1672x941）の家具や地面に合わせて調整した値。
-import type { IngredientId } from '../../core/shopConfig';
+import { DISHES, dishGroup, type IngredientId } from '../../core/shopConfig';
 
 export { TAVERN_SEATS, entryPosition } from '../../core/tavernNavigation';
 export const ORDER_CARD = { height: 34, offset: 58 };
@@ -76,5 +76,6 @@ const DISH_ICON: Record<string, number> = {
 };
 
 export function dishIcon(id: string) {
-  return DISH_ICON[id] ?? 7;
+  const dish = DISHES.find((d) => d.id === id);
+  return DISH_ICON[dish ? dishGroup(dish) : id] ?? 7;
 }

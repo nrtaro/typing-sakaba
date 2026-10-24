@@ -166,6 +166,7 @@ export class MinigameView {
     const live = game.input.active[0];
     const m = live?.matcher ?? new RomajiMatcher(kana);
     const w = Math.max(180, sc.W(text, 20) + 50, sc.W(m.typed + m.remaining, 13) + 40);
+    if (live) sc.glow(LW / 2 - w / 2, y, w, 52);
     sc.panel(LW / 2 - w / 2, y, w, 52, 'rgba(42,27,38,0.95)', live ? C.gold : col);
     sc.TB(text, LW / 2, y + 5, 20, C.w, 'center');
     sc.roma(m.typed, m.remaining, LW / 2, y + 32, 13, 'active');
@@ -295,8 +296,19 @@ export class MinigameView {
       const box = { x: Math.max(4, Math.min(LW - w - 4, deer ? sideX : pos.x - w / 2)),
         y: deer ? pos.y - spriteH + 8 : pos.y - spriteH - h - 8, w, h };
       const cx = box.x + w / 2;
-      sc.panel(box.x, box.y, w, h, live ? '#4a2c3c' : 'rgba(42,27,38,0.92)', live ? C.gold : p.kind === 'deer' ? C.gold2 : C.wood4, dim ? 0.55 : 1);
-      sc.T(p.word.text, cx, box.y + 2, 12, dim ? C.gray : C.w, 'center');
+      // 弱める札も透かさない（明るい砂地の上でも文字が読めるように）。枠と文字の色だけ落とす
+      const edge = live ? C.gold : dim ? '#6a5040' : deer ? C.gold2 : C.cream2;
+      const a = 1;
+      // 札と獲物を細い線でつなぎ、位置が毎回変わってもどの獲物の言葉か分かるようにする
+      const ax = deer ? (box.x > pos.x ? box.x : box.x + w) : cx;
+      const ay = deer ? box.y + h / 2 : box.y + h;
+      const tx = deer ? pos.x + (box.x > pos.x ? 14 : -14) : pos.x;
+      const ty = deer ? pos.y - spriteH * 0.6 : pos.y - spriteH + 2;
+      const n = Math.max(2, Math.ceil(Math.hypot(tx - ax, ty - ay) / 2));
+      for (let k = 0; k <= n; k++) sc.PR(ax + (tx - ax) * (k / n) - 0.5, ay + (ty - ay) * (k / n) - 0.5, 1, 1, edge, a * 0.8);
+      if (live) sc.glow(box.x, box.y, w, h);
+      sc.panel(box.x, box.y, w, h, live ? '#4a2c3c' : dim ? '#241820' : '#1e131a', edge, a);
+      sc.T(p.word.text, cx, box.y + 2, 12, dim ? '#a89a90' : C.w, 'center');
       sc.roma(m.typed, m.remaining, cx, box.y + 18, 10, live ? 'active' : dim ? 'dim' : 'idle');
       for (let i = 0; i < p.maxHp; i++) sc.PR(cx - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
       if (p.kind === 'deer') sc.TB('大物 肉×12', cx, box.y - 16, 9, C.gold3, 'center');
@@ -340,8 +352,9 @@ export class MinigameView {
       const w = Math.max(92, sc.W(m.typed + m.remaining, 10) + 12);
       // 絵があるときは芽のすぐ上に置き、前の列の芽を隠さない
       const top = pos.y - (this.art ? AMBER.gathering.sprout.size + 31 : 70);
-      sc.panel(pos.x - w / 2, top, w, 30, live ? '#4a2c3c' : bad ? '#3a1e48' : 'rgba(42,27,38,0.92)', live ? C.gold : bad ? C.purple : C.green, dim ? 0.55 : 1);
-      sc.T((bad ? '☠ ' : '') + s.word.text, pos.x, top + 2, 11, bad ? '#e0c8ff' : dim ? C.gray : C.w, 'center');
+      if (live) sc.glow(pos.x - w / 2, top, w, 30);
+      sc.panel(pos.x - w / 2, top, w, 30, live ? '#4a2c3c' : bad ? '#3a1e48' : '#241820', live ? C.gold : dim ? '#5a4a40' : bad ? C.purple : C.green);
+      sc.T((bad ? '☠ ' : '') + s.word.text, pos.x, top + 2, 11, dim ? '#a89a90' : bad ? '#e0c8ff' : C.w, 'center');
       sc.roma(m.typed, m.remaining, pos.x, top + 17, 10, live ? 'active' : dim ? 'dim' : 'idle');
       sc.PR(pos.x - w / 2 + 4, top + 28, (w - 8) * (s.life / s.maxLife), 1.5, bad ? C.purple : C.green3);
     }
