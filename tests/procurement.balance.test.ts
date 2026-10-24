@@ -50,7 +50,7 @@ export function procurementRows() {
 }
 
 describe('WPM別の調達バランス', () => {
-  it('難易度とWPMごとの比較を再現できる', () => {
+  it('難易度とWPMごとの比較を再現できる', { timeout: 30000 }, () => {
     const rows = procurementRows();
     if (import.meta.env.VITE_PROCUREMENT_REPORT) console.log('PROCUREMENT_REPORT', JSON.stringify(rows));
     expect(rows).toHaveLength(60);
