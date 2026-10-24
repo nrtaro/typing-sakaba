@@ -189,6 +189,35 @@ export class Screen {
     ctx.restore();
   }
 
+  /**
+   * 画面全体を、絵で縦横比を保ったまま覆う（はみ出す分は切る）。
+   * 小さく縮めた絵を滑らかに拡大するので、ぼかしたように見える。余白を埋める背景に使う。
+   */
+  coverImage(img: CanvasImageSource, iw: number, ih: number, darken = 0) {
+    const { ctx, canvas } = this;
+    const k = Math.max(canvas.width / iw, canvas.height / ih);
+    const w = iw * k;
+    const h = ih * k;
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+    ctx.restore();
+    if (darken > 0) this.cover('#120a08', darken);
+  }
+
+  /**
+   * 描く位置を基準の座標で (dx, dy) だけずらして描く。
+   * 上の帯をウィンドウの上端に、下の欄を下端に付けるのに使う（縦に長いウィンドウでも浮かない）。
+   */
+  shifted(dx: number, dy: number, draw: () => void) {
+    const ox = this.OX;
+    const oy = this.OY;
+    this.OX = ox + dx * this.S;
+    this.OY = oy + dy * this.S;
+    try { draw(); } finally { this.OX = ox; this.OY = oy; }
+  }
+
   /** 画面全体を覆う（暗くするなど） */
   cover(col: Color, a: number) {
     const { ctx } = this;

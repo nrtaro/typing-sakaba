@@ -282,7 +282,7 @@ export class Game {
       this.view.handle(ev, shop);
       switch (ev.type) {
         case 'key': if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); break;
-        case 'serve': this.sound.chord(Math.floor(ev.combo / 3)); this.sound.coin(); if (ev.combo >= 3) this.sound.combo(ev.combo); break;
+        case 'serve': this.sound.chord(Math.floor(ev.combo / 3)); this.sound.coin(); if (ev.combo >= 1) this.sound.combo(ev.combo); break;
         case 'lack': case 'angry': this.sound.bad(); break;
         case 'tripStart':
           this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
@@ -424,12 +424,6 @@ export class Game {
     sc.cover(C.bg, 0.6);
     sc.TB(title, LW / 2, 92, 20, C.gold3, 'center');
     if (sub) sc.TB(sub, LW / 2, 122, 10, C.cream, 'center');
-    else {
-      const w = sc.W('Esc', 8) + 8.8;
-      const x0 = LW / 2 - (w + 4 + sc.W('で再開', 9)) / 2;
-      sc.keycap('Esc', x0, 118, 8);
-      sc.T('で再開', x0 + w + 4, 120, 9, C.cream);
-    }
     this.drawMenu(146);
   }
 

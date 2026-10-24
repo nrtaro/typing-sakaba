@@ -1,4 +1,7 @@
 import { comboFx } from './comboFx';
+
+/** 紙吹雪と最大コンボの色（順に巡らせる） */
+const CONFETTI = ['#ffd25c', '#ff7fb0', '#7fc8ff', '#7ff0d8', '#e07cff', '#fff7ea', '#ffa35c'];
 import { C, TRIP_COLOR, type Color } from './palette';
 import { Screen, LW } from './screen';
 import { FAM, guestSprite, ICON, PORTRAIT, WALKERS } from './sprites';
@@ -63,6 +66,13 @@ export class ShopView {
   comboBurst = 0;
   comboAnchor = { x: 0, y: 0 };
   comboCount = 0;
+  /** コンボの全体演出：画面の一瞬の光・揺れ・紙吹雪・中央の掛け声 */
+  private comboFlash = 0;
+  private flashPeak = 0;
+  private shakeT = 0;
+  private shakeAmp = 0;
+  private confetti: { x: number; y: number; vx: number; vy: number; t: number; life: number; col: string; spin: number }[] = [];
+  private callout: { text: string; t: number; col: string; level: number } | null = null;
   lackTrip: { id: TripId; t: number } | null = null;
   gotTrip: { id: TripId; t: number; gains: Partial<Record<IngredientId, number>> } | null = null;
   /** 出かけている／帰ってきた家族のひとこと */
@@ -95,8 +105,19 @@ export class ShopView {
             s.serveStart = null;
           }
         }
-        if (ev.combo >= 3) {
+        if (ev.combo >= 1) {
           const fx = comboFx(ev.combo);
+          this.flashPeak = fx.flash;
+          this.comboFlash = fx.flash ? 0.18 : 0;
+          if (fx.shake) { this.shakeT = 0.3; this.shakeAmp = fx.shake; }
+          for (let i = 0; i < fx.confetti; i++) {
+            this.confetti.push({
+              x: Math.random() * 480, y: -10 - Math.random() * 40, vx: (Math.random() - 0.5) * 30, vy: 40 + Math.random() * 50,
+              t: 0, life: 1.6 + Math.random() * 0.8, col: CONFETTI[i % CONFETTI.length], spin: Math.random() * 6,
+            });
+          }
+          if (this.confetti.length > 160) this.confetti.splice(0, this.confetti.length - 160);
+          if (fx.callout) this.callout = { text: fx.callout, t: 0, col: fx.color, level: fx.level };
           const y = seat.ty - (this.art ? ORDER_CARD.offset : 70);
           this.comboCount = ev.combo;
           this.comboAnchor = { x: seat.x, y: y + 20 };
@@ -186,7 +207,12 @@ export class ShopView {
     const targetSpeed = serverWalkSpeed(shop?.seats.filter(g => g !== null).length ?? 0);
     this.serverSpeed += (targetSpeed - this.serverSpeed) * (1 - Math.exp(-dt / 0.18));
     this.missFlash = Math.max(0, this.missFlash - dt);
-    this.comboBurst = shop && shop.combo < 3 ? 0 : Math.max(0, this.comboBurst - dt);
+    this.comboBurst = shop && shop.combo < 1 ? 0 : Math.max(0, this.comboBurst - dt);
+    this.comboFlash = Math.max(0, this.comboFlash - dt);
+    this.shakeT = Math.max(0, this.shakeT - dt);
+    for (const c of this.confetti) { c.t += dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= 0.99; }
+    this.confetti = this.confetti.filter((c) => c.t < c.life && c.y < 280);
+    if (this.callout && (this.callout.t += dt) > 1.1) this.callout = null;
     for (const p of this.pops) p.t += dt;
     this.pops = this.pops.filter((p) => p.t < 1.3);
     for (const p of this.sparks) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 140 * dt; }
@@ -269,11 +295,26 @@ export class ShopView {
   // ================= 描画 =================
 
   draw(sc: Screen, shop: Shop, t: number, reduce: boolean) {
+    // コンボが高いときだけ、画面を一瞬だけ揺らす（減衰しながら）
+    const k = this.shakeT / 0.3;
+    const ox = sc.OX, oy = sc.OY;
+    if (k > 0) {
+      sc.OX = ox + (Math.random() - 0.5) * 2 * this.shakeAmp * k * sc.S;
+      sc.OY = oy + (Math.random() - 0.5) * 2 * this.shakeAmp * k * sc.S;
+    }
+    try {
+      this.drawScene(sc, shop, t, reduce);
+    } finally {
+      sc.OX = ox;
+      sc.OY = oy;
+    }
+  }
+
+  private drawScene(sc: Screen, shop: Shop, t: number, reduce: boolean) {
     if (this.art) {
       this.drawAmber(sc, shop, this.art);
-      this.drawHud(sc, shop);
       this.drawOrders(sc, shop);
-      this.drawSupply(sc, shop, t);
+      this.drawEdges(sc, shop, t);
       this.drawFx(sc, shop);
       return;
     }
@@ -286,10 +327,22 @@ export class ShopView {
     this.drawActors(sc, shop, t);
     drawLights(g, ph, sc);
     sc.present();
-    this.drawHud(sc, shop);
     this.drawOrders(sc, shop);
-    this.drawSupply(sc, shop, t);
+    this.drawEdges(sc, shop, t);
     this.drawFx(sc, shop);
+  }
+
+  /** 上の帯はウィンドウの上端に、調達欄は下端に付ける（縦に長いウィンドウでも画面の端に揃う） */
+  private drawEdges(sc: Screen, shop: Shop, t: number) {
+    const e = sc.ext;
+    // 縦に長いウィンドウでは、店内の絵の上下（暗い部分）を帯の地の色で覆い、画面の枠として見せる
+    if (e.y0 < 0) {
+      sc.PR(e.x0, e.y0, e.w, 26 - e.y0, C.ink);
+      sc.PR(e.x0, 26, e.w, 1, C.wood3);
+      sc.PR(e.x0, 210, e.w, e.y1 - 210, C.ink);
+    }
+    sc.shifted(0, e.y0, () => this.drawHud(sc, shop));
+    sc.shifted(0, e.y1 - 270, () => this.drawSupply(sc, shop, t));
   }
 
   private drawActors(sc: Screen, shop: Shop, t: number) {
@@ -379,8 +432,13 @@ export class ShopView {
     if (shop.combo > 1) {
       const mult = shop.multiplier;
       const label = `${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : '');
-      if (this.comboBurst > 0) sc.panel(374, 3, 102, 21, 'rgba(85,45,31,0.4)', C.gold3, Math.min(1, this.comboBurst));
-      sc.TB(label, 476, 5, sc.fitSize(label, 13, 100), this.comboBurst > 0 ? C.gold3 : mult > 1 ? C.pink : C.w, 'right');
+      const fx = comboFx(shop.combo);
+      if (this.comboBurst > 0) sc.panel(374, 3, 102, 21, 'rgba(85,45,31,0.4)', fx.color, Math.min(1, this.comboBurst));
+      // 7 からは色が巡り、増えた瞬間に少し大きく弾む
+      const hot = fx.level >= 2;
+      const col = fx.max ? CONFETTI[Math.floor(this.time * 10) % CONFETTI.length] : hot ? fx.color : this.comboBurst > 0 ? C.gold3 : mult > 1 ? C.pink : C.w;
+      const punch = 1 + Math.max(0, this.comboBurst - (fx.duration - 0.15)) * (1 + fx.level * 0.15);
+      sc.TB(label, 476, 5, sc.fitSize(label, 13 * punch, 100), col, 'right');
       if (shop.difficulty.comboMissAllowance > 0) {
         const budget = `ミス猶予 あと${shop.comboMissesLeft}回`;
         const width = sc.W(budget, 5.5);
@@ -447,10 +505,12 @@ export class ShopView {
     sc.PR(e.x0, 210, e.w, e.y1 - 210, C.ink);
     sc.PR(e.x0, 210, e.w, 1, C.wood3);
     const typing = shop.input.typed.length > 0;
+    // 4つの欄をウィンドウの幅いっぱいに広げる（広すぎるときは間をあけて中央に寄せる）
+    const w = Math.min(150, (e.w - 8 - 12) / 4);
+    const left = e.x0 + (e.w - (w * 4 + 12)) / 2;
     TRIPS.forEach((tr, i) => {
-      const x = 4 + i * 118;
+      const x = left + i * (w + 4);
       const y = 214;
-      const w = 114;
       const h = 52;
       const col = TRIP_COLOR[tr.id];
       const live = shop.input.active.find((l) => l.target.id === `trip:${tr.id}`);
@@ -469,7 +529,7 @@ export class ShopView {
       const rx = x + 23 + sc.W(tr.text, 13);
       sc.roma(m.typed, m.remaining, rx + sc.W(m.typed + m.remaining, 9) / 2, y + 6, 9, live ? 'active' : dim ? 'dim' : 'idle');
       tr.gives.forEach((ing, k) => {
-        const ex = x + 6 + k * 54;
+        const ex = x + 6 + k * Math.max(54, (w - 12) / 2);
         const ey = y + 21;
         const n = shop.stock[ing];
         if (n <= 1 && Math.floor(t * 3) % 2 === 0) sc.PR(ex - 2, ey - 1, 50, 22, C.red2, 0.7);
@@ -600,7 +660,27 @@ export class ShopView {
     sc.PR(x - w / 2, y - 0.5, w, 1.5, '#1a0c10', 0.22);
   }
 
-  private drawFx(sc: Screen, _shop: Shop) {
+  private drawFx(sc: Screen, shop: Shop) {
+    const e = sc.ext;
+    // 画面の縁の光：コンボが続いている間、段階に応じて脈打つ（15 以上は色が巡る）
+    const live = comboFx(shop.combo);
+    if (shop.combo >= 1 && live.edge > 0) {
+      const pulse = 0.78 + 0.22 * Math.sin(this.time * (4 + live.level));
+      const col = live.max ? CONFETTI[Math.floor(this.time * 6) % CONFETTI.length] : live.color;
+      const a = (0.25 + live.edge * 0.5) * pulse;
+      const w = 8 + live.level * 1.8;
+      sc.fade(e.x0, e.y0, w, e.h, col, a, 0, 'x');
+      sc.fade(e.x1, e.y0, -w, e.h, col, a, 0, 'x');
+      sc.fade(e.x0, e.y0, e.w, w, col, a, 0, 'y');
+      sc.fade(e.x0, e.y1, e.w, -w, col, a * 0.6, 0, 'y');
+    }
+    // 一瞬の光
+    if (this.comboFlash > 0) sc.cover('#fff4d6', this.flashPeak * (this.comboFlash / 0.18));
+    for (const c of this.confetti) {
+      const a = Math.min(1, (c.life - c.t) * 2);
+      const flat = Math.abs(Math.sin(c.t * 8 + c.spin));
+      sc.PR(c.x, c.y, 2, 0.6 + flat * 2.2, c.col, a);
+    }
     for (const p of this.sparks) {
       const draw = () => sc.PR(p.x, p.y, 1.5, 1.5, p.col, 1 - p.t / 0.7);
       if (p.bounds) sc.clip(p.bounds.x, p.bounds.y, p.bounds.w, p.bounds.h, draw);
@@ -649,9 +729,22 @@ export class ShopView {
       if (p.slot === 'combo' && p.count !== undefined) {
         const fx = comboFx(p.count);
         // 完了して空いた注文枠内に収め、隣の未完了の注文を隠さない。
-        sc.TB(String(p.count), p.x, p.y + 1, sc.fitSize(String(p.count), Math.min(24, 16 + fx.level * 2) + Math.max(0, 1 - p.t * 6) * 4, 54), p.col, 'center', C.ink, a);
-        sc.TB('COMBO' + (fx.level >= 5 ? '!!' : fx.level ? '!' : ''), p.x, p.y + 31, 8, p.col, 'center', C.ink, a);
+        // 数字は出た瞬間に大きく弾んで、すっと元の大きさへ戻る
+        const punch = 1 + Math.max(0, 0.18 - p.t) * (3 + fx.level * 0.4);
+        const col = fx.max ? CONFETTI[Math.floor((this.time + p.t) * 12) % CONFETTI.length] : p.col;
+        sc.TB(String(p.count), p.x, p.y + 1 - (punch - 1) * 6, sc.fitSize(String(p.count), fx.numberSize * punch, 58), col, 'center', C.ink, a);
+        sc.TB(fx.max ? 'FEVER' : 'COMBO' + (fx.level >= 6 ? '!!' : fx.level ? '!' : ''), p.x, p.y + 31, 8, col, 'center', C.ink, a);
       } else sc.TB(p.text, p.x, p.y - p.t * 16, p.big ? 12 : 11, p.col, 'center', C.ink, a);
+    }
+    if (this.callout) {
+      // 節目の掛け声：客席の列の間（注文の札を隠さない位置）に大きく弾ませる
+      const c = this.callout;
+      const grow = c.t < 0.12 ? 0.6 + c.t / 0.12 * 0.6 : 1.2 - Math.min(0.2, (c.t - 0.12) * 0.8);
+      const a = Math.min(1, (1.1 - c.t) * 3);
+      const size = (14 + c.level * 1.2) * grow;
+      const col = c.level >= 10 ? CONFETTI[Math.floor(this.time * 12) % CONFETTI.length] : c.col;
+      sc.TB(c.text, LW / 2 + 41.5, 151.5 - size / 2, size, C.ink, 'center', col, a * 0.8);
+      sc.TB(c.text, LW / 2 + 40, 150 - size / 2, size, col, 'center', C.ink, a);
     }
     if (this.banner) {
       const tw = sc.W(this.banner.text, 11) + 24;
