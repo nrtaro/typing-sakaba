@@ -334,3 +334,17 @@ describe('狩りの出現位置', () => {
     }
   });
 });
+
+describe('大物の札', () => {
+  it('大物が左端へ走っても、札は反対側へ飛ばずになめらかに動く', async () => {
+    const { deerLabelBox } = await import('../src/ui/huntLayout');
+    let prev = deerLabelBox({ x: 470, y: 200 }, 80, 32, 48);
+    for (let x = 469; x >= 50; x -= 1) {
+      const b = deerLabelBox({ x, y: 200 }, 80, 32, 48);
+      expect(Math.abs(b.x - prev.x)).toBeLessThan(3);
+      expect(Math.abs(b.y - prev.y)).toBeLessThan(3);
+      expect(b.x + b.w).toBeLessThanOrEqual(x + 40);
+      prev = b;
+    }
+  });
+});

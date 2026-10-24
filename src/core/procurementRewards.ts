@@ -11,6 +11,6 @@ export function procurementReward(kind: TripId, keys: number, big = false): numb
   if (keys <= 0) return 0;
   const rate = kind === 'fishing' ? (big ? .5 : .45)
     : kind === 'hunting' ? (big ? .55 : .45)
-    : kind === 'gathering' ? .5 : .28;
+    : kind === 'gathering' ? .5 : .36;
   return Math.max(1, Math.round(keys * rate));
 }

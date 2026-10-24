@@ -61,12 +61,21 @@ describe('RomajiMatcher', () => {
 
   it('ガイド表示は入力した綴りに追従する', () => {
     const m = new RomajiMatcher('しお');
-    expect(m.remaining).toBe('shio');
+    expect(m.remaining).toBe('sio');
     m.input('s');
-    expect(m.remaining).toBe('hio');
+    m.input('h');
+    expect(m.remaining).toBe('io');
     m.input('i');
-    expect(m.typed).toBe('si');
+    expect(m.typed).toBe('shi');
     expect(m.remaining).toBe('o');
+  });
+
+  it('し・ち・つ・ふ・じ・しゃ・ちゃ・ちぇ は訓令式の綴りを先に表示する', () => {
+    const cases: [string, string][] = [
+      ['ふつう', 'hutuu'], ['しち', 'siti'], ['じびーる', 'zibi-ru'], ['しゃしゅしょ', 'syasyusyo'],
+      ['しぇ', 'sye'], ['ちゃちゅちょ', 'tyatyutyo'], ['ちぇ', 'tye'],
+    ];
+    for (const [kana, roma] of cases) expect(new RomajiMatcher(kana).remaining).toBe(roma);
   });
 
   it('wouldAccept は状態を変えない', () => {

@@ -11,6 +11,7 @@ import { RomajiMatcher } from '../core/romaji';
 import { INGREDIENT_NAME, TRIPS } from '../core/shopConfig';
 import type { Shop } from '../core/shop';
 import type { Art } from './amber/art';
+import { deerLabelBox } from './huntLayout';
 import { animLength, frameAt } from './amber/manifest';
 import { AMBER, ICON_INDEX } from './amber/layout';
 
@@ -325,10 +326,10 @@ export class MinigameView {
       const w = Math.max(60, sc.W(m.typed + m.remaining, 10) + 14, sc.W(label, 12) + 14);
       const spriteH = p.kind === 'deer' ? 48 : 24;
       const deer = p.kind === 'deer';
-      // 大物の頭上は中段の小物の走路。横に寄せて、その小物を枠で隠さない。
-      const sideX = pos.x - 34 - w >= 4 ? pos.x - 34 - w : pos.x + 34;
-      const box = { x: Math.max(4, Math.min(LW - w - 4, deer ? sideX : pos.x - w / 2)),
-        y: deer ? pos.y - spriteH + 8 : pos.y - spriteH - h - 8, w, h };
+      // 大物の頭上は中段の小物の走路。ふだんは頭の左横に置き、画面の左端に近づいたら
+      // 反対側へ飛ばさずに、少しずつ頭の上へ移していく（札が急に跳ねて大物が戻ったように見えないように）
+      const box = deer ? deerLabelBox(pos, w, h, spriteH)
+        : { x: Math.max(4, Math.min(LW - w - 4, pos.x - w / 2)), y: pos.y - spriteH - h - 8, w, h };
       const cx = box.x + w / 2;
       // 弱める札も透かさない（明るい砂地の上でも文字が読めるように）。枠と文字の色だけ落とす
       const edge = live ? C.gold : dim ? '#6a5040' : deer ? C.gold2 : C.cream2;

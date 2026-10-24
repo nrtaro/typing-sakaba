@@ -218,6 +218,29 @@ export class Screen {
     try { draw(); } finally { this.OX = ox; this.OY = oy; }
   }
 
+  /** 中心から外へ自然に消えていく丸い光（加算で重ねて、周りに溶け込ませる） */
+  radialGlow(x: number, y: number, r: number, col: Color, alpha: number, squash = 1) {
+    if (alpha <= 0 || r <= 0) return;
+    const { ctx } = this;
+    const cx = this.px(x);
+    const cy = this.py(y);
+    const rr = r * this.S;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = Math.min(1, alpha);
+    ctx.translate(cx, cy);
+    ctx.scale(1, squash);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rr);
+    g.addColorStop(0, col);
+    g.addColorStop(0.35, col + '99');
+    g.addColorStop(1, col + '00');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, rr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   /** 画面全体を覆う（暗くするなど） */
   cover(col: Color, a: number) {
     const { ctx } = this;

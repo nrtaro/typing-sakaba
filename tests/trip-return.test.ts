@@ -16,7 +16,7 @@ function setup(trip = TRIPS[0]) {
   const game = Object.assign(Object.create(Game.prototype) as Game, {
     mode: 'play', paused: false, artState: 'ready', shop, menu: { reset: vi.fn() },
     trip: { game: mini, phase: 'game', t: 0 },
-    sound: { unlock: vi.fn(), chord: vi.fn(), bgm: vi.fn() },
+    sound: new Proxy({}, { get: () => vi.fn() }),
   });
   return { game, shop, mini };
 }

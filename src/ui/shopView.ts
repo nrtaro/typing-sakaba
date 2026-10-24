@@ -64,6 +64,8 @@ export class ShopView {
   sparks: Spark[] = [];
   missFlash = 0;
   comboBurst = 0;
+  /** はじめての営業の案内（注文を打つ／調達する）。null なら出さない */
+  guide: 'order' | 'supply' | null = null;
   comboAnchor = { x: 0, y: 0 };
   comboCount = 0;
   /** コンボの全体演出：画面の一瞬の光・揺れ・紙吹雪・中央の掛け声 */
@@ -130,17 +132,19 @@ export class ShopView {
         }
         this.stirUntil = this.time + 2.4;
         this.fxs.push({ anim: 'きらめき', x: seat.x, y: seat.ty - 8, h: 22, start: this.time });
-        this.pop('income', { x: 78, y: 180, t: 0, text: `+${ev.gain}円`, col: C.gold });
+        this.pop('income', { x: seat.x, y: seat.ty - 18, t: 0, text: `+${ev.gain}円`, col: C.gold, big: true });
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, C.gold, 10, 80);
         break;
       }
       case 'lack': {
-        this.pop('warning', { x: 78, y: 115, t: 0, text: '素材が足りない！', col: C.red3 });
+        const ls = SEATS[ev.seat];
+        this.pop('warning', { x: ls.x, y: ls.ty - (this.art ? ORDER_CARD.offset : 70) - 6, t: 0, text: '素材が足りない！', col: '#ff6a5a', big: true });
         this.lackTrip = { id: SOURCE[ev.missing[0]], t: 1.4 };
         break;
       }
       case 'angry': {
-        this.pop('warning', { x: 78, y: 115, t: 0, text: 'プンプン！', col: C.red3 });
+        const as = SEATS[ev.seat];
+        this.pop('angry', { x: as.x, y: as.ty - 22, t: 0, text: 'プンプン！', col: '#ff6a5a', big: true });
         break;
       }
       case 'tripStart':
@@ -316,6 +320,7 @@ export class ShopView {
       this.drawOrders(sc, shop);
       this.drawEdges(sc, shop, t);
       this.drawFx(sc, shop);
+      this.drawGuide(sc, shop);
       return;
     }
     const ph = shop.phaseIndex;
@@ -433,7 +438,18 @@ export class ShopView {
       const mult = shop.multiplier;
       const label = `${shop.combo}コンボ` + (mult > 1 ? ` ×${mult.toFixed(1)}` : '');
       const fx = comboFx(shop.combo);
-      if (this.comboBurst > 0) sc.panel(374, 3, 102, 21, 'rgba(85,45,31,0.4)', fx.color, Math.min(1, this.comboBurst));
+      // 増えた瞬間：文字の後ろに丸い光が広がって消え、火花が散る（四角い背景は使わない）
+      if (this.comboBurst > 0) {
+        const age = fx.duration - this.comboBurst;
+        const tw = sc.W(label, 13);
+        const gx = 476 - tw / 2;
+        sc.radialGlow(gx, 12, 16 + age * 40 + fx.level * 2, fx.color, Math.max(0, 0.7 - age * 0.9), 0.45);
+        for (let n = 0; n < 6 + fx.level; n++) {
+          const ang = n * 2.399 + age;
+          const r = 6 + age * (50 + fx.level * 4);
+          sc.PR(gx + Math.cos(ang) * r * 1.4, 12 + Math.sin(ang) * r * 0.5, 1.5, 1.5, n % 2 ? fx.color : C.gold3, Math.max(0, 1 - age * 1.4));
+        }
+      }
       // 7 からは色が巡り、増えた瞬間に少し大きく弾む
       const hot = fx.level >= 2;
       const col = fx.max ? CONFETTI[Math.floor(this.time * 10) % CONFETTI.length] : hot ? fx.color : this.comboBurst > 0 ? C.gold3 : mult > 1 ? C.pink : C.w;
@@ -451,52 +467,136 @@ export class ShopView {
   private drawOrders(sc: Screen, shop: Shop) {
     const typing = shop.input.typed.length > 0;
     const active = shop.input.active;
+    // 1つに絞り込めた札には、コンボを付ける（大きさは変えず、隣の注文を隠さない）
+    const focus = typing && active.length === 1 && active[0].target.data.kind === 'order' ? active[0].target.id : null;
     shop.seats.forEach((gst, i) => {
       if (!gst || gst.state !== 'wait') return;
-      const seat = SEATS[i];
-      const id = `seat:${i}`;
-      const live = active.find((l) => l.target.id === id);
-      const dim = typing && !live;
-      // 同じ料理の候補のうち、先に出す客だけを金色に
-      const twins = active
-        .filter((l) => l.target.data.kind === 'order' && l.target.kana === gst.dish.kana)
-        .sort((a, b) => shop.urgency(a.target.data) - shop.urgency(b.target.data));
-      const first = !!live && twins.length > 1 && twins[0] === live;
-      const second = !!live && twins.length > 1 && !first;
-      const bw = 62;
-      const bh = this.art ? ORDER_CARD.height : 42;
-      const x = seat.x - bw / 2;
-      const y = seat.ty - (this.art ? ORDER_CARD.offset : 70);
-      const edge = second ? C.cream2 : live ? C.gold : gst.lack > 0 ? C.red : C.wood4;
-      const a = dim ? 0.5 : 1;
-      if (live) sc.glow(x, y, bw, bh, second ? C.cream2 : C.gold);
-      sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
-      sc.PR(seat.x - 2, y + bh, 4, 2, edge, a);
-      sc.PR(seat.x - 1, y + bh + 2, 2, 1, edge, a);
-      const nameSize = sc.fitSize(gst.dish.text, this.art ? 9 : 10, bw - 6);
-      sc.T(gst.dish.text, seat.x, y + 2, nameSize, dim ? C.gray : C.w, 'center');
-      const m = live?.matcher ?? new RomajiMatcher(gst.dish.kana);
-      const romaSize = sc.fitSize(m.typed + m.remaining, 8, bw - 6, 5.5);
-      sc.roma(m.typed, m.remaining, seat.x, y + (this.art ? 12 : 14), romaSize, live ? 'active' : dim ? 'dim' : 'idle');
-      const ids = Object.keys(gst.dish.need) as IngredientId[];
-      let ix = seat.x - ids.length * 7 + 1;
-      for (const ing of ids) {
-        const ok = shop.stock[ing] >= gst.dish.need[ing]!;
-        this.icon(sc, ing, ix, y + (this.art ? 21 : 24), this.art ? 9 : 12, dim ? 0.35 : ok ? 1 : 0.4);
-        if (!this.art) sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
-        // 数量や不足の印も、ほかの言葉を打っている間は札と同じだけ弱める
-        if (gst.dish.need[ing]! > 1) {
-          sc.PR(ix + 5, y + 24, 9, 6, C.ink, dim ? 0.4 : 1);
-          sc.T(`×${gst.dish.need[ing]}`, ix + 10, y + 24, 5.5, ok ? C.cream : C.red3, 'center', dim ? 0.35 : 1);
-        }
-        if (!ok) sc.TB('×', ix + 6, y + 21, 9, C.red3, 'center', C.ink, dim ? 0.35 : 1);
-        ix += 14;
-      }
-      const p = gst.wait / gst.maxWait;
-      sc.PR(x + 4, y + bh - 3, bw - 8, 2, C.ink, a);
-      sc.PR(x + 4, y + bh - 3, (bw - 8) * p, 2, p > 0.5 ? C.green : p > 0.25 ? C.gold : C.red, a);
-      if (first) sc.TB('▼先に出す', seat.x, y - 10, 8, C.gold3, 'center');
+      this.drawOrderCard(sc, shop, i, `seat:${i}` === focus);
     });
+  }
+
+  /** 注文の札。big は打っている札を大きく描く（コンボもこの札に付ける） */
+  private drawOrderCard(sc: Screen, shop: Shop, i: number, big: boolean) {
+    const gst = shop.seats[i]!;
+    const typing = shop.input.typed.length > 0;
+    const active = shop.input.active;
+    const seat = SEATS[i];
+    const live = active.find((l) => l.target.id === `seat:${i}`);
+    const dim = typing && !live;
+    // 同じ料理の候補のうち、先に出す客だけを金色に
+    const twins = active
+      .filter((l) => l.target.data.kind === 'order' && l.target.kana === gst.dish.kana)
+      .sort((a, b) => shop.urgency(a.target.data) - shop.urgency(b.target.data));
+    const first = !!live && twins.length > 1 && twins[0] === live;
+    const second = !!live && twins.length > 1 && !first;
+    const k = 1;
+    const bw = 62 * k;
+    const bh = (this.art ? ORDER_CARD.height : 42) * k;
+    const bottom = seat.ty - (this.art ? ORDER_CARD.offset : 70) + (this.art ? ORDER_CARD.height : 42);
+    const x = Math.max(2, Math.min(LW - bw - 2, seat.x - bw / 2));
+    // 打っている札は少しだけ浮かせる
+    const y = bottom - bh - (live ? 2 : 0);
+    const cx = x + bw / 2;
+    const short = Object.entries(gst.dish.need).some(([id, n]) => shop.stock[id as IngredientId] < n!);
+    const edge = second ? C.cream2 : live ? C.gold : short ? (Math.sin(this.time * 8) > 0 ? '#ff5a4a' : C.red2) : C.wood4;
+    const a = dim ? 0.5 : 1;
+    if (live) sc.PR(x + 1, y + 3, bw, bh, '#0c0604', 0.45);
+    if (live) sc.glow(x, y, bw, bh, second ? C.cream2 : C.gold);
+    sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
+    sc.PR(seat.x - 2, bottom, 4, 2, edge, a);
+    sc.PR(seat.x - 1, bottom + 2, 2, 1, edge, a);
+    const nameSize = sc.fitSize(gst.dish.text, (this.art ? 10 : 10) * k, bw - 6);
+    sc.T(gst.dish.text, cx, y + 2 * k, nameSize, dim ? C.gray : C.w, 'center');
+    const m = live?.matcher ?? new RomajiMatcher(gst.dish.kana);
+    const romaSize = sc.fitSize(m.typed + m.remaining, 9 * k, bw - 6, 6);
+    sc.roma(m.typed, m.remaining, cx, y + 13 * k, romaSize, live ? 'active' : dim ? 'dim' : 'idle');
+    const ids = Object.keys(gst.dish.need) as IngredientId[];
+    const isz = (this.art ? 9 : 12) * k;
+    const step = 14 * k;
+    let ix = cx - ids.length * step / 2 + 1;
+    const iy = y + (this.art ? 23 : 24) * k;
+    for (const ing of ids) {
+      const ok = shop.stock[ing] >= gst.dish.need[ing]!;
+      if (!ok) {
+        // 足りない素材：赤い丸が脈打ち、素材の絵は暗く沈む
+        const pulse = 0.55 + 0.35 * Math.sin(this.time * 8);
+        sc.radialGlow(ix + isz / 2, iy + isz / 2, isz * 0.95, '#ff4a3a', (dim ? 0.3 : 0.9) * pulse);
+        sc.PR(ix - 1, iy - 1, isz + 2, isz + 2, '#5a1018', dim ? 0.3 : 0.75);
+      }
+      this.icon(sc, ing, ix, iy, isz, dim ? 0.35 : ok ? 1 : 0.55);
+      if (!this.art) sc.PR(ix, y + 36, 12, 1.5, TRIP_COLOR[SOURCE[ing]].main, dim ? 0.4 : 1);
+      // 数量や不足の印も、ほかの言葉を打っている間は札と同じだけ弱める
+      if (gst.dish.need[ing]! > 1) {
+        sc.PR(ix + 5 * k, iy + 3 * k, 9 * k, 6 * k, C.ink, dim ? 0.4 : 1);
+        sc.T(`×${gst.dish.need[ing]}`, ix + 10 * k, iy + 3 * k, 5.5 * k, ok ? C.cream : C.red3, 'center', dim ? 0.35 : 1);
+      }
+      if (!ok) sc.TB('×', ix + isz / 2, iy - 1, 11 * k, '#ff6a5a', 'center', C.ink, dim ? 0.35 : 1);
+      ix += step;
+    }
+    const p = gst.wait / gst.maxWait;
+    sc.PR(x + 4, y + bh - 3, bw - 8, 2, C.ink, a);
+    sc.PR(x + 4, y + bh - 3, (bw - 8) * p, 2, p > 0.5 ? C.green : p > 0.25 ? C.gold : C.red, a);
+    if (first) sc.TB('▼先に出す', cx, y - 10, 8, C.gold3, 'center');
+    // 打っている札の上にコンボを付ける（目線を動かさずに見えるように）
+    if (big && shop.combo >= 2) {
+      const fx = comboFx(shop.combo);
+      const text = `${shop.combo}コンボ`;
+      const tw = sc.W(text, 8) + 8;
+      sc.panel(x - 2, y - 11, tw, 12, '#2a1b26', fx.color);
+      sc.T(text, x - 2 + tw / 2, y - 9, 8, fx.color, 'center');
+      const allow = shop.difficulty.comboMissAllowance;
+      for (let n = 0; n < allow; n++) sc.PR(x + tw + 2 + n * 6, y - 7, 4, 4, n < shop.comboMissesLeft ? C.teal3 : C.ink);
+    }
+  }
+
+  /** はじめての営業の案内：吹き出しと、指し示す矢印 */
+  private drawGuide(sc: Screen, shop: Shop) {
+    if (!this.guide) return;
+    const bob = Math.sin(this.time * 5) * 2;
+    let tx: number;
+    let ty: number;
+    let text = '';
+    const below = false;
+    if (this.guide === 'order') {
+      const i = shop.seats.findIndex((g) => g && g.state === 'wait');
+      if (i < 0) return;
+      // 札の左横から、右向きの矢印で指す（上の帯や客にかぶらない）
+      const cardX = SEATS[i].x - 31;
+      const cardY = SEATS[i].ty - (this.art ? ORDER_CARD.offset : 70);
+      const t2 = '料理名を打つと出せる';
+      const w2 = sc.W(t2, 9) + 16;
+      const bx2 = cardX - w2 - 10 + bob;
+      const by2 = cardY + 9;
+      sc.glow(bx2, by2, w2, 18, C.gold3);
+      sc.panel(bx2, by2, w2, 18, '#fff3d6', C.gold2);
+      sc.T(t2, bx2 + w2 / 2, by2 + 4, 9, '#3a2414', 'center');
+      for (let r = 0; r < 6; r++) sc.PR(bx2 + w2 + r, by2 + 9 - (5 - r), 1, (5 - r) * 2 + 1, C.gold2);
+      return;
+    } else {
+      // 一番少ない食材の調達欄を指す
+      const e = sc.ext;
+      const w = Math.min(150, (e.w - 8 - 12) / 4);
+      const left = e.x0 + (e.w - (w * 4 + 12)) / 2;
+      let best = 0;
+      let low = Infinity;
+      TRIPS.forEach((tr, k) => {
+        const n = Math.min(...tr.gives.map((g) => shop.stock[g]));
+        if (n < low) { low = n; best = k; }
+      });
+      tx = left + best * (w + 4) + w / 2;
+      ty = 214 + (e.y1 - 270) - 3;
+      text = '減ったら下の言葉で調達';
+    }
+    const w = sc.W(text, 9) + 16;
+    const bx = Math.max(4, Math.min(LW - w - 4, tx - w / 2));
+    const by = (below ? ty + 10 : ty - 32) + bob;
+    sc.glow(bx, by, w, 18, C.gold3);
+    sc.panel(bx, by, w, 18, '#fff3d6', C.gold2);
+    sc.T(text, bx + w / 2, by + 4, 9, '#3a2414', 'center');
+    // 矢印
+    const ax = tx;
+    const ay = by + 18;
+    for (let r = 0; r < 6; r++) sc.PR(ax - (5 - r), ay + r, (5 - r) * 2 + 1, 1, C.gold2);
   }
 
   /** 調達パネル：調達の言葉・担当・取れる素材と残り数を1つの枠にまとめ、色で結ぶ */
@@ -532,9 +632,20 @@ export class ShopView {
         const ex = x + 6 + k * Math.max(54, (w - 12) / 2);
         const ey = y + 21;
         const n = shop.stock[ing];
-        if (n <= 1 && Math.floor(t * 3) % 2 === 0) sc.PR(ex - 2, ey - 1, 50, 22, C.red2, 0.7);
-        this.icon(sc, ing, ex - 1, ey - 1, 24, dim ? 0.5 : 1);
-        sc.TB(`×${n}`, ex + 24, ey + 4, 13, n <= 1 ? C.red3 : C.w, 'left', C.ink, dim ? 0.5 : 1);
+        const low = n <= 2;
+        const shake = low && n <= 1 ? Math.sin(t * 30) * 1 : 0;
+        if (low) {
+          // 残りわずか：赤い光が脈打ち、0〜1個では素材の絵が小刻みに揺れる
+          const pulse = 0.5 + 0.5 * Math.sin(t * (n === 0 ? 10 : 6));
+          sc.radialGlow(ex + 11, ey + 11, 22, '#ff3a2a', (dim ? 0.35 : 0.85) * pulse);
+          sc.panel(ex - 3, ey - 2, 50, 24, 'rgba(90,16,24,0.55)', n === 0 ? '#ff5a4a' : C.red2, dim ? 0.5 : 0.6 + 0.4 * pulse);
+        }
+        this.icon(sc, ing, ex - 1 + shake, ey - 1, 24, dim ? 0.5 : n === 0 ? 0.55 : 1);
+        sc.TB(`×${n}`, ex + 24, ey + 4, 13, low ? '#ff7a6a' : C.w, 'left', C.ink, dim ? 0.5 : 1);
+        if (low && !dim) {
+          sc.panel(ex - 4, ey - 4, 9, 10, '#ff5a4a', C.ink);
+          sc.T('!', ex + 0.5, ey - 3, 8, C.w, 'center');
+        }
         const got = this.gotTrip?.id === tr.id ? this.gotTrip : null;
         if (got && got.gains[ing]) sc.TB(`+${got.gains[ing]}`, ex + 44, ey - 2 - (1.4 - got.t) * 5, 8, C.gold3, 'center');
       });
@@ -672,8 +783,8 @@ export class ShopView {
     if (shop.combo >= 1 && live.edge > 0) {
       const pulse = 0.78 + 0.22 * Math.sin(this.time * (4 + live.level));
       const col = live.max ? CONFETTI[Math.floor(this.time * 6) % CONFETTI.length] : live.color;
-      const a = (0.25 + live.edge * 0.5) * pulse;
-      const w = 8 + live.level * 1.8;
+      const a = (0.12 + live.edge * 0.26) * pulse;
+      const w = 6 + live.level * 1.2;
       sc.fade(e.x0, e.y0, w, e.h, col, a, 0, 'x');
       sc.fade(e.x1, e.y0, -w, e.h, col, a, 0, 'x');
       sc.fade(e.x0, e.y0, e.w, w, col, a, 0, 'y');
@@ -697,37 +808,32 @@ export class ShopView {
       const a = Math.min(1, this.comboBurst * 2);
       const { x, y } = this.comboAnchor;
       const col = fx.color;
-      sc.clip(x - 30, y - 20, 60, 58, () => {
-        // 柱状の光・多重リング・星形の放射光。完了した席の幅で切り、隣の注文を守る。
-        if (fx.level) {
-          const pulse = 0.7 + Math.sin(age * 12) * 0.3;
-          sc.PR(x - 28, y - 18, 56, 48, col, a * (0.05 + fx.level * 0.018) * pulse);
-          for (let band = 0; band < fx.level; band++) {
-            const xx = x - 25 + (band + 0.5) * 50 / fx.level;
-            sc.PR(xx, y - 18, 1.5, 48, col, a * 0.15 * pulse);
-          }
+      // 丸く柔らかい光を重ね、周りの空間に溶け込ませる（四角く切り取らない）
+      const pulse = 0.75 + Math.sin(age * 12) * 0.25;
+      const grow = Math.min(1, age / 0.12);
+      sc.radialGlow(x, y + 4, (18 + fx.level * 2.2) * (0.6 + grow * 0.4), col, a * (0.28 + fx.level * 0.035) * pulse, 0.8);
+      if (fx.level >= 4) sc.radialGlow(x, y + 4, 10 + fx.level, '#fff7ea', a * 0.25 * pulse, 0.8);
+      for (let ring = 0; ring < fx.rings; ring++) {
+        const r = 8 + ((age * 26 + ring * 9) % 22);
+        const ra = a * 0.7 * (1 - r / 32);
+        for (let k = 0; k < 24; k++) {
+          const angle = k * Math.PI / 12 - age * 0.8;
+          sc.PR(x + Math.cos(angle) * r, y + Math.sin(angle) * r * 0.75, 1.5, 1.5, ring % 2 ? C.gold3 : col, ra);
         }
-        for (let ring = 0; ring < fx.rings; ring++) {
-          const r = 8 + ((age * 26 + ring * 9) % 27);
-          for (let i = 0; i < 24; i++) {
-            const angle = i * Math.PI / 12 - age * 0.8;
-            sc.PR(x + Math.cos(angle) * r, y + Math.sin(angle) * r * 0.75, 1.5, 1.5, ring % 2 ? C.gold3 : col, a * 0.7);
-          }
+      }
+      for (let k = 0; k < fx.rays; k++) {
+        const angle = k * Math.PI * 2 / fx.rays + age * 0.8;
+        const r = 12 + ((age * 18 + k * 3) % 14);
+        for (let jj = 0; jj < 2 + Math.ceil(fx.level / 2); jj++) {
+          const radius = r + jj * 1.7;
+          sc.PR(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius * 0.75, 1.5, 1.5, col, a * (1 - jj * 0.14) * (1 - radius / 34));
         }
-        for (let i = 0; i < fx.rays; i++) {
-          const angle = i * Math.PI * 2 / fx.rays + age * 0.8;
-          const r = 13 + ((age * 18 + i * 3) % 17);
-          for (let j = 0; j < 2 + Math.ceil(fx.level / 2); j++) {
-            const radius = r + j * 1.7;
-            sc.PR(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius * 0.75, 1.5, 1.5, col, a * (1 - j * 0.12));
-          }
-          if (fx.level >= 3 && i % 3 === 0) {
-            const xx = x + Math.cos(angle) * r, yy = y + Math.sin(angle) * r * 0.75;
-            sc.PR(xx - 3, yy, 7, 1, C.w, a);
-            sc.PR(xx, yy - 3, 1, 7, C.w, a);
-          }
+        if (fx.level >= 3 && k % 3 === 0) {
+          const xx = x + Math.cos(angle) * r, yy = y + Math.sin(angle) * r * 0.75;
+          sc.PR(xx - 3, yy, 7, 1, C.w, a * 0.8);
+          sc.PR(xx, yy - 3, 1, 7, C.w, a * 0.8);
         }
-      });
+      }
     }
     for (const p of this.pops) {
       const a = Math.min(1, (1.3 - p.t) * 3);
@@ -752,9 +858,11 @@ export class ShopView {
       sc.TB(c.text, LW / 2 + 40, 150 - size / 2, size, col, 'center', C.ink, a);
     }
     if (this.banner) {
-      const tw = sc.W(this.banner.text, 11) + 24;
-      sc.panel(LW / 2 - tw / 2, 30, tw, 20, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));
-      sc.TB(this.banner.text, LW / 2, 34, 11, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
+      // 家族のひとことは、注文の札がない厨房の上に出す
+      const tw = sc.W(this.banner.text, 10) + 20;
+      const bx = Math.max(4, 82 - tw / 2);
+      sc.panel(bx, 64, tw, 18, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));
+      sc.TB(this.banner.text, bx + tw / 2, 68, 10, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
     }
     // 絞り込み中だけ、打った途中のローマ字を薄く出す
     if (this.missFlash > 0) {
