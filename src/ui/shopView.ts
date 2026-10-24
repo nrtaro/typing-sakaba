@@ -553,6 +553,11 @@ export class ShopView {
 
   // ================= 画像素材での描画 =================
 
+  /** 店内の様子だけを描く（上の帯・注文・調達欄なし）。タイトル画面の背景に使う */
+  drawTavern(sc: Screen, shop: Shop) {
+    if (this.art) this.drawAmber(sc, shop, this.art);
+  }
+
   private drawAmber(sc: Screen, shop: Shop, art: Art) {
     const L = AMBER.tavern;
     const ph = shop.phaseIndex;

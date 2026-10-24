@@ -1,7 +1,7 @@
 import { C } from './palette';
 import { Screen, LW } from './screen';
 import { Sound } from './audio';
-import { ShopView } from './shopView';
+import { SEATS, ShopView } from './shopView';
 import { MinigameView } from './minigameView';
 import { FAM, PORTRAIT } from './sprites';
 import { drawLights, drawRoomLive, roomLayer } from './room';
@@ -10,7 +10,7 @@ import { CandidateInput } from '../core/candidates';
 import { Shop } from '../core/shop';
 import { createMinigame, type Minigame } from '../core/minigames';
 import { Rng } from '../core/rng';
-import { RomajiMatcher } from '../core/romaji';
+import { RomajiMatcher, defaultRomaji } from '../core/romaji';
 import { SaveStore, type DayRecord } from '../core/save';
 import {
   DAY_LENGTH, DIFFICULTIES, FAMILY_NAME, GAME_SUBTITLE, GAME_TITLE, INGREDIENT_NAME, PHASES, SHOP, difficultyOf, rankFor,
@@ -52,6 +52,11 @@ export class Game {
   art: Art | null = null;
   artState: 'loading' | 'ready' | 'failed' = 'loading';
   private artProgress = 0;
+  /** タイトルの背景で動かす営業（自動で料理を出し続ける、にぎわう夜の店） */
+  private demo: { shop: Shop; view: ShopView; next: number; rng: Rng } | null = null;
+  /** 客席から上がる掛け声や音符 */
+  private cheers: { x: number; y: number; t: number; text: string; col: string }[] = [];
+  private cheerNext = 0.6;
 
   constructor(canvas: HTMLCanvasElement) {
     this.sc = new Screen(canvas);
@@ -235,6 +240,7 @@ export class Game {
   step(dt: number) {
     this.t += dt;
     this.missFlash = Math.max(0, this.missFlash - dt);
+    if (this.mode === 'title') this.demoStep(dt);
     if (this.mode !== 'play' || !this.shop || this.paused) return;
     // 背景の読み込み待ちで営業時間を消費しない。
     if (this.trip?.phase === 'intro' && this.trip.t <= 0 && this.tripView.art && !this.tripView.art.has(`bg-${this.trip.game.kind}`)) return;
@@ -332,6 +338,70 @@ export class Game {
     this.sound.chord(8);
   }
 
+  // ---------- タイトルの背景：にぎわう夜の店 ----------
+
+  /** 夜の部の途中で時間を止め、食材は尽きないようにして、自動で料理を出し続ける */
+  private demoStep(dt: number) {
+    if (!this.art) return;
+    if (!this.demo) {
+      // 客が次々に来て、ゆっくり食べていく店にする（背景用。遊ぶときの難易度とは別）
+      const shop = new Shop(new Rng(20261024), { ...difficultyOf('normal'), everyMult: 0.5, waitMult: 4 });
+      const view = new ShopView();
+      view.art = this.art;
+      this.demo = { shop, view, next: 0.5, rng: new Rng(99) };
+      // 最初から席が埋まっている状態にしておく
+      for (let i = 0; i < 20 * 60; i++) this.demoTick(1 / 20);
+    }
+    this.demoTick(dt);
+  }
+
+  private demoTick(dt: number) {
+    const d = this.demo!;
+    const shop = d.shop;
+    shop.clock = PHASES[0].length + PHASES[1].length + 20;
+    for (const k of Object.keys(shop.stock) as (keyof typeof shop.stock)[]) shop.stock[k] = 99;
+    shop.update(dt);
+    for (const ev of shop.drainEvents()) d.view.handle(ev, shop);
+    d.view.update(dt, shop);
+    // 一番待たせている客から、少し間を置いて出していく
+    d.next -= dt;
+    if (d.next <= 0) {
+      d.next = d.rng.range(0.6, 1.3);
+      const waiting = shop.seats
+        .map((g, i) => ({ g, i }))
+        .filter((x) => x.g && x.g.state === 'wait')
+        .sort((a, b) => a.g!.wait - b.g!.wait)[0];
+      if (waiting) {
+        shop.input.reset();
+        for (const c of defaultRomaji(waiting.g!.dish.kana)) shop.key(c);
+        shop.input.reset();
+      }
+    }
+    // 食べている客から、ときどき掛け声や音符が上がる
+    for (const c of this.cheers) c.t += dt;
+    this.cheers = this.cheers.filter((c) => c.t < 1.6);
+    this.cheerNext -= dt;
+    if (this.cheerNext <= 0) {
+      this.cheerNext = d.rng.range(0.35, 0.9);
+      const eating = shop.seats.map((g, i) => ({ g, i })).filter((x) => x.g && x.g.state === 'eat' && !x.g.awaitingDelivery);
+      if (eating.length) {
+        const { i } = d.rng.pick(eating);
+        const words = ['カンパイ！', 'うまい！', '♪', '♪', 'おかわり！', '♪'];
+        const text = d.rng.pick(words);
+        this.cheers.push({ x: SEATS[i].x + d.rng.range(-6, 6), y: SEATS[i].ty - 30, t: 0, text, col: text === '♪' ? C.gold3 : C.cream });
+      }
+    }
+  }
+
+  private drawCheers() {
+    const sc = this.sc;
+    for (const c of this.cheers) {
+      const a = Math.min(1, c.t * 4, (1.6 - c.t) * 2);
+      const size = c.text === '♪' ? 10 : 8;
+      sc.TB(c.text, c.x + Math.sin(c.t * 3 + c.x) * 2, c.y - c.t * 14, size, c.col, 'center', C.ink, a);
+    }
+  }
+
   // ---------- 描画 ----------
 
   private draw() {
@@ -358,7 +428,11 @@ export class Game {
     // タイトル・遊び方・結果：店内を背景に
     const g = sc.g;
     const ph = this.mode === 'result' ? 2 : 1;
-    if (this.art) {
+    if (this.mode === 'title' && this.art && this.demo) {
+      sc.clearScreen();
+      this.demo.view.drawTavern(sc, this.demo.shop);
+      this.drawCheers();
+    } else if (this.art) {
       sc.clearScreen();
       if (this.mode === 'result' || this.mode === 'title') this.art.drawBackground(sc, 'bg-tavern-night');
       else this.art.drawMenuBackground(sc);
@@ -370,13 +444,11 @@ export class Game {
       drawLights(g, ph, sc);
       sc.present();
     }
-    sc.cover(C.bg, this.mode === 'title' ? 0.3 : 0.7);
     if (this.mode === 'title') {
-      // 左から右へ暗さを抜き、看板と札を読みやすくする。下も少し沈める
-      sc.fade(sc.ext.x0, sc.ext.y0, 300 - sc.ext.x0, sc.ext.h, '#120a06', 0.82, 0, 'x');
-      sc.fade(sc.ext.x0, 200, sc.ext.w, sc.ext.y1 - 200, '#120a06', 0, 0.7, 'y');
-      this.drawEmbers();
-    }
+      // 店の様子は見せたまま、上だけ少し沈めて看板と黒板を読みやすくする
+      sc.cover(C.bg, 0.08);
+      sc.fade(sc.ext.x0, sc.ext.y0, sc.ext.w, 100 - sc.ext.y0, '#120a06', 0.55, 0, 'y');
+    } else sc.cover(C.bg, 0.7);
     if (this.mode === 'title') this.drawTitle();
     else if (this.mode === 'help') this.drawHelp();
     else if (this.mode === 'difficulty') this.drawDifficulty();
@@ -388,13 +460,7 @@ export class Game {
   private drawMenu(y: number) {
     const sc = this.sc;
     const items = this.menuItems();
-    if (this.mode === 'title') {
-      const [start, help, sound] = items;
-      this.button(start, 22, 128, 232, 38, 'primary', 'Enter');
-      this.button(help, 22, 176, 140, 30, 'plain');
-      this.button(sound, 170, 176, 84, 30, 'plain');
-      return;
-    }
+    if (this.mode === 'title') return;
     if (this.mode === 'difficulty' || this.mode === 'help') {
       this.button(items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
       return;
@@ -464,19 +530,6 @@ export class Game {
     if (dim) sc.PR(x, yy, w, h, '#0e0805', 0.62);
   }
 
-  /** タイトル：ゆっくり立ちのぼる火の粉 */
-  private drawEmbers() {
-    const sc = this.sc;
-    for (let i = 0; i < 22; i++) {
-      const life = (this.t * (0.05 + (i % 5) * 0.012) + i * 0.137) % 1;
-      const x = ((i * 97) % 480) + Math.sin(this.t * 0.8 + i) * 6;
-      const y = 262 - life * 230;
-      const a = Math.sin(life * Math.PI) * 0.55;
-      const size = i % 3 ? 1 : 1.5;
-      sc.PR(x, y, size, size, i % 2 ? C.gold3 : '#ffb45a', a);
-    }
-  }
-
   /** 吊り看板：鎖で下がった木の板に店名を彫る */
   private drawSignboard(x: number, y: number, w: number, h: number) {
     const sc = this.sc;
@@ -496,26 +549,39 @@ export class Game {
     }
   }
 
+  /**
+   * タイトル：上に吊り看板と自己ベストの黒板、下に木のカウンター風のメニュー台。
+   * 真ん中は実際の店（客が食べ、家族が運び、おやじが鍋を混ぜる）をそのまま見せる。
+   */
   private drawTitle() {
     const sc = this.sc;
-    this.drawSignboard(18, 14, 240, 78);
-    sc.TB(GAME_TITLE, 138, 24, 30, '#ffd98a', 'center', '#3a1408');
-    sc.T(GAME_SUBTITLE, 138, 66, 10, '#f3dcb0', 'center');
-    // 店の合言葉：看板の下に、細い線で挟んで小さく添える
-    sc.PR(42, 105, 40, 0.8, C.gold3, 0.6);
-    sc.PR(194, 105, 40, 0.8, C.gold3, 0.6);
-    sc.T('打つほどに、店がにぎわう', 138, 100, 9, C.gold3, 'center', 0.95);
-    if (this.art) {
-      for (const [id, x, h] of [['master', 318, 112], ['wife', 376, 102], ['daughter', 432, 88]] as const) {
-        sc.PR(x - 18, 236, 36, 3, '#170d08', 0.45);
-        this.art.drawAnim(sc, `family-${id}`, '待機', this.t, x, 236, this.art.scaleFor(`family-${id}`, 0, h));
-      }
-    } else {
-      sc.spr(FAM.master[0], 295, 140, 3);
-      sc.spr(FAM.wife[0], 350, 150, 3);
-      sc.spr(FAM.daughter[0], 405, 160, 3);
+    const e = sc.ext;
+    if (!this.art || !this.demo) {
+      sc.spr(FAM.master[0], 300, 120, 3);
+      sc.spr(FAM.wife[0], 350, 130, 3);
+      sc.spr(FAM.daughter[0], 400, 140, 3);
     }
-    this.drawBestBoard(298, 12, 166, 74);
+    sc.shifted(0, e.y0, () => {
+      this.drawSignboard(14, 8, 232, 66);
+      sc.TB(GAME_TITLE, 130, 15, 27, '#ffd98a', 'center', '#3a1408');
+      sc.T(GAME_SUBTITLE, 130, 51, 9, '#f3dcb0', 'center');
+      this.drawBestBoard(330, 8, 138, 74);
+    });
+    // メニュー台：店の床から下をすべて覆う木の台（縦に長いウィンドウでも下に隙間を作らない）
+    sc.PR(e.x0, 212, e.w, e.y1 - 212, '#2a1a10');
+    sc.PR(e.x0, 212, e.w, 2, '#a8743f');
+    sc.PR(e.x0, 214, e.w, 1, '#5a3a1c');
+    for (let y = 232; y < e.y1; y += 18) sc.PR(e.x0, y, e.w, 0.6, '#3a2414', 0.8);
+    const tag = '打つほどに、店がにぎわう';
+    const tw = sc.W(tag, 8) + 16;
+    sc.panel(LW / 2 - tw / 2, 205, tw, 13, '#2a1a10', '#a8743f');
+    sc.T(tag, LW / 2, 207.5, 8, C.gold3, 'center');
+    sc.shifted(0, (e.y1 - 270) / 2, () => {
+      const [start, help, sound] = this.menuItems();
+      this.button(start, 30, 224, 180, 38, 'primary', 'Enter');
+      this.button(help, 218, 228, 130, 30, 'plain');
+      this.button(sound, 356, 228, 94, 30, 'plain');
+    });
   }
 
   /** 黒板：難易度ごとの自己ベストとランク。前回選んだ難易度に印を付ける */
