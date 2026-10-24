@@ -613,9 +613,9 @@ export class Game {
   }
 
   /** 吊り看板：鎖で下がった木の板に店名を彫る */
-  private drawSignboard(x: number, y: number, w: number, h: number) {
+  private drawSignboard(x: number, y: number, w: number, h: number, chainFrom?: number) {
     const sc = this.sc;
-    for (const cx of [x + 28, x + w - 28]) for (let cy = sc.ext.y0; cy < y; cy += 4) {
+    for (const cx of [x + 28, x + w - 28]) for (let cy = chainFrom ?? sc.ext.y0; cy < y; cy += 4) {
       sc.PR(cx - 1.5, cy, 3, 2.5, '#8a6a44');
       sc.PR(cx - 0.5, cy + 2.5, 1, 1.5, '#5a4128');
     }
@@ -715,7 +715,8 @@ export class Game {
         const h = 150;
         if (live) sc.glow(x, y, w, h, C.gold3);
         else if (last && !typing) sc.glow(x, y, w, h, C.gold3, 0.35 + 0.25 * Math.sin(this.t * 3));
-        this.drawSignboard(x, y, w, h);
+        // 真ん中の札は「難易度をえらぶ」の看板から吊るし、鎖が看板の文字にかからないようにする
+        this.drawSignboard(x, y, w, h, i === 1 ? 40 : undefined);
         if (!i) {
           sc.panel(x + 10, y + 10, 66, 13, '#a7c99d', '#4c6b43');
           sc.T('はじめての人に', x + 14, y + 13, 7, '#203321');
