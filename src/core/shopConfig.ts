@@ -93,7 +93,11 @@ export const SHOP = {
   /** 旧セーブ・手動生成した客の表示用。通常の入店時間は経路長と歩速から決める。 */
   walkTime: 0.9,
   eatTime: 2.4,
+  /** 基準配分。初期在庫はこの合計を維持してランダムに振り分ける。 */
   startStock: { fish: 6, meat: 6, veg: 6, mush: 4, ale: 5, spice: 3 } as Record<IngredientId, number>,
+  startStockRange: {
+    fish: [2, 8], meat: [2, 8], veg: [2, 8], mush: [2, 6], ale: [2, 7], spice: [2, 4],
+  } as Record<IngredientId, readonly [number, number]>,
   /** チップの最大額（待ち時間が満タンのとき） */
   tipMax: 60,
   /** 何コンボごとに倍率が上がるか・上がる量・上限 */

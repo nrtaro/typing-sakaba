@@ -1,3 +1,4 @@
+import { startingStock } from './startingStock';
 import { CandidateInput, type Target } from './candidates';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
@@ -55,7 +56,7 @@ export class Shop {
   score = 0;
   combo = 0;
   comboMistakes = 0;
-  stock: Record<IngredientId, number> = { ...SHOP.startStock };
+  stock: Record<IngredientId, number>;
   seats: (Guest | null)[] = Array.from({ length: SHOP.seats }, () => null);
   queue: Guest[] = [];
   away: Trip | null = null;
@@ -69,6 +70,7 @@ export class Shop {
   private lastPhase = 0;
 
   constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1]) {
+    this.stock = startingStock(this.rng);
     this.input = new CandidateInput(() => this.targets());
   }
 

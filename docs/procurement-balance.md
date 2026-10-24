@@ -1,5 +1,7 @@
 # コンボのミス猶予とWPM別素材バランス
 
+初期在庫はこの記録の固定配分から[ランダム配分](starting-stock.md)へ追加調整しています。
+
 ブランチ：`codex/combo-procurement-balance`。変更前はマージ済みの `7bd158d`。
 
 ## コンボ
