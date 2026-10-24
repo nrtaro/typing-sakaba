@@ -93,11 +93,19 @@ const SONGS: Record<Track, Song> = {
 };
 
 export class Sound {
+  /** 曲の一覧（音の確認用に外から読めるようにする） */
+  static readonly SONGS = SONGS;
   private ac: AudioContext | null = null;
   private sfx: GainNode | null = null;
   private music: GainNode | null = null;
   private timer: number | null = null;
   private step = 0;
+  /** 次の拍を鳴らす時刻（音の時計）。先読みして予約し、タイマーの遅れで拍がずれないようにする */
+  private nextTime = 0;
+  /** 全体の音量と、音割れを防ぐリミッター */
+  private master: GainNode | null = null;
+  /** ノイズ用の音（1秒分を一度だけ作り、毎回切り出して使う） */
+  private noiseBuf: AudioBuffer | null = null;
   private track: Track | null = null;
   private wanted: Track | null = null;
 
@@ -111,11 +119,7 @@ export class Sound {
     }
     try {
       const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.ac = new Ctor();
-      this.sfx = this.ac.createGain();
-      this.music = this.ac.createGain();
-      this.sfx.connect(this.ac.destination);
-      this.music.connect(this.ac.destination);
+      this.build(new Ctor());
       this.apply(this.settings);
       // 音が使えるようになる前に頼まれていた曲を、ここで始める
       if (this.wanted) {
@@ -126,6 +130,31 @@ export class Sound {
     } catch {
       this.ac = null;
     }
+  }
+
+  /**
+   * 音の通り道を作る：効果音・BGM → 全体の音量 → リミッター → スピーカー。
+   * 音が重なっても上限を超えないよう、最後にリミッターでならす（音割れの「プツッ」を防ぐ）。
+   */
+  private build(ac: BaseAudioContext) {
+    this.ac = ac as AudioContext;
+    this.sfx = ac.createGain();
+    this.music = ac.createGain();
+    this.master = ac.createGain();
+    this.master.gain.value = 0.8;
+    const limit = ac.createDynamicsCompressor();
+    limit.threshold.value = -12;
+    limit.knee.value = 6;
+    limit.ratio.value = 12;
+    limit.attack.value = 0.002;
+    limit.release.value = 0.2;
+    this.sfx.connect(this.master);
+    this.music.connect(this.master);
+    this.master.connect(limit).connect(ac.destination);
+    const len = ac.sampleRate;
+    this.noiseBuf = ac.createBuffer(1, len, ac.sampleRate);
+    const ch = this.noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
   }
 
   /** 音が鳴らせる状態か（ブラウザは最初の操作まで音を止めている） */
@@ -139,12 +168,16 @@ export class Sound {
     const t = this.ac.currentTime;
     // 段階ごとの音量。「大」は以前の約2.5倍
     const level = s.muted ? 0 : VOLUME_LEVELS[Math.max(0, Math.min(3, s.volume ?? 3))];
-    this.sfx.gain.setTargetAtTime(level * 1.1, t, 0.02);
-    this.music.gain.setTargetAtTime(level * 0.95, t, 0.05);
+    this.sfx.gain.setTargetAtTime(level * 1.0, t, 0.02);
+    this.music.gain.setTargetAtTime(level * 0.85, t, 0.05);
   }
 
   // ---------- 音の部品 ----------
 
+  /**
+   * 1音。立ち上がりと消え際を必ずなめらかにし（いきなり鳴らさない・いきなり止めない）、
+   * 角のある波形ほど立ち上がりを少し長くする。
+   */
   private tone(f: number, at: number, d: number, type: OscillatorType, v: number, out: GainNode, f2?: number) {
     const ac = this.ac!;
     const o = ac.createOscillator();
@@ -152,29 +185,34 @@ export class Sound {
     o.type = type;
     o.frequency.setValueAtTime(f, at);
     if (f2) o.frequency.exponentialRampToValueAtTime(f2, at + d);
+    const attack = type === 'sine' || type === 'triangle' ? 0.006 : 0.01;
+    // 音量の初期値は 1。鳴り始めの瞬間に1サンプルだけ全開で出て「プツッ」となるので、作った時点で 0 にしておく
+    g.gain.value = 0;
     g.gain.setValueAtTime(0, at);
-    g.gain.linearRampToValueAtTime(v, at + 0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+    g.gain.linearRampToValueAtTime(v, at + attack);
+    g.gain.exponentialRampToValueAtTime(0.001, at + Math.max(d, attack + 0.01));
+    g.gain.linearRampToValueAtTime(0, at + d + 0.02);
     o.connect(g).connect(out);
     o.start(at);
-    o.stop(at + d + 0.02);
+    o.stop(at + d + 0.05);
   }
 
+  /** ノイズ（打楽器・水しぶき・足音など）。作り置きの音から切り出し、前後をなめらかにつなぐ */
   private noise(at: number, d: number, v: number, out: GainNode, type: BiquadFilterType = 'highpass', freq = 7000) {
     const ac = this.ac!;
-    const b = ac.createBuffer(1, Math.max(1, Math.floor(ac.sampleRate * d)), ac.sampleRate);
-    const ch = b.getChannelData(0);
-    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
     const s = ac.createBufferSource();
     const g = ac.createGain();
     const f = ac.createBiquadFilter();
     f.type = type;
     f.frequency.value = freq;
-    s.buffer = b;
-    g.gain.setValueAtTime(v, at);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+    s.buffer = this.noiseBuf;
+    g.gain.value = 0;
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(v, at + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.001, at + Math.max(d, 0.01));
+    g.gain.linearRampToValueAtTime(0, at + d + 0.02);
     s.connect(f).connect(g).connect(out);
-    s.start(at);
+    s.start(at, Math.random() * 0.5, d + 0.05);
   }
 
   private note(n: number) {
@@ -396,27 +434,38 @@ export class Sound {
     if (!this.ac) return;
     const song = SONGS[track];
     this.step = 0;
+    this.nextTime = this.ac.currentTime + 0.06;
     const beat = 60 / song.tempo / 2;
-    const bar = song.chords.length * 8;
+    // 25ミリ秒ごとに、少し先（0.15秒）までの拍を音の時計で予約する。
+    // 画面の処理で一瞬止まっても、拍の時刻はずれない
     this.timer = window.setInterval(() => {
       const ac = this.ac;
-      const out = this.music;
-      if (!ac || !out || ac.state !== 'running') return;
-      const t = ac.currentTime + 0.03;
-      const i = this.step++;
-      const pos = i % 8;
-      const ch = song.chords[Math.floor(i / 8) % song.chords.length];
-      const v = song.vol;
-      if (song.bass.includes(pos)) this.tone(this.semi(ch[0] - 24), t, beat * 1.7, 'triangle', 0.12 * v, out);
-      const a = song.arp[pos];
-      if (a !== null && a !== undefined) this.tone(this.semi(ch[a % ch.length] + (a >= ch.length ? 24 : 12)), t, beat * 0.9, song.arpWave, 0.016 * v, out);
-      const l = song.lead[i % bar % song.lead.length];
-      // 旋律は2周に1回だけ鳴らし、伴奏だけの小節で息継ぎさせる
-      if (l !== null && l !== undefined && Math.floor(i / bar) % 2 === 0) this.tone(this.semi(l), t, beat * 1.7, song.leadWave, (song.leadWave === 'sawtooth' ? 0.016 : 0.028) * v, out);
-      if (song.kick?.includes(pos)) this.tone(130, t, 0.12, 'sine', 0.13 * v, out, 45);
-      if (song.snare?.includes(pos)) this.noise(t, 0.09, 0.05 * v, out, 'bandpass', 1800);
-      if (song.hat?.includes(pos)) this.noise(t, 0.03, 0.025 * v, out);
-    }, beat * 1000);
+      if (!ac || !this.music || ac.state !== 'running') return;
+      // 裏に回るなどで大きく遅れたら、まとめて鳴らさずに今から仕切り直す
+      if (this.nextTime < ac.currentTime - 0.1) this.nextTime = ac.currentTime + 0.05;
+      while (this.nextTime < ac.currentTime + 0.15) {
+        this.beatAt(song, this.step++, this.nextTime, beat);
+        this.nextTime += beat;
+      }
+    }, 25);
+  }
+
+  /** 1拍分の伴奏・旋律・打楽器を、時刻 t に予約する */
+  private beatAt(song: Song, i: number, t: number, beat: number) {
+    const out = this.music!;
+    const bar = song.chords.length * 8;
+    const pos = i % 8;
+    const ch = song.chords[Math.floor(i / 8) % song.chords.length];
+    const v = song.vol;
+    if (song.bass.includes(pos)) this.tone(this.semi(ch[0] - 24), t, beat * 1.7, 'triangle', 0.12 * v, out);
+    const a = song.arp[pos];
+    if (a !== null && a !== undefined) this.tone(this.semi(ch[a % ch.length] + (a >= ch.length ? 24 : 12)), t, beat * 0.9, song.arpWave, 0.016 * v, out);
+    const l = song.lead[i % bar % song.lead.length];
+    // 旋律は2周に1回だけ鳴らし、伴奏だけの小節で息継ぎさせる
+    if (l !== null && l !== undefined && Math.floor(i / bar) % 2 === 0) this.tone(this.semi(l), t, beat * 1.7, song.leadWave, (song.leadWave === 'sawtooth' ? 0.016 : 0.028) * v, out);
+    if (song.kick?.includes(pos)) this.tone(130, t, 0.12, 'sine', 0.13 * v, out, 45);
+    if (song.snare?.includes(pos)) this.noise(t, 0.09, 0.05 * v, out, 'bandpass', 1800);
+    if (song.hat?.includes(pos)) this.noise(t, 0.03, 0.025 * v, out);
   }
 
   /** 互換用：昔の呼び方（mode と速さ）を曲に読み替える */
