@@ -23,6 +23,8 @@ type Mode = 'title' | 'help' | 'difficulty' | 'play' | 'result';
 const PHASE_TRACK = ['morning', 'noon', 'night'] as const;
 /** 結果画面の演出が終わるまでの秒数（この後にメニューを出す） */
 const RESULT_READY = 2.6;
+/** 開店前のカウントダウンの秒数 */
+const COUNTDOWN = 3;
 /** 結果画面に来てから、キーを受け付けない秒数（打ちながら来ても演出を飛ばさない） */
 const RESULT_LOCK = 1.2;
 interface MenuItem { text: string; kana: string; act: () => void }
@@ -69,6 +71,10 @@ export class Game {
   /** 結果画面の演出の開始時刻と、鳴らした音の記録 */
   private resultAt = 0;
   private resultFx = { tick: 0, stamped: false, sparkled: false };
+  /** 開店までの残り秒数（0 なら営業中） */
+  countdown = 0;
+  /** 「開店！」を見せている残り時間 */
+  private goShown = 0;
   /** 音量を変えたときの表示の残り時間 */
   private volumeShown = 0;
 
@@ -179,8 +185,11 @@ export class Game {
     this.paused = false;
     this.mode = 'play';
     this.result = null;
-    this.sound.play('morning');
-    this.sound.bell();
+    // 開店まで3秒数える。その間は時間が進まず、打っても反応しない
+    this.countdown = COUNTDOWN;
+    this.goShown = 0;
+    this.sound.stop();
+    this.sound.count(3);
   }
 
   private autoPause() {
@@ -244,6 +253,11 @@ export class Game {
       }
       return;
     }
+    // カウントダウン中は打っても反応しない（Esc の一時停止だけは使える）
+    if (this.countdown > 0) {
+      if (k.length === 1 || k === 'Enter' || k === 'Backspace') e.preventDefault();
+      return;
+    }
     // 長押しや帰還演出中の連打で二重に帰還処理を始めない。
     if (k === 'Enter') {
       e.preventDefault();
@@ -293,6 +307,19 @@ export class Game {
     if (this.mode === 'result') this.resultStep();
     if (this.mode === 'play' && this.shop) this.view.guide = this.settings.guided ? null : this.guideFor(this.shop);
     if (this.mode !== 'play' || !this.shop || this.paused) return;
+    if (this.countdown > 0) {
+      const before = Math.ceil(this.countdown);
+      this.countdown = Math.max(0, this.countdown - dt);
+      const after = Math.ceil(this.countdown);
+      if (after !== before) this.sound.count(after);
+      if (this.countdown === 0) {
+        this.goShown = 0.9;
+        this.sound.play('morning');
+      }
+      this.view.update(dt);
+      return;
+    }
+    this.goShown = Math.max(0, this.goShown - dt);
     // 背景の読み込み待ちで営業時間を消費しない。
     if (this.trip?.phase === 'intro' && this.trip.t <= 0 && this.tripView.art && !this.tripView.art.has(`bg-${this.trip.game.kind}`)) return;
     const shop = this.shop;
@@ -484,6 +511,7 @@ export class Game {
       } else {
         this.view.draw(sc, this.shop, this.t, false);
         if (this.trip?.phase === 'intro') this.drawTripIntro();
+        this.drawCountdown();
       }
       if (this.paused) this.drawMenuScreen('一時停止中', '');
       this.drawVolume();
@@ -523,6 +551,39 @@ export class Game {
     if (this.mode !== 'result' || this.t - this.resultAt > RESULT_READY - 0.3) this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 200 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);
     this.drawVolume();
+  }
+
+  /** 開店のカウントダウン：数字が大きく弾んで縮み、光の輪が広がる。最後に「開店！」 */
+  private drawCountdown() {
+    const sc = this.sc;
+    if (this.countdown > 0) {
+      const n = Math.ceil(this.countdown);
+      const p = 1 - (this.countdown - (n - 1)); // その数字が出てからの割合（0→1）
+      const pop = p < 0.15 ? 1.6 - p / 0.15 * 0.6 : 1 - (p - 0.15) * 0.15;
+      sc.cover(C.bg, 0.45);
+      sc.radialGlow(LW / 2, 130, 40 + p * 110, '#ffd25c', 0.5 * (1 - p));
+      for (let k = 0; k < 24; k++) {
+        const ang = (k / 24) * Math.PI * 2 + n;
+        const r = 30 + p * 90;
+        sc.PR(LW / 2 + Math.cos(ang) * r, 130 + Math.sin(ang) * r * 0.6, 2, 2, k % 2 ? C.gold : C.gold3, 1 - p);
+      }
+      const size = 64 * pop;
+      sc.TB(String(n), LW / 2, 130 - size / 2, size, '#ffe7a6', 'center', '#3a1408', Math.min(1, (1 - p) * 4));
+      sc.TB('開店まで', LW / 2, 74, 11, C.cream, 'center', C.ink, 0.9);
+      return;
+    }
+    if (this.goShown > 0) {
+      const p = 1 - this.goShown / 0.9;
+      const a = Math.min(1, this.goShown * 3);
+      const size = 40 * (p < 0.12 ? 0.6 + p / 0.12 * 0.6 : 1.2 - Math.min(0.2, (p - 0.12) * 0.5));
+      sc.radialGlow(LW / 2, 130, 60 + p * 160, '#ffb45a', 0.55 * a);
+      for (let k = 0; k < 16; k++) {
+        const ang = (k / 16) * Math.PI * 2;
+        const r = 20 + p * 160;
+        sc.PR(LW / 2 + Math.cos(ang) * r, 130 + Math.sin(ang) * r * 0.55, 3, 1.5, k % 2 ? C.gold : '#ff9fbd', a);
+      }
+      sc.TB('開店！', LW / 2, 130 - size / 2, size, '#ffd25c', 'center', '#3a1408', a);
+    }
   }
 
   /** 音量を変えた直後だけ、右上に4段のメーターを出す */

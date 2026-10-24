@@ -334,6 +334,19 @@ export class Sound {
 
   // ---------- 結果画面 ----------
 
+  /** 開店のカウントダウン：3・2・1 は短い音、0 は開店の明るい和音 */
+  count(n: number) {
+    if (!this.ok) return;
+    const t = this.now;
+    if (n > 0) {
+      this.tone(this.semi(19), t, 0.16, 'square', 0.05, this.sfx!);
+      this.tone(this.semi(31), t, 0.08, 'triangle', 0.03, this.sfx!);
+    } else {
+      [24, 28, 31, 36].forEach((s, i) => this.tone(this.semi(s), t + i * 0.03, 0.5, 'square', 0.04, this.sfx!));
+      this.noise(t, 0.08, 0.05, this.sfx!);
+    }
+  }
+
   /** 売上を数える間のカチカチ音 */
   tick() {
     if (!this.ok) return;
