@@ -4,6 +4,10 @@ export const TAVERN_SEATS = [110, 190].flatMap((ty) => [196, 260, 324, 388].map(
 export const WALK_SPEED = 84;
 /** 配膳は客より速く、往復で営業のテンポを止めない。 */
 export const SERVER_WALK_SPEED = 112;
+/** 店内の客数に応じて配膳を急ぐ。２人までは通常、６人で２倍、満席で2.5倍。 */
+export function serverWalkSpeed(guests: number) {
+  return SERVER_WALK_SPEED * (1 + Math.min(6, Math.max(0, guests - 2)) * 0.25);
+}
 export const TAVERN_DOOR = { x: 452, y: 202 };
 export const TAVERN_AISLE = 156;
 

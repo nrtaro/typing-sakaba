@@ -3,7 +3,7 @@ vi.mock('../src/ui/sprites', () => ({ FAM: {}, ICON: {}, PORTRAIT: {}, WALKERS: 
 import { ShopView } from '../src/ui/shopView';
 import { Shop } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
-import { DISHES, SHOP } from '../src/core/shopConfig';
+import { DISHES, SHOP, TRIPS } from '../src/core/shopConfig';
 import { RomajiMatcher } from '../src/core/romaji';
 import { HUNTING, HuntingGame } from '../src/core/minigames';
 import { AMBER, ORDER_CARD, TAVERN_SEATS, entryPosition } from '../src/ui/amber/layout';
@@ -17,6 +17,7 @@ describe('画像版の配膳と営業の同期', () => {
     const shop = new Shop(new Rng(1));
     const view = new ShopView();
     view.art = { anim: () => ({ frames: [8, 9, 10, 9, 8], fps: 5 }) } as unknown as Art;
+    shop.away = TRIPS.find(t => t.id === 'gathering')!; // 娘が調達中で、同じ担当に２件並ぶケース
     const dish = DISHES.find((d) => d.id === 'ale')!;
     const guests = [3, 5].map((seat, i) => {
       const g = { id: 100 + i, dish, look: 0, wait: 25, maxWait: 30, state: 'wait' as const, t: 0, lack: 0 };
