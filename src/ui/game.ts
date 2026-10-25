@@ -1,4 +1,4 @@
-import { C } from './palette';
+import { C, TRIP_COLOR } from './palette';
 import { Screen, LW } from './screen';
 import { Sound, VOLUME_NAMES } from './audio';
 import { SEATS, ShopView } from './shopView';
@@ -13,11 +13,27 @@ import { Rng } from '../core/rng';
 import { RomajiMatcher, defaultRomaji } from '../core/romaji';
 import { SaveStore, type DayRecord } from '../core/save';
 import {
-  DAY_LENGTH, DIFFICULTIES, FAMILY_NAME, GAME_SUBTITLE, GAME_TITLE, INGREDIENT_NAME, PHASES, SHOP, difficultyOf, rankFor,
+  DAY_LENGTH, DIFFICULTIES, FAMILY_NAME, GAME_SUBTITLE, GAME_TITLE, INGREDIENT_NAME, PHASES, SHOP, TRIPS, difficultyOf, rankFor,
   type DifficultyId,
 } from '../core/shopConfig';
 
 type Mode = 'title' | 'help' | 'difficulty' | 'play' | 'result';
+
+/** 調達のしかた：場所の絵の切り取り位置（背景の原画の画素）と、3行の説明。【】は打つ言葉として色を変える */
+const TRIP_HELP: { id: 'fishing' | 'hunting' | 'gathering' | 'trading'; crop: [number, number, number]; lines: string[] }[] = [
+  { id: 'fishing', crop: [60, 260, 620], lines: ['浮きが沈んだら【あわせ】', 'かかったら【巻き上げ】', '大物は3語・3ミスで糸切れ'] },
+  { id: 'hunting', crop: [0, 360, 620], lines: ['獲物の【言葉】で仕留める', '大物のシカは3発で肉どっさり', '柵を越えると逃げられる'] },
+  { id: 'gathering', crop: [200, 360, 640], lines: ['野菜やきのこの【名前】', '☠ 毒きのこは打たない', '生えている間に摘もう'] },
+  { id: 'trading', crop: [330, 330, 760], lines: ['【品物の名前】を打ち切る', 'ライバルより先に落札', 'ミスなしで1箱おまけ'] },
+];
+
+/** 素材 → アイコンの番号 */
+const ICON_FOR: Record<string, number> = { fish: 0, meat: 1, veg: 2, mush: 3, ale: 4, spice: 5 };
+
+/** 「【…】」で囲んだ部分を色付きにするため、文を分ける */
+function splitHot(line: string): [string, boolean][] {
+  return line.split(/(【[^】]*】)/).filter(Boolean).map((part) => (part.startsWith('【') ? [part.slice(1, -1), true] : [part, false]));
+}
 
 /** 時間帯ごとの曲 */
 const PHASE_TRACK = ['morning', 'noon', 'night'] as const;
@@ -68,6 +84,8 @@ export class Game {
   private cheerNext = 0.6;
   /** 遊び方で試し打ちしたときの演出（料理は提供、調達は出発） */
   private helpFx: { kind: 'dish' | 'fishing' | 'hunting'; x: number; y: number; start: number }[] = [];
+  /** 遊び方のページ（0=基本、1=調達のしかた） */
+  helpPage = 0;
   /** 結果画面の演出の開始時刻と、鳴らした音の記録 */
   private resultAt = 0;
   private resultFx = { tick: 0, stamped: false, sparkled: false };
@@ -114,15 +132,18 @@ export class Game {
       case 'title':
         return [
           { text: 'はじめる', kana: 'はじめる', act: () => { this.mode = 'difficulty'; } },
-          { text: 'あそびかた', kana: 'あそびかた', act: () => { this.mode = 'help'; } },
+          { text: 'あそびかた', kana: 'あそびかた', act: () => { this.mode = 'help'; this.helpPage = 0; } },
           { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
         ];
       case 'help':
         // 遊び方の画面では、例の言葉を実際に打って試せる（打ち切ると演出が出て、また打てる）
+        // 2ページ目：4つの調達のくわしい説明（もどるで1ページ目へ）
+        if (this.helpPage === 1) return [{ text: 'もどる', kana: 'もどる', act: () => { this.helpPage = 0; } }];
         return [
           { text: '焼き魚', kana: 'やきざかな', act: () => this.helpPlay('dish') },
           { text: 'つり', kana: 'つり', act: () => this.helpPlay('fishing') },
           { text: 'かり', kana: 'かり', act: () => this.helpPlay('hunting') },
+          { text: '調達のしかた ▶', kana: 'ちょうたつ', act: () => this.openTripHelp() },
           { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
         ];
       case 'difficulty':
@@ -231,6 +252,7 @@ export class Game {
       e.preventDefault();
       this.sound.select();
       if (this.mode === 'result') this.toTitle();
+      else if (this.mode === 'help' && this.helpPage === 1) this.helpPage = 0;
       else this.mode = 'title';
       this.menu.reset();
       return;
@@ -545,7 +567,7 @@ export class Game {
       sc.cover(C.bg, 0.4);
     } else sc.cover(C.bg, 0.7);
     if (this.mode === 'title') this.drawTitle();
-    else if (this.mode === 'help') this.drawHelp();
+    else if (this.mode === 'help') { if (this.helpPage === 1) this.drawTripHelp(); else this.drawHelp(); }
     else if (this.mode === 'difficulty') this.drawDifficulty();
     else this.drawResult();
     if (this.mode !== 'result' || this.t - this.resultAt > RESULT_READY - 0.3) this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 200 : this.mode === 'difficulty' ? 170 : 172);
@@ -605,6 +627,7 @@ export class Game {
     if (this.mode === 'difficulty') return;
     if (this.mode === 'help') {
       this.button(items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
+      if (this.helpPage === 0) this.button(items[items.length - 2], 300, 222, 158, 38, 'primary');
       return;
     }
     const iw = items.length >= 4 ? 108 : 124;
@@ -891,6 +914,103 @@ export class Game {
       sc.T(label, kx, 196, 10, C.cream);
       kx += sc.W(label, 10) + 18;
     }
+  }
+
+  /** 調達のしかたのページを開く（背景の絵をここで読み込み始める） */
+  private openTripHelp() {
+    this.helpPage = 1;
+    if (this.art) for (const id of TRIP_HELP.map((h) => `bg-${h.id}`)) void this.art.ensure(id).catch(() => {});
+  }
+
+  /**
+   * 調達のしかた：4枚の札を2×2に並べる。色は店の調達欄と同じ。
+   * 左に実際の場所の小さな絵（家族と獲物入り）、右に名前・手に入るもの・3行の説明。
+   */
+  private drawTripHelp() {
+    const sc = this.sc;
+    sc.TB('調達のしかた', 24, 14, 20, C.gold3, 'left');
+    // 共通のコツ（キーの絵で短く）
+    const tipX = 196;
+    sc.T('長い言葉ほど多く取れる', tipX, 21, 9, C.cream);
+    const ew = sc.keycap('Enter', tipX + sc.W('長い言葉ほど多く取れる', 9) + 12, 18, 8);
+    sc.T('途中で店へ戻る', tipX + sc.W('長い言葉ほど多く取れる', 9) + 16 + ew, 21, 9, C.cream);
+    TRIP_HELP.forEach((h, n) => {
+      const x = 22 + (n % 2) * 222;
+      const y = 46 + Math.floor(n / 2) * 88;
+      const w = 214;
+      const hh = 82;
+      const col = TRIP_COLOR[h.id];
+      const trip = TRIPS.find((t) => t.id === h.id)!;
+      // 札：調達欄と同じ色の縁と見出しの帯
+      sc.PR(x + 2, y + 3, w, hh, '#0c0604', 0.5);
+      sc.panel(x, y, w, hh, col.dark, col.main);
+      // 場所の絵
+      const tx = x + 5;
+      const ty = y + 5;
+      const tw = 74;
+      const th = hh - 10;
+      this.drawTripThumb(h.id, tx, ty, tw, th);
+      sc.PR(tx - 1, ty - 1, tw + 2, 1, col.main);
+      sc.PR(tx - 1, ty + th, tw + 2, 1, col.main);
+      // 見出し：調達の言葉と担当
+      const rx = tx + tw + 8;
+      sc.PR(rx - 3, y + 4, w - (rx - x) - 2, 17, col.main, 0.55);
+      sc.TB(trip.text, rx, y + 5, 12, C.w, 'left');
+      const tw2 = sc.W(trip.text, 12);
+      sc.T(`${trip.place}で${FAMILY_NAME[trip.who]}が${trip.act}`, rx + tw2 + 6, y + 9, 7, C.cream, 'left', 0.9);
+      // 手に入るもの
+      let ix = rx;
+      for (const ing of trip.gives) {
+        this.art?.drawIcon(sc, 'icons-dishes', ICON_FOR[ing], ix, y + 24, 13);
+        sc.T(INGREDIENT_NAME[ing], ix + 15, y + 26, 8, C.gold3);
+        ix += 17 + sc.W(INGREDIENT_NAME[ing], 8) + 6;
+      }
+      // 説明：要点だけ3行。打つ言葉は色を変える
+      const room = x + w - 6 - (rx + 7);
+      h.lines.forEach((line, k) => {
+        const ly = y + 41 + k * 13;
+        sc.PR(rx, ly + 3, 3, 3, col.main);
+        // 札からはみ出さない大きさで描く
+        const size = sc.fitSize(line.replace(/[【】]/g, ''), 8.5, room, 7);
+        let cx = rx + 7;
+        for (const [part, hot] of splitHot(line)) {
+          if (hot) sc.TB(part, cx, ly, size, C.gold, 'left', C.ink);
+          else sc.T(part, cx, ly, size, C.cream);
+          cx += sc.W(part, size);
+        }
+      });
+    });
+  }
+
+  /** 調達の場所の小さな絵：背景の一部を切り取り、家族と獲物を小さく置く */
+  private drawTripThumb(id: string, x: number, y: number, w: number, h: number) {
+    const sc = this.sc;
+    const art = this.art;
+    const bg = `bg-${id}`;
+    sc.PR(x, y, w, h, '#1a120c');
+    if (!art || !art.has(bg)) return;
+    const { img } = art.sheet(bg);
+    const crop = TRIP_HELP.find((t) => t.id === id)!.crop;
+    const cw = crop[2];
+    const ch = cw * (h / w);
+    sc.blit(img, crop[0], crop[1], cw, ch, x, y, w, h);
+    sc.clip(x, y, w, h, () => {
+      const foot = y + h - 6;
+      if (id === 'fishing') art.drawFrame(sc, 'wife-fishing', 0, x + 26, foot - 6, art.scaleFor('wife-fishing', 0, 40));
+      if (id === 'hunting') {
+        art.drawFrame(sc, 'props-actions', 4, x + 18, foot, art.scaleFor('props-actions', 4, 34));
+        art.drawAnim(sc, 'wildlife', 'シカ・走行', this.t, x + 62, foot - 4, art.scaleFor('wildlife', 4, 30));
+      }
+      if (id === 'gathering') {
+        art.drawAnim(sc, 'family-daughter', '待機', this.t, x + 20, foot, art.scaleFor('family-daughter', 0, 34));
+        art.drawIcon(sc, 'icons-dishes', 2, x + 44, foot - 26, 14);
+        art.drawIcon(sc, 'icons-dishes', 3, x + 60, foot - 18, 14);
+      }
+      if (id === 'trading') {
+        art.drawAnim(sc, 'family-master', '待機', this.t, x + 20, foot, art.scaleFor('family-master', 0, 36));
+        art.drawFrame(sc, 'props-actions', 0, x + 60, foot, art.scaleFor('props-actions', 0, 36), true);
+      }
+    });
   }
 
   /** 試し打ちの演出 */
