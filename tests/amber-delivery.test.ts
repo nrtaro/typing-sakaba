@@ -122,7 +122,7 @@ describe('狩りのゲージと報酬', () => {
         keys += rewardKeys(prey.word.kana);
         for (const key of new RomajiMatcher(prey.word.kana).remaining) game.key(key);
       }
-      expect((game.gains.meat ?? 0) - before).toBe(procurementReward('hunting', keys, kind === 'deer'));
+      expect((game.gains.meat ?? 0) - before).toBe(procurementReward('hunting', keys, kind === 'deer', game.difficulty.id));
     }
   });
 });

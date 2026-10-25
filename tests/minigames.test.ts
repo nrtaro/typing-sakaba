@@ -63,7 +63,7 @@ describe('調達ミニゲーム', () => {
         keys += rewardKeys(g.word!.kana);
         for (const c of defaultRomaji(g.word!.kana)) g.key(c);
       }
-      return procurementReward('fishing', keys, g.big);
+      return procurementReward('fishing', keys, g.big, g.difficulty.id);
     };
     const small = land();
     expect(g.gains.fish).toBe(small);
@@ -188,9 +188,9 @@ describe('調達ミニゲーム', () => {
       { id: 'b', word: GATHER_BAD[0], ing: null, slot: 1, life: 5, maxLife: 5 },
     ];
     for (const c of defaultRomaji(GATHER_GOOD[0].kana)) g.key(c);
-    expect(g.gains.veg).toBe(procurementReward('gathering', rewardKeys(GATHER_GOOD[0].kana)));
+    expect(g.gains.veg).toBe(procurementReward('gathering', rewardKeys(GATHER_GOOD[0].kana), false, g.difficulty.id));
     for (const c of defaultRomaji(GATHER_BAD[0].kana)) g.key(c);
-    expect(g.gains.veg).toBe(procurementReward('gathering', rewardKeys(GATHER_GOOD[0].kana)) - GATHER.poisonLoss);
+    expect(g.gains.veg).toBe(procurementReward('gathering', rewardKeys(GATHER_GOOD[0].kana), false, g.difficulty.id) - GATHER.poisonLoss);
   });
 
   it('採取：畑に片方しかないとき、次の安全な出題で不足側を補う', () => {
@@ -208,7 +208,7 @@ describe('調達ミニゲーム', () => {
     for (const miss of [false, true]) {
       const g = new TradingGame(new Rng(10));
       const ing = g.lot.item;
-      const base = procurementReward('trading', rewardKeys(g.lot.word.kana));
+      const base = procurementReward('trading', rewardKeys(g.lot.word.kana), false, g.difficulty.id);
       if (miss) g.key('q');
       for (const c of defaultRomaji(g.lot.word.kana)) g.key(c);
       expect(g.gains[ing]).toBe(base + (miss ? 0 : 1));
