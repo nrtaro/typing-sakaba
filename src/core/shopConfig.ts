@@ -183,9 +183,9 @@ export interface Difficulty {
 }
 
 export const DIFFICULTIES: Difficulty[] = [
-  { id: 'easy', comboMissAllowance: 2, name: 'やさしい', kana: 'やさしい', desc: 'お客はのんびり、獲物もゆっくり。はじめての人に', everyMult: 2.1, waitMult: 2.2, hookMult: 2.4, preyMult: 0.55, sproutLifeMult: 1.8, poisonRate: 0.04, rivalMult: 0.5, rankMult: 0.6 },
-  { id: 'normal', comboMissAllowance: 1, name: 'ふつう', kana: 'ふつう', desc: '標準の忙しさ', everyMult: 1.2, waitMult: 1.2, hookMult: 1.3, preyMult: 0.9, sproutLifeMult: 1.15, poisonRate: 0.1, rivalMult: 0.85, rankMult: 1 },
-  { id: 'hard', comboMissAllowance: 0, name: 'むずかしい', kana: 'むずかしい', desc: 'お客が次々来て待ってくれない。腕に自信のある人に', everyMult: 0.9, waitMult: 0.9, hookMult: 1, preyMult: 1.1, sproutLifeMult: 0.95, poisonRate: 0.17, rivalMult: 1.1, rankMult: 1.2 },
+  { id: 'easy', comboMissAllowance: 3, name: 'やさしい', kana: 'やさしい', desc: 'お客はのんびり、獲物もゆっくり。はじめての人に', everyMult: 2.1, waitMult: 2.2, hookMult: 2.4, preyMult: 0.55, sproutLifeMult: 1.8, poisonRate: 0.04, rivalMult: 0.5, rankMult: 0.6 },
+  { id: 'normal', comboMissAllowance: 2, name: 'ふつう', kana: 'ふつう', desc: '標準の忙しさ', everyMult: 1.2, waitMult: 1.2, hookMult: 1.3, preyMult: 0.9, sproutLifeMult: 1.15, poisonRate: 0.1, rivalMult: 0.85, rankMult: 1 },
+  { id: 'hard', comboMissAllowance: 1, name: 'むずかしい', kana: 'むずかしい', desc: 'お客が次々来て待ってくれない。腕に自信のある人に', everyMult: 0.9, waitMult: 0.9, hookMult: 1, preyMult: 1.1, sproutLifeMult: 0.95, poisonRate: 0.17, rivalMult: 1.1, rankMult: 1.2 },
 ];
 
 export function difficultyOf(id: DifficultyId): Difficulty {
