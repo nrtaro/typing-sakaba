@@ -17,6 +17,7 @@ function setup(trip = TRIPS[0]) {
     mode: 'play', paused: false, artState: 'ready', shop, menu: { reset: vi.fn() },
     trip: { game: mini, phase: 'game', t: 0 },
     sound: new Proxy({}, { get: () => vi.fn() }),
+    settings: { muted: false, volume: 3 },
   });
   return { game, shop, mini };
 }
