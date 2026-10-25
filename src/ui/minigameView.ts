@@ -604,17 +604,17 @@ export class MinigameView {
     sc.T('相手', x0 + 14, y + 60, 7, C.red3);
     sc.PR(bx, y + 62, bw, 3, C.ink);
     sc.PR(bx, y + 62, bw * lot.rival, 3, C.red);
-    // 次の品物：打っているローマ字のすぐ右、札の外側に小さく添える（目線を動かさずに見える）
-    this.drawNextLot(sc, game, x0 + w + 4, y + 30, 'left');
+    // 次の品物：品物の名前の右上（札の右上の縁）に小さく添える（目線を動かさずに見える）
+    this.drawNextLot(sc, game, x0 + w - 6, y - 9, 'right');
   }
 
   /** 次の品物の小さな札。align は x を左端にするか中央にするか */
-  private drawNextLot(sc: Screen, game: TradingGame, x: number, y: number, align: 'left' | 'center') {
+  private drawNextLot(sc: Screen, game: TradingGame, x: number, y: number, align: 'left' | 'center' | 'right') {
     const nx = game.next;
     const label = 'つぎ';
     const name = nx.word.text;
     const w = sc.W(label, 7) + sc.W(name, 9) + 32;
-    const left = Math.min(LW - w - 2, align === 'center' ? x - w / 2 : x);
+    const left = Math.min(LW - w - 2, align === 'center' ? x - w / 2 : align === 'right' ? x - w : x);
     sc.panel(left, y, w, 16, 'rgba(30,19,26,0.92)', C.gold2);
     sc.panel(left + 2, y + 2, sc.W(label, 7) + 6, 12, C.gold2, C.ink);
     sc.T(label, left + 5, y + 4, 7, C.ink);
