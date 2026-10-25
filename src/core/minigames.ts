@@ -235,7 +235,7 @@ export class FishingGame extends Minigame<null> {
       this.word = this.reelWord(this.word ?? undefined);
       return;
     }
-    this.add('fish', procurementReward('fishing', this.catchKeys, this.big), 0, 0);
+    this.add('fish', procurementReward('fishing', this.catchKeys, this.big, this.difficulty.id), 0, 0);
     this.fishIndex++;
     // 次の合図は直ちに入力可能。水しぶきの演出と入力受付を分離する。
     this.word = this.rng.pick(HOOK_WORDS);
@@ -372,7 +372,7 @@ export class HuntingGame extends Minigame<Prey> {
     p.hp--;
     p.flash = 0.25;
     if (p.hp <= 0) {
-      this.add('meat', procurementReward('hunting', p.rewardKeys, p.kind === 'deer'), p.x, p.lane, p.kind === 'deer');
+      this.add('meat', procurementReward('hunting', p.rewardKeys, p.kind === 'deer', this.difficulty.id), p.x, p.lane, p.kind === 'deer');
       this.prey = this.prey.filter((q) => q !== p);
     } else {
       p.word = pickWord(this.rng, HUNTING_WORDS, this.usedFirst(p), p.word);
@@ -454,7 +454,7 @@ export class GatheringGame extends Minigame<Sprout> {
     const s = t.data;
     this.sprouts = this.sprouts.filter((q) => q.id !== s.id);
     if (s.ing) {
-      const amount = procurementReward('gathering', rewardKeys(t.kana));
+      const amount = procurementReward('gathering', rewardKeys(t.kana), false, this.difficulty.id);
       for (let i = 0; i < amount; i++) this.basket.push(s.ing);
       this.add(s.ing, amount, s.slot, 0);
     } else {
@@ -586,7 +586,7 @@ export class TradingGame extends Minigame<null> {
     const lot = this.lot;
     lot.outcome = 'won';
     this.wins++;
-    this.add(lot.item, procurementReward('trading', rewardKeys(lot.word.kana)) + (lot.missed ? 0 : TRADING.bonus), 0, 0);
+    this.add(lot.item, procurementReward('trading', rewardKeys(lot.word.kana), false, this.difficulty.id) + (lot.missed ? 0 : TRADING.bonus), 0, 0);
     // 落札したら間を置かずに次の品物を出し、すぐ打ち始められるようにする
     this.lots++;
     this.lot = this.newLot();

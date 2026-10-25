@@ -14,7 +14,7 @@ export function tripRun(id: TripId, seed: number, wpm: number, diff: Difficulty)
     let targets = game.targets();
     if (game instanceof GatheringGame) targets = targets.filter(t => game.sprouts.find(s => s.id === t.id)?.ing);
     if (game instanceof HuntingGame) targets.sort((a, b) => {
-      const cost = (id: string) => {const p = game.prey.find(p => p.id === id)!;const remaining = p.hp * defaultRomaji(p.word.kana).length; return procurementReward('hunting', (p.rewardKeys ?? 0) + remaining, p.kind === 'deer') / remaining;};
+      const cost = (id: string) => {const p = game.prey.find(p => p.id === id)!;const remaining = p.hp * defaultRomaji(p.word.kana).length; return procurementReward('hunting', (p.rewardKeys ?? 0) + remaining, p.kind === 'deer', diff.id) / remaining;};
       return cost(b.id) - cost(a.id);
     });
     const live = game.input.active.find(a => targets.some(t => t.id === a.target.id));
@@ -61,9 +61,9 @@ describe('WPM別の調達バランス', () => {
       expect(fast.total / fast.seconds).toBeGreaterThan(slow.total / slow.seconds * 1.25);
     }
     // 主材料の供給効率が特定の調達だけに偏らない（釣りの延長時間も含める）。
-    for (const wpm of [45, 60, 90, 120]) {
-      const fish = rows.find(r => r.difficulty === 'normal' && r.trip === 'fishing' && r.wpm === wpm)!;
-      const meat = rows.find(r => r.difficulty === 'normal' && r.trip === 'hunting' && r.wpm === wpm)!;
+    for (const difficulty of ['easy', 'normal', 'hard']) for (const wpm of [45, 60, 90, 120]) {
+      const fish = rows.find(r => r.difficulty === difficulty && r.trip === 'fishing' && r.wpm === wpm)!;
+      const meat = rows.find(r => r.difficulty === difficulty && r.trip === 'hunting' && r.wpm === wpm)!;
       const ratio = (fish.total / fish.seconds) / (meat.total / meat.seconds);
       expect(ratio).toBeGreaterThan(.8);
       expect(ratio).toBeLessThan(1.25);

@@ -1,0 +1,692 @@
+[
+  {
+    "difficulty": "easy",
+    "wpm": 30,
+    "trip": "fishing",
+    "gains": {
+      "fish": 20
+    },
+    "total": 20,
+    "portions": 10,
+    "seconds": 12.6
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 30,
+    "trip": "hunting",
+    "gains": {
+      "meat": 10.6
+    },
+    "total": 10.6,
+    "portions": 5.3,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 30,
+    "trip": "gathering",
+    "gains": {
+      "veg": 6.4,
+      "mush": 6.6
+    },
+    "total": 13,
+    "portions": 8.7,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 30,
+    "trip": "trading",
+    "gains": {
+      "ale": 8.5,
+      "spice": 5.6
+    },
+    "total": 14.1,
+    "portions": 12.4,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 45,
+    "trip": "fishing",
+    "gains": {
+      "fish": 20
+    },
+    "total": 20,
+    "portions": 10,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 45,
+    "trip": "hunting",
+    "gains": {
+      "meat": 22
+    },
+    "total": 22,
+    "portions": 11,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 45,
+    "trip": "gathering",
+    "gains": {
+      "veg": 13,
+      "mush": 8.5
+    },
+    "total": 21.5,
+    "portions": 14.3,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 45,
+    "trip": "trading",
+    "gains": {
+      "ale": 11.7,
+      "spice": 9.9
+    },
+    "total": 21.6,
+    "portions": 19.3,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 60,
+    "trip": "fishing",
+    "gains": {
+      "fish": 38.9
+    },
+    "total": 38.9,
+    "portions": 19.5,
+    "seconds": 13.6
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 60,
+    "trip": "hunting",
+    "gains": {
+      "meat": 29.8
+    },
+    "total": 29.8,
+    "portions": 14.9,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 60,
+    "trip": "gathering",
+    "gains": {
+      "veg": 20.8,
+      "mush": 10.8
+    },
+    "total": 31.6,
+    "portions": 21.1,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 60,
+    "trip": "trading",
+    "gains": {
+      "ale": 16.9,
+      "spice": 11.9
+    },
+    "total": 28.8,
+    "portions": 25.4,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 90,
+    "trip": "fishing",
+    "gains": {
+      "fish": 38.9
+    },
+    "total": 38.9,
+    "portions": 19.5,
+    "seconds": 10.2
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 90,
+    "trip": "hunting",
+    "gains": {
+      "meat": 39.3
+    },
+    "total": 39.3,
+    "portions": 19.7,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 90,
+    "trip": "gathering",
+    "gains": {
+      "veg": 27.8,
+      "mush": 16.9
+    },
+    "total": 44.8,
+    "portions": 29.8,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 90,
+    "trip": "trading",
+    "gains": {
+      "ale": 23.7,
+      "spice": 16.8
+    },
+    "total": 40.5,
+    "portions": 35.8,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 120,
+    "trip": "fishing",
+    "gains": {
+      "fish": 50.9
+    },
+    "total": 50.9,
+    "portions": 25.5,
+    "seconds": 11.4
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 120,
+    "trip": "hunting",
+    "gains": {
+      "meat": 44
+    },
+    "total": 44,
+    "portions": 22,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 120,
+    "trip": "gathering",
+    "gains": {
+      "veg": 32.8,
+      "mush": 22.6
+    },
+    "total": 55.4,
+    "portions": 36.9,
+    "seconds": 10
+  },
+  {
+    "difficulty": "easy",
+    "wpm": 120,
+    "trip": "trading",
+    "gains": {
+      "ale": 28.6,
+      "spice": 22.7
+    },
+    "total": 51.3,
+    "portions": 45.6,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 30,
+    "trip": "fishing",
+    "gains": {
+      "fish": 16.7
+    },
+    "total": 16.7,
+    "portions": 8.4,
+    "seconds": 13.5
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 30,
+    "trip": "hunting",
+    "gains": {
+      "meat": 6.1
+    },
+    "total": 6.1,
+    "portions": 3.1,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 30,
+    "trip": "gathering",
+    "gains": {
+      "veg": 4.8,
+      "mush": 3.3
+    },
+    "total": 8,
+    "portions": 5.4,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 30,
+    "trip": "trading",
+    "gains": {
+      "ale": 5.3,
+      "spice": 4.6
+    },
+    "total": 9.9,
+    "portions": 8.8,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 45,
+    "trip": "fishing",
+    "gains": {
+      "fish": 18.2
+    },
+    "total": 18.2,
+    "portions": 9.1,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 45,
+    "trip": "hunting",
+    "gains": {
+      "meat": 16.8
+    },
+    "total": 16.8,
+    "portions": 8.4,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 45,
+    "trip": "gathering",
+    "gains": {
+      "veg": 5.9,
+      "mush": 5.6
+    },
+    "total": 11.5,
+    "portions": 7.7,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 45,
+    "trip": "trading",
+    "gains": {
+      "ale": 9.7,
+      "spice": 8.2
+    },
+    "total": 17.8,
+    "portions": 16,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 60,
+    "trip": "fishing",
+    "gains": {
+      "fish": 28.5
+    },
+    "total": 28.5,
+    "portions": 14.3,
+    "seconds": 13
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 60,
+    "trip": "hunting",
+    "gains": {
+      "meat": 23.8
+    },
+    "total": 23.8,
+    "portions": 11.9,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 60,
+    "trip": "gathering",
+    "gains": {
+      "veg": 12.5,
+      "mush": 6.3
+    },
+    "total": 18.8,
+    "portions": 12.5,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 60,
+    "trip": "trading",
+    "gains": {
+      "ale": 14.1,
+      "spice": 9.8
+    },
+    "total": 23.9,
+    "portions": 21.1,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 90,
+    "trip": "fishing",
+    "gains": {
+      "fish": 34.3
+    },
+    "total": 34.3,
+    "portions": 17.2,
+    "seconds": 10.8
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 90,
+    "trip": "hunting",
+    "gains": {
+      "meat": 30.6
+    },
+    "total": 30.6,
+    "portions": 15.3,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 90,
+    "trip": "gathering",
+    "gains": {
+      "veg": 22.2,
+      "mush": 12.8
+    },
+    "total": 35,
+    "portions": 23.3,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 90,
+    "trip": "trading",
+    "gains": {
+      "ale": 19.7,
+      "spice": 13.8
+    },
+    "total": 33.5,
+    "portions": 29.6,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 120,
+    "trip": "fishing",
+    "gains": {
+      "fish": 34.3
+    },
+    "total": 34.3,
+    "portions": 17.2,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 120,
+    "trip": "hunting",
+    "gains": {
+      "meat": 34.9
+    },
+    "total": 34.9,
+    "portions": 17.5,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 120,
+    "trip": "gathering",
+    "gains": {
+      "veg": 24.8,
+      "mush": 18.4
+    },
+    "total": 43.3,
+    "portions": 28.8,
+    "seconds": 10
+  },
+  {
+    "difficulty": "normal",
+    "wpm": 120,
+    "trip": "trading",
+    "gains": {
+      "ale": 23.8,
+      "spice": 18.6
+    },
+    "total": 42.3,
+    "portions": 37.6,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 30,
+    "trip": "fishing",
+    "gains": {
+      "fish": 4.1
+    },
+    "total": 4.1,
+    "portions": 2.1,
+    "seconds": 11.2
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 30,
+    "trip": "hunting",
+    "gains": {
+      "meat": 5.8
+    },
+    "total": 5.8,
+    "portions": 2.9,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 30,
+    "trip": "gathering",
+    "gains": {
+      "veg": 4.1,
+      "mush": 3
+    },
+    "total": 7.1,
+    "portions": 4.7,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 30,
+    "trip": "trading",
+    "gains": {
+      "ale": 4,
+      "spice": 3
+    },
+    "total": 7,
+    "portions": 6.2,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 45,
+    "trip": "fishing",
+    "gains": {
+      "fish": 15.4
+    },
+    "total": 15.4,
+    "portions": 7.7,
+    "seconds": 10.5
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 45,
+    "trip": "hunting",
+    "gains": {
+      "meat": 12.6
+    },
+    "total": 12.6,
+    "portions": 6.3,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 45,
+    "trip": "gathering",
+    "gains": {
+      "veg": 4.7,
+      "mush": 4.1
+    },
+    "total": 8.8,
+    "portions": 5.9,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 45,
+    "trip": "trading",
+    "gains": {
+      "ale": 7.7,
+      "spice": 6.3
+    },
+    "total": 13.9,
+    "portions": 12.5,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 60,
+    "trip": "fishing",
+    "gains": {
+      "fish": 16
+    },
+    "total": 16,
+    "portions": 8,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 60,
+    "trip": "hunting",
+    "gains": {
+      "meat": 17.7
+    },
+    "total": 17.7,
+    "portions": 8.9,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 60,
+    "trip": "gathering",
+    "gains": {
+      "veg": 9,
+      "mush": 4.7
+    },
+    "total": 13.7,
+    "portions": 9.1,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 60,
+    "trip": "trading",
+    "gains": {
+      "ale": 11.3,
+      "spice": 7.8
+    },
+    "total": 19,
+    "portions": 16.8,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 90,
+    "trip": "fishing",
+    "gains": {
+      "fish": 29.6
+    },
+    "total": 29.6,
+    "portions": 14.8,
+    "seconds": 11.6
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 90,
+    "trip": "hunting",
+    "gains": {
+      "meat": 23.6
+    },
+    "total": 23.6,
+    "portions": 11.8,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 90,
+    "trip": "gathering",
+    "gains": {
+      "veg": 14.8,
+      "mush": 9.3
+    },
+    "total": 24.1,
+    "portions": 16.1,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 90,
+    "trip": "trading",
+    "gains": {
+      "ale": 15.7,
+      "spice": 10.8
+    },
+    "total": 26.5,
+    "portions": 23.4,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 120,
+    "trip": "fishing",
+    "gains": {
+      "fish": 29.6
+    },
+    "total": 29.6,
+    "portions": 14.8,
+    "seconds": 10.1
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 120,
+    "trip": "hunting",
+    "gains": {
+      "meat": 26.1
+    },
+    "total": 26.1,
+    "portions": 13.1,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 120,
+    "trip": "gathering",
+    "gains": {
+      "veg": 18.3,
+      "mush": 14.9
+    },
+    "total": 33.3,
+    "portions": 22.1,
+    "seconds": 10
+  },
+  {
+    "difficulty": "hard",
+    "wpm": 120,
+    "trip": "trading",
+    "gains": {
+      "ale": 18.9,
+      "spice": 14.5
+    },
+    "total": 33.4,
+    "portions": 29.6,
+    "seconds": 10
+  }
+]

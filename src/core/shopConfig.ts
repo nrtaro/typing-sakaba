@@ -157,6 +157,13 @@ export const MINIGAME_SECONDS = 10;
 
 export type DifficultyId = 'easy' | 'normal' | 'hard';
 
+/** 基準報酬への上乗せ。短い語でも難易度ごとの差を保証する。 */
+export const PROCUREMENT_BONUS: Record<DifficultyId, { rate: number; minimum: number }> = {
+  easy: { rate: 0.5, minimum: 2 },
+  normal: { rate: 0.25, minimum: 1 },
+  hard: { rate: 0, minimum: 0 },
+};
+
 /** 難易度ごとの倍率。1 が「ふつう」 */
 export interface Difficulty {
   id: DifficultyId;
