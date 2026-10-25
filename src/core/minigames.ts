@@ -12,7 +12,7 @@ export interface Word {
 export type MinigameEvent =
   | { type: 'key'; ok: boolean; count: number }
   | { type: 'word'; id: string }
-  | { type: 'gain'; ingredient: IngredientId; amount: number; x: number; y: number }
+  | { type: 'gain'; ingredient: IngredientId; amount: number; x: number; y: number; big?: boolean }
   | { type: 'loss'; ingredient: IngredientId; x: number; y: number }
   | { type: 'bite'; big: boolean }
   | { type: 'escape'; id: string };
@@ -71,9 +71,9 @@ export abstract class Minigame<T = unknown> {
     }
   }
 
-  protected add(id: IngredientId, n: number, x = 0, y = 0) {
+  protected add(id: IngredientId, n: number, x = 0, y = 0, big = false) {
     this.gains[id] = Math.max(0, (this.gains[id] ?? 0) + n);
-    this.events.push(n >= 0 ? { type: 'gain', ingredient: id, amount: n, x, y } : { type: 'loss', ingredient: id, x, y });
+    this.events.push(n >= 0 ? { type: 'gain', ingredient: id, amount: n, x, y, ...(big ? { big } : {}) } : { type: 'loss', ingredient: id, x, y });
   }
 
   drainEvents() {
@@ -372,7 +372,7 @@ export class HuntingGame extends Minigame<Prey> {
     p.hp--;
     p.flash = 0.25;
     if (p.hp <= 0) {
-      this.add('meat', procurementReward('hunting', p.rewardKeys, p.kind === 'deer'), p.x, p.lane);
+      this.add('meat', procurementReward('hunting', p.rewardKeys, p.kind === 'deer'), p.x, p.lane, p.kind === 'deer');
       this.prey = this.prey.filter((q) => q !== p);
     } else {
       p.word = pickWord(this.rng, HUNTING_WORDS, this.usedFirst(p), p.word);
@@ -521,6 +521,8 @@ export interface Lot {
 export class TradingGame extends Minigame<null> {
   readonly kind = 'trading' as const;
   lot: Lot;
+  /** 次に競りに出る品物（打っている間も見せる） */
+  next: Lot;
   lots = 0;
   wins = 0;
   losses = 0;
@@ -528,17 +530,26 @@ export class TradingGame extends Minigame<null> {
 
   constructor(rng: Rng, difficulty?: Difficulty) {
     super(rng, difficulty);
-    this.lot = this.newLot();
+    this.lot = this.makeLot(0);
+    this.next = this.makeLot(1, this.lot.word);
   }
 
-  private newLot(): Lot {
-    const item = this.lots % 2 === 0 ? 'ale' : 'spice';
+  /** index 番目の品物（酒と香辛料を交互に。後の品物ほどライバルが速い） */
+  private makeLot(index: number, avoid?: Word): Lot {
+    const item = index % 2 === 0 ? 'ale' : 'spice';
     const list = item === 'ale' ? ALE_GOODS : SPICE_GOODS;
-    const word = pickWord(this.rng, list, new Set(), this.lot?.word);
+    const word = pickWord(this.rng, list, new Set(), avoid);
     return {
       item, word, rival: 0, rivalKeys: defaultRomaji(word.kana).length, delay: TRADING.rivalDelay, missed: false, outcome: 'open',
-      rivalSpeed: Math.min(TRADING.rivalMax, TRADING.rivalSpeed + this.lots * TRADING.rivalGrow) * this.difficulty.rivalMult,
+      rivalSpeed: Math.min(TRADING.rivalMax, TRADING.rivalSpeed + index * TRADING.rivalGrow) * this.difficulty.rivalMult,
     };
+  }
+
+  /** 次の品物を競りに出し、その次を用意する */
+  private newLot(): Lot {
+    const lot = this.next;
+    this.next = this.makeLot(this.lots + 1, lot.word);
+    return lot;
   }
 
   targets(): Target<null>[] {

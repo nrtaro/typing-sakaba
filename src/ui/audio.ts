@@ -355,6 +355,41 @@ export class Sound {
     }
   }
 
+  /** 獲物に当たった：乾いた銃声 */
+  shot() {
+    if (!this.ok) return;
+    const t = this.now;
+    this.noise(t, 0.1, 0.12, this.sfx!, 'lowpass', 3000);
+    this.tone(160, t, 0.12, 'sine', 0.08, this.sfx!, 70);
+  }
+
+  /** 仕留めた：小物は弾む音、大物は二連の銃声と重い響きとファンファーレ */
+  kill(big: boolean) {
+    if (!this.ok) return;
+    const t = this.now;
+    if (!big) {
+      this.noise(t, 0.14, 0.16, this.sfx!, 'lowpass', 2600);
+      this.tone(130, t, 0.2, 'sine', 0.12, this.sfx!, 50);
+      [19, 24].forEach((s, i) => this.tone(this.semi(s), t + 0.06 + i * 0.06, 0.18, 'triangle', 0.05, this.sfx!));
+      return;
+    }
+    for (const d of [0, 0.12]) {
+      this.noise(t + d, 0.2, 0.2, this.sfx!, 'lowpass', 2200);
+      this.tone(110, t + d, 0.35, 'sine', 0.16, this.sfx!, 38);
+    }
+    this.noise(t + 0.15, 0.5, 0.06, this.sfx!, 'lowpass', 400);
+    [12, 16, 19, 24, 28].forEach((s, i) => this.tone(this.semi(s), t + 0.28 + i * 0.07, 0.32, 'square', 0.035, this.sfx!));
+    this.tone(this.semi(31), t + 0.65, 0.6, 'triangle', 0.05, this.sfx!);
+  }
+
+  /** 毒きのこを摘んだ：くぐもった「ぼふっ」 */
+  poison() {
+    if (!this.ok) return;
+    const t = this.now;
+    this.noise(t, 0.25, 0.1, this.sfx!, 'lowpass', 600);
+    this.tone(200, t, 0.3, 'triangle', 0.06, this.sfx!, 90);
+  }
+
   /** 魚がかかった */
   bite() {
     if (!this.ok) return;

@@ -404,8 +404,16 @@ export class Game {
     if (this.trip?.phase === 'game') {
       for (const ev of this.trip.game.drainEvents()) {
         this.tripView.handle(ev, this.trip.game);
+        const kind = this.trip.game.kind;
         if (ev.type === 'key') { if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); }
-        else if (ev.type === 'gain') this.sound.gain(this.trip.game.kind);
+        else if (ev.type === 'word' && kind === 'hunting') this.sound.shot();
+        else if (ev.type === 'gain' && kind === 'hunting') this.sound.kill(!!ev.big);
+        else if (ev.type === 'gain') {
+          this.sound.gain(kind);
+          // 釣りの大物は、きらめく音を重ねる
+          if (kind === 'fishing' && (this.trip.game as unknown as { big: boolean }).big) this.sound.sparkle();
+        }
+        else if (ev.type === 'loss' && kind === 'gathering') this.sound.poison();
         else if (ev.type === 'loss' || ev.type === 'escape') this.sound.loss();
         else if (ev.type === 'bite') this.sound.bite();
       }
