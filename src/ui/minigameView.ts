@@ -580,9 +580,11 @@ export class MinigameView {
 
   private drawTradingUi(sc: Screen, game: TradingGame) {
     const lot = game.lot;
-    // 次に出る品物：打っている間も、札の下に小さく見せておく
-    this.drawNextLot(sc, game, lot.outcome === 'open' ? 172 : 104);
-    if (lot.outcome !== 'open') return;
+    // 待ち時間（取られた直後）は、次の品物だけを札の位置に見せる
+    if (lot.outcome !== 'open') {
+      this.drawNextLot(sc, game, LW / 2, 112, 'center');
+      return;
+    }
     // 品物の札：左上に品物の絵と箱数、下の縁に自分（緑）とライバル（赤）の進み具合
     const y = 92;
     const w = this.bigWord(sc, lot.word.text, lot.word.kana, game, y, C.gold2);
@@ -602,22 +604,24 @@ export class MinigameView {
     sc.T('相手', x0 + 14, y + 60, 7, C.red3);
     sc.PR(bx, y + 62, bw, 3, C.ink);
     sc.PR(bx, y + 62, bw * lot.rival, 3, C.red);
+    // 次の品物：打っているローマ字のすぐ右、札の外側に小さく添える（目線を動かさずに見える）
+    this.drawNextLot(sc, game, x0 + w + 4, y + 30, 'left');
   }
 
-  /** 次の品物の小さな札 */
-  private drawNextLot(sc: Screen, game: TradingGame, y: number) {
+  /** 次の品物の小さな札。align は x を左端にするか中央にするか */
+  private drawNextLot(sc: Screen, game: TradingGame, x: number, y: number, align: 'left' | 'center') {
     const nx = game.next;
     const label = 'つぎ';
     const name = nx.word.text;
-    const w = sc.W(name, 10) + sc.W(label, 7) + 44;
-    const x = LW / 2 - w / 2;
-    sc.panel(x, y, w, 18, 'rgba(30,19,26,0.92)', C.wood4);
-    sc.panel(x + 3, y + 3, sc.W(label, 7) + 6, 12, C.gold2, C.ink);
-    sc.T(label, x + 6, y + 5, 7, C.ink);
-    const ix = x + sc.W(label, 7) + 12;
-    if (this.art) this.art.drawIcon(sc, 'icons-dishes', ICON_INDEX[nx.item], ix, y + 2, 14);
-    else sc.spr(ICON[nx.item], ix, y + 3, 1);
-    sc.T(name, ix + 18, y + 4, 10, C.cream);
+    const w = sc.W(label, 7) + sc.W(name, 9) + 32;
+    const left = Math.min(LW - w - 2, align === 'center' ? x - w / 2 : x);
+    sc.panel(left, y, w, 16, 'rgba(30,19,26,0.92)', C.gold2);
+    sc.panel(left + 2, y + 2, sc.W(label, 7) + 6, 12, C.gold2, C.ink);
+    sc.T(label, left + 5, y + 4, 7, C.ink);
+    const ix = left + sc.W(label, 7) + 11;
+    if (this.art) this.art.drawIcon(sc, 'icons-dishes', ICON_INDEX[nx.item], ix, y + 2, 12);
+    else sc.spr(ICON[nx.item], ix, y + 2, 1);
+    sc.T(name, ix + 14, y + 3, 9, C.cream);
   }
 
   // ---------- 画像素材（A案）で描く ----------
