@@ -27,6 +27,9 @@ function preyPos(p: Prey) {
   return { x: 74 + p.x * 396, y: 118 + p.lane * 106 };
 }
 
+/** 釣り上げた魚が手元へ飛ぶ時間（秒） */
+const CATCH_TIME = 0.75;
+
 /** 調達ミニゲームの画面 */
 export class MinigameView {
   /** 画像素材（なければコードで描く絵） */
@@ -44,6 +47,10 @@ export class MinigameView {
   private shotStart: number | null = null;
   private pickStart: number | null = null;
   private dealStart = 0;
+  /** 釣り上げた魚が飛んでくる演出 */
+  private catchFx: { start: number; x: number; y: number; big: boolean } | null = null;
+  /** 水面に広がる波紋 */
+  private ripples: { x: number; y: number; start: number; big: boolean }[] = [];
   private lastLot: unknown = null;
   private seen = new Set<string>();
 
@@ -58,6 +65,9 @@ export class MinigameView {
     if (game instanceof FishingGame && (ev.type === 'bite' || ev.type === 'gain')) {
       const b = this.bobberPos(game);
       this.fxs.push({ anim: '水しぶき', x: b.x, y: b.y + 2, h: AMBER.fishing.splash.h, start: this.time });
+      this.ripples.push({ x: b.x, y: b.y + 1, start: this.time, big: ev.type === 'gain' });
+      // 釣り上げ：魚が水面から跳ね上がり、弧を描いて女将の手元へ
+      if (ev.type === 'gain') this.catchFx = { start: this.time, x: b.x, y: b.y, big: game.big };
     }
     if (ev.type === 'word' && game instanceof HuntingGame) this.shotStart = this.time;
     if (ev.type === 'word' && game instanceof GatheringGame) this.pickStart = this.time;
@@ -465,12 +475,25 @@ export class MinigameView {
   private drawFishingArt(sc: Screen, art: Art, game: FishingGame) {
     const L = AMBER.fishing;
     const t = this.time;
-    // 魚影（あたり・巻き上げ中だけ）
     const b = this.bobberPos(game);
-    if (game.phase === 'hook' || game.phase === 'reel') {
-      const w = game.big ? 56 : 24;
-      sc.PR(b.x - w / 2 + 8, b.y + 10, w, game.big ? 12 : 6, '#0e2236', 0.45);
-      sc.PR(b.x + w / 2 + 8, b.y + 11, game.big ? 10 : 5, game.big ? 10 : 4, '#0e2236', 0.45);
+    // 波紋：あたり・釣り上げのたびに、楕円の輪が広がって消える。巻き上げ中は小さな輪が続く
+    this.ripples = this.ripples.filter((r) => t - r.start < 1.2);
+    if (game.phase === 'reel' && Math.floor(t * 3) !== Math.floor((t - 1 / 60) * 3)) this.ripples.push({ x: b.x, y: b.y + 1, start: t, big: false });
+    for (const r of this.ripples) {
+      const age = t - r.start;
+      const rad = 4 + age * (r.big ? 34 : 18);
+      const a = Math.max(0, 0.7 - age * 0.6);
+      for (let k = 0; k < 28; k++) {
+        const ang = (k / 28) * Math.PI * 2;
+        sc.PR(r.x + Math.cos(ang) * rad, r.y + Math.sin(ang) * rad * 0.28, 1.2, 0.8, '#d8f0ff', a);
+      }
+    }
+    // 魚影：あたり・巻き上げ中だけ。魚の形（胴と尾びれ）で、巻き上げるほど岸へ寄りながら左右にくねる
+    const flying = this.catchFx && t - this.catchFx.start < CATCH_TIME;
+    if ((game.phase === 'hook' || game.phase === 'reel') && !flying) {
+      const len = game.big ? 30 : 16;
+      const wig = Math.sin(t * (game.phase === 'reel' ? 9 : 4)) * (game.phase === 'reel' ? 3 : 1.5);
+      this.fishShadow(sc, b.x + 6 + wig, b.y + 10, len);
     }
     // 板面への接地影。足元より下の桟橋側面や支柱には落とさない。
     sc.PR(L.wife.x - 8, L.wife.y - 1, 16, 2, '#332313', 0.28);
@@ -479,19 +502,60 @@ export class MinigameView {
     const idx = frameAt(anim, t) ?? anim.frames[0];
     const k = art.scaleFor('wife-fishing', anim.frames[0], L.wife.h);
     art.drawFrame(sc, 'wife-fishing', idx, L.wife.x, L.wife.y, k);
-    // 仕掛けの下端から水面の浮きまで糸を張る（巻き上げ中はぴんと張る）
     const f = art.frame('wife-fishing', idx);
     const [lx, ly] = L.lure[idx] ?? L.lure[0];
     const sx = L.wife.x + (lx - f.registration[0]) * k;
     const sy = L.wife.y + (ly - f.registration[1]) * k;
-    const sag = game.phase === 'reel' ? 2 : 9;
-    const n = Math.ceil(Math.hypot(b.x - sx, b.y - sy) / 1.5);
-    for (let i = 0; i <= n; i++) {
-      const p = i / n;
-      sc.PR(sx + (b.x - sx) * p, sy + (b.y - 4 - sy) * p + Math.sin(p * Math.PI) * sag, 0.6, 0.6, '#f4ead0', 0.85);
+    if (flying) {
+      // 釣り上げ：魚が弧を描いて手元へ飛ぶ。糸は魚につながったまま、ぴんと張る
+      const c = this.catchFx!;
+      const p = (t - c.start) / CATCH_TIME;
+      const ease = 1 - Math.pow(1 - p, 2);
+      const tx = L.wife.x + 14;
+      const ty = L.wife.y - 30;
+      const fx = c.x + (tx - c.x) * ease;
+      const fy = c.y + (ty - c.y) * ease - Math.sin(p * Math.PI) * (c.big ? 105 : 95);
+      this.line(sc, sx, sy, fx, fy, 1);
+      // 水滴を散らしながら飛ぶ
+      for (let d = 0; d < 6; d++) {
+        const q = Math.max(0, p - d * 0.04);
+        const dx = c.x + (tx - c.x) * (1 - Math.pow(1 - q, 2));
+        const dy = c.y + (ty - c.y) * (1 - Math.pow(1 - q, 2)) - Math.sin(q * Math.PI) * (c.big ? 105 : 95) + d * 3;
+        sc.PR(dx + (d % 2 ? 3 : -3), dy, 1.2, 1.2, '#d8f0ff', 0.8 - d * 0.12);
+      }
+      const size = (c.big ? 30 : 18) * (1 + 0.15 * Math.sin(p * Math.PI * 6));
+      art.drawIcon(sc, 'icons-dishes', 0, fx - size / 2, fy - size / 2, size);
+      // 手元に届いたら光る
+      if (p > 0.85) sc.radialGlow(tx, ty, 18, '#ffe7a6', (p - 0.85) * 4);
+      return;
     }
+    // 糸：浮きまで張る（巻き上げ中はぴんと張り、あたりの間は細かく震える）
+    const sag = game.phase === 'reel' ? 1.5 : game.phase === 'hook' ? 4 : 9;
+    this.line(sc, sx, sy, b.x, b.y - 4, sag);
     // 浮き
     art.drawFrame(sc, 'props-actions', 14, b.x, b.y, art.scaleFor('props-actions', 14, L.bobber.h));
+  }
+
+  /** 釣り糸：細い点を連ねて描く。sag はたるみ */
+  private line(sc: Screen, x0: number, y0: number, x1: number, y1: number, sag: number) {
+    const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 1.2);
+    for (let i = 0; i <= n; i++) {
+      const p = i / n;
+      sc.PR(x0 + (x1 - x0) * p, y0 + (y1 - y0) * p + Math.sin(p * Math.PI) * sag, 0.6, 0.6, '#f4ead0', 0.85);
+    }
+  }
+
+  /** 水中の魚影：胴の楕円と尾びれ（左向き＝岸の方へ泳ぐ） */
+  private fishShadow(sc: Screen, x: number, y: number, len: number) {
+    const hgt = len * 0.32;
+    for (let r = -hgt; r <= hgt; r += 0.8) {
+      const w = len * Math.sqrt(Math.max(0, 1 - (r / hgt) ** 2));
+      sc.PR(x - w / 2, y + r * 0.6, w, 0.9, '#0b1d2e', 0.32);
+    }
+    for (let r = -hgt * 0.8; r <= hgt * 0.8; r += 0.8) {
+      const w = len * 0.28 * (Math.abs(r) / hgt + 0.2);
+      sc.PR(x + len / 2 - 1, y + r * 0.6, w, 0.9, '#0b1d2e', 0.28);
+    }
   }
 
   private drawHuntingArt(sc: Screen, art: Art, game: HuntingGame) {

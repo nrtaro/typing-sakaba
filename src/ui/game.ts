@@ -6,6 +6,7 @@ import { MinigameView } from './minigameView';
 import { FAM, PORTRAIT } from './sprites';
 import { drawLights, drawRoomLive, roomLayer } from './room';
 import { Art } from './amber/art';
+import { AMBER } from './amber/layout';
 import { CandidateInput } from '../core/candidates';
 import { Shop } from '../core/shop';
 import { createMinigame, type Minigame } from '../core/minigames';
@@ -19,12 +20,12 @@ import {
 
 type Mode = 'title' | 'help' | 'difficulty' | 'play' | 'result';
 
-/** 調達のしかた：場所の絵の切り取り位置（背景の原画の画素）と、3行の説明。【】は打つ言葉として色を変える */
-const TRIP_HELP: { id: 'fishing' | 'hunting' | 'gathering' | 'trading'; crop: [number, number, number]; lines: string[] }[] = [
-  { id: 'fishing', crop: [60, 260, 620], lines: ['浮きが沈んだら【あわせ】', 'かかったら【巻き上げ】', '大物は3語・3ミスで糸切れ'] },
-  { id: 'hunting', crop: [0, 360, 620], lines: ['獲物の【言葉】で仕留める', '大物のシカは3発で肉どっさり', '柵を越えると逃げられる'] },
-  { id: 'gathering', crop: [200, 360, 640], lines: ['野菜やきのこの【名前】', '☠ 毒きのこは打たない', '生えている間に摘もう'] },
-  { id: 'trading', crop: [330, 330, 760], lines: ['【品物の名前】を打ち切る', 'ライバルより先に落札', 'ミスなしで1箱おまけ'] },
+/** 調達のしかた：ゲーム画面のどこを切り取るか（基準の座標で左・上・幅）と、3行の説明。【】は打つ言葉として色を変える */
+const TRIP_HELP: { id: 'fishing' | 'hunting' | 'gathering' | 'trading'; view: [number, number, number]; lines: string[] }[] = [
+  { id: 'fishing', view: [28, 46, 136], lines: ['浮きが沈んだら【あわせ】', 'かかったら【巻き上げ】', '大物は3語・3ミスで糸切れ'] },
+  { id: 'hunting', view: [8, 112, 160], lines: ['獲物の【言葉】で仕留める', '大物のシカは3発で肉どっさり', '柵を越えると逃げられる'] },
+  { id: 'gathering', view: [62, 120, 156], lines: ['野菜やきのこの【名前】', '☠ 毒きのこは打たない', '生えている間に摘もう'] },
+  { id: 'trading', view: [104, 76, 198], lines: ['【品物の名前】を打ち切る', 'ライバルより先に落札', 'ミスなしで1箱おまけ'] },
 ];
 
 /** 素材 → アイコンの番号 */
@@ -125,6 +126,7 @@ export class Game {
     if (this.mode === 'play' && this.paused) {
       return [
         { text: 'さいかい', kana: 'さいかい', act: () => { this.paused = false; } },
+        { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
         { text: 'やめる', kana: 'やめる', act: () => this.toTitle() },
       ];
     }
@@ -235,12 +237,6 @@ export class Game {
       return;
     }
     const inMenu = this.mode !== 'play' || this.paused;
-    // ←→ でいつでも音量を変えられる
-    if (k === 'ArrowLeft' || k === 'ArrowRight') {
-      e.preventDefault();
-      this.setVolume(this.volume + (k === 'ArrowRight' ? 1 : -1));
-      return;
-    }
     // 結果の演出中：打ち続けたまま来ても飛ばされないよう、最初の少しはキーを受け付けない。
     // そのあとはキーで演出を飛ばして最後の状態にする
     if (this.mode === 'result' && this.t - this.resultAt < RESULT_READY) {
@@ -744,9 +740,6 @@ export class Game {
     sc.T(tag, LW / 2, 207.5, 8, C.gold3, 'center');
     sc.shifted(0, (e.y1 - 270) / 2, () => {
       if (!this.sound.ready && this.volume > 0) sc.T('♪ キーかクリックで音楽が流れます', 470, 205, 7, C.cream2, 'right', 0.8);
-      // 音量は ←→ でも変えられる
-      const aw = sc.keycap('←→', 410, 216, 6, 0.85);
-      sc.T('音量', 410 + aw + 3, 217, 7, C.cream2, 'left', 0.85);
       const [start, help, sound] = this.menuItems();
       this.button(start, 30, 224, 180, 38, 'primary', 'Enter');
       this.button(help, 218, 228, 130, 30, 'plain');
@@ -982,33 +975,48 @@ export class Game {
     });
   }
 
-  /** 調達の場所の小さな絵：背景の一部を切り取り、家族と獲物を小さく置く */
+  /**
+   * 調達の場所の小さな絵：ゲーム画面（基準の 480x270）の一部をそのまま縮めて切り取る。
+   * 家族や獲物はゲームと同じ立ち位置・大きさで描くので、桟橋や地面にきちんと立つ。
+   */
   private drawTripThumb(id: string, x: number, y: number, w: number, h: number) {
     const sc = this.sc;
     const art = this.art;
     const bg = `bg-${id}`;
     sc.PR(x, y, w, h, '#1a120c');
     if (!art || !art.has(bg)) return;
+    const view = TRIP_HELP.find((t) => t.id === id)!.view;
+    const bw = view[2];
+    const bh = bw * (h / w);
+    const s = w / bw;
     const { img } = art.sheet(bg);
-    const crop = TRIP_HELP.find((t) => t.id === id)!.crop;
-    const cw = crop[2];
-    const ch = cw * (h / w);
-    sc.blit(img, crop[0], crop[1], cw, ch, x, y, w, h);
+    const kx = img.naturalWidth / 480;
+    const ky = img.naturalHeight / 270;
+    sc.blit(img, view[0] * kx, view[1] * ky, bw * kx, bh * ky, x, y, w, h);
+    // 基準の座標 → 小さな絵の座標
+    const X = (bx: number) => x + (bx - view[0]) * s;
+    const Y = (by: number) => y + (by - view[1]) * s;
+    const L = AMBER;
     sc.clip(x, y, w, h, () => {
-      const foot = y + h - 6;
-      if (id === 'fishing') art.drawFrame(sc, 'wife-fishing', 0, x + 26, foot - 6, art.scaleFor('wife-fishing', 0, 40));
-      if (id === 'hunting') {
-        art.drawFrame(sc, 'props-actions', 4, x + 18, foot, art.scaleFor('props-actions', 4, 34));
-        art.drawAnim(sc, 'wildlife', 'シカ・走行', this.t, x + 62, foot - 4, art.scaleFor('wildlife', 4, 30));
-      }
-      if (id === 'gathering') {
-        art.drawAnim(sc, 'family-daughter', '待機', this.t, x + 20, foot, art.scaleFor('family-daughter', 0, 34));
-        art.drawIcon(sc, 'icons-dishes', 2, x + 44, foot - 26, 14);
-        art.drawIcon(sc, 'icons-dishes', 3, x + 60, foot - 18, 14);
-      }
-      if (id === 'trading') {
-        art.drawAnim(sc, 'family-master', '待機', this.t, x + 20, foot, art.scaleFor('family-master', 0, 36));
-        art.drawFrame(sc, 'props-actions', 0, x + 60, foot, art.scaleFor('props-actions', 0, 36), true);
+      if (id === 'fishing') {
+        const f = L.fishing.wife;
+        sc.PR(X(f.x) - 8 * s, Y(f.y) - 1, 16 * s, 1.5, '#332313', 0.3);
+        art.drawFrame(sc, 'wife-fishing', 0, X(f.x), Y(f.y), art.scaleFor('wife-fishing', 0, f.h * s));
+      } else if (id === 'hunting') {
+        const m = L.hunting.master;
+        art.drawFrame(sc, 'props-actions', 4, X(m.x), Y(m.y), art.scaleFor('props-actions', 4, m.h * s));
+        art.drawAnim(sc, 'wildlife', 'シカ・走行', this.t, X(150), Y(222), art.scaleFor('wildlife', 4, L.hunting.deer.h * s));
+      } else if (id === 'gathering') {
+        const g = L.gathering;
+        const sz = g.sprout.size * s;
+        art.drawIcon(sc, 'icons-dishes', 2, X(g.slots[0].x) - sz / 2, Y(g.slots[0].y) - sz + 1, sz);
+        art.drawIcon(sc, 'icons-dishes', 3, X(g.slots[3].x) - sz / 2, Y(g.slots[3].y) - sz + 1, sz);
+        art.drawAnim(sc, 'family-daughter', '待機', this.t, X(g.daughter.x), Y(g.daughter.y), art.scaleFor('family-daughter', 0, g.daughter.h * s));
+        art.drawFrame(sc, 'props-actions', 11, X(g.basket.x), Y(g.basket.y), art.scaleFor('props-actions', 11, g.basket.h * s));
+      } else {
+        const tr = L.trading;
+        art.drawAnim(sc, 'family-master', '待機', this.t, X(tr.master.x), Y(tr.master.y), art.scaleFor('family-master', 0, tr.master.h * s));
+        art.drawFrame(sc, 'props-actions', 0, X(tr.merchant.x), Y(tr.merchant.y), art.scaleFor('props-actions', 0, tr.merchant.h * s), true);
       }
     });
   }
