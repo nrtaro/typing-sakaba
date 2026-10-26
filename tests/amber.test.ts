@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import manifestJson from '../assets/amber-v3/manifest.json';
+import manifestJson from '../assets/amber-v4/manifest.json';
+import originalManifest from '../assets/amber-v3/manifest.json';
 import { animDone, destRect, frameAt, sourceRect, standingHeight, walkFrame, type Manifest, type ManifestAnimation, type ManifestFrame } from '../src/ui/amber/manifest';
 import { AMBER } from '../src/ui/amber/layout';
 import { LOOK_COUNT } from '../src/core/shop';
@@ -8,6 +9,9 @@ const manifest = manifestJson as unknown as Manifest;
 const asset = (id: string) => manifest.assets.find((a) => a.id === id)!;
 
 describe('A案素材の切り出し', () => {
+  it('配信画像の最適化で切り出し・足元・アニメーションの情報を変更しない', () => {
+    expect(manifestJson.assets).toEqual(originalManifest.assets);
+  });
   const f: ManifestFrame = { index: 1, rect: [229, 0, 253, 259], visibleBounds: [25, 9, 214, 231], registration: [119, 231] };
 
   it('描画元は rect の原点に visibleBounds の位置を足す（隣のセルにまたがっても正しい）', () => {

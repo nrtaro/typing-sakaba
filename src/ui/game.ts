@@ -72,6 +72,7 @@ export class Game {
   readonly menu: CandidateInput<MenuItem>;
   private t = 0;
   private last = performance.now();
+  private readyMarked = false;
   private missFlash = 0;
   private seed = Math.floor(Math.random() * 1e9);
   /** A案の画像素材。読み込み中は null。失敗したらコードで描く絵で動かす */
@@ -105,6 +106,7 @@ export class Game {
         this.view.art = art;
         this.tripView.art = art;
         this.artState = 'ready';
+        performance.mark('game:images-ready');
       })
       .catch((err) => {
         console.warn(err);
@@ -302,6 +304,10 @@ export class Game {
     this.step(dt);
     this.sc.now = this.t;
     this.draw();
+    if (!this.readyMarked && this.artState === 'ready' && document.fonts.status === 'loaded') {
+      this.readyMarked = true;
+      performance.mark('game:ready');
+    }
     requestAnimationFrame((n) => this.frame(n));
   }
 
@@ -339,7 +345,7 @@ export class Game {
     }
     this.goShown = Math.max(0, this.goShown - dt);
     // 背景の読み込み待ちで営業時間を消費しない。
-    if (this.trip?.phase === 'intro' && this.trip.t <= 0 && this.tripView.art && !this.tripView.art.has(`bg-${this.trip.game.kind}`)) return;
+    if (this.trip?.phase === 'intro' && this.trip.t <= 0 && this.tripView.art && !this.tripView.art.hasTrip(this.trip.game.kind)) return;
     const shop = this.shop;
     shop.update(dt);
     this.view.update(dt, shop);
@@ -361,7 +367,7 @@ export class Game {
     const trip = this.trip!;
     trip.t -= dt;
     if (trip.phase === 'intro' && trip.t <= 0) {
-      if (this.tripView.art && !this.tripView.art.has(`bg-${trip.game.kind}`)) return;
+      if (this.tripView.art && !this.tripView.art.hasTrip(trip.game.kind)) return;
       trip.phase = 'game';
       this.sound.play(trip.game.kind);
     } else if (trip.phase === 'game') {
@@ -391,7 +397,7 @@ export class Game {
           this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
           this.tripView = new MinigameView();
           this.tripView.art = this.art;
-          if (this.art) void this.art.ensure(`bg-${ev.trip.id}`).catch(() => { this.tripView.art = null; });
+          if (this.art) void this.art.ensureTrip(ev.trip.id).catch(() => { this.tripView.art = null; });
           this.sound.tripStart();
           // 最初の調達に出たら、はじめての人向けの案内は終わり
           if (!this.settings.guided) { this.settings.guided = true; this.store.saveSettings(this.settings); }
@@ -920,7 +926,7 @@ export class Game {
   /** 調達のしかたのページを開く（背景の絵をここで読み込み始める） */
   private openTripHelp() {
     this.helpPage = 1;
-    if (this.art) for (const id of TRIP_HELP.map((h) => `bg-${h.id}`)) void this.art.ensure(id).catch(() => {});
+    if (this.art) for (const h of TRIP_HELP) void this.art.ensureTrip(h.id).catch(() => {});
   }
 
   /**
@@ -987,12 +993,12 @@ export class Game {
    * 調達の場所の小さな絵：ゲーム画面（基準の 480x270）の一部をそのまま縮めて切り取る。
    * 家族や獲物はゲームと同じ立ち位置・大きさで描くので、桟橋や地面にきちんと立つ。
    */
-  private drawTripThumb(id: string, x: number, y: number, w: number, h: number) {
+  private drawTripThumb(id: 'fishing' | 'hunting' | 'gathering' | 'trading', x: number, y: number, w: number, h: number) {
     const sc = this.sc;
     const art = this.art;
     const bg = `bg-${id}`;
     sc.PR(x, y, w, h, '#1a120c');
-    if (!art || !art.has(bg)) return;
+    if (!art || !art.hasTrip(id)) return;
     const view = TRIP_HELP.find((t) => t.id === id)!.view;
     const bw = view[2];
     const bh = bw * (h / w);

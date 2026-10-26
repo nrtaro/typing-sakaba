@@ -28,6 +28,24 @@ function enter(game: Game, repeat = false) {
 }
 
 describe('Enterで調達を切り上げる', () => {
+  it('背景が届いても専用画像が揃うまでは営業時計を止め、出発演出から先へ進めない', () => {
+    const { game, shop } = setup();
+    game.settings.guided = true;
+    game.countdown = 0;
+    game.trip!.phase = 'intro'; game.trip!.t = 0;
+    game.view = { update: vi.fn() } as unknown as Game['view'];
+    const hasTrip = vi.fn(() => false);
+    game.tripView = { art: { hasTrip }, update: vi.fn() } as unknown as Game['tripView'];
+    game.step(.5);
+    expect(shop.clock).toBe(0);
+    expect(game.view.update).not.toHaveBeenCalled();
+    game['stepTrip'](.1);
+    expect(game.trip!.phase).toBe('intro');
+    hasTrip.mockReturnValue(true);
+    game['stepTrip'](.1);
+    expect(game.trip!.phase).toBe('game');
+  });
+
   it.each(TRIPS.map(trip => [trip.id, trip] as const))('%s：獲得素材・打鍵記録を一度だけ持ち帰る', (_id, trip) => {
     const { game, shop, mini } = setup(trip);
     const before = { ...shop.stock }, keys = shop.stats.correctKeys;
