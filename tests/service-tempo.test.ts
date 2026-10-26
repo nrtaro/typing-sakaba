@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../src/ui/sprites', () => ({ FAM: {}, ICON: {}, PORTRAIT: {}, WALKERS: [], guestSprite: () => null }));
-import manifest from '../assets/amber-v3/manifest.json';
+import manifest from '../assets/amber-v4/manifest.json';
 import { ShopView } from '../src/ui/shopView';
 import { Shop, type Guest } from '../src/core/shop';
 import { DISHES } from '../src/core/shopConfig';

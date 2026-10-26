@@ -1,14 +1,23 @@
 // A案「琥珀の酒場」の画像素材を読み込み、manifest どおりに切り出して描く。
 // 絵は低解像度の画面ではなく、拡大後の画面へ直接描く（高解像度素材の細部を残すため）。
 // 平滑化はしない。配置はすべて基準の 480x270 座標で指定する。
-import manifestJson from '../../../assets/amber-v3/manifest.json';
+import manifestJson from '../../../assets/amber-v4/manifest.json';
 import { destRect, frameAt, sourceRect, standingHeight, type Manifest, type ManifestAnimation, type ManifestAsset, type ManifestFrame } from './manifest';
 import type { Screen } from '../screen';
+import type { TripId } from '../../core/shopConfig';
 
 const manifest = manifestJson as unknown as Manifest;
 
+export const TRIP_ASSETS: Record<TripId, string[]> = {
+  fishing: ['bg-fishing', 'wife-fishing'],
+  hunting: ['bg-hunting', 'wildlife'],
+  gathering: ['bg-gathering'],
+  trading: ['bg-trading'],
+};
+const deferred = new Set(Object.values(TRIP_ASSETS).flat());
+
 // 本番ビルドでも配信されるよう、画像は Vite に URL を解決させる
-const URLS = import.meta.glob('../../../assets/amber-v3/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const URLS = import.meta.glob('../../../assets/amber-v4/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 
 function urlFor(file: string) {
   const key = Object.keys(URLS).find((k) => k.endsWith(`/${file}`));
@@ -37,6 +46,12 @@ export class Art {
 
   has(id: string) { return this.sheets.has(id); }
 
+  hasTrip(id: TripId) { return TRIP_ASSETS[id].every(asset => this.has(asset)); }
+
+  async ensureTrip(id: TripId): Promise<void> {
+    await Promise.all(TRIP_ASSETS[id].map(asset => this.ensure(asset)));
+  }
+
   /** 調達背景は出発時に読み込む。失敗時は次の出発で再試行できる。 */
   ensure(id: string): Promise<void> {
     if (this.has(id)) return Promise.resolve();
@@ -56,7 +71,7 @@ export class Art {
   /** 初期画面の画像を読み込む。調達先の背景は出発時に取得する。 */
   static async load(onProgress?: (done: number, total: number) => void): Promise<Art> {
     const art = new Art();
-    const initial = manifest.assets.filter((a) => !a.id.startsWith('bg-') || a.id.startsWith('bg-tavern'));
+    const initial = manifest.assets.filter((a) => !deferred.has(a.id));
     const total = initial.length;
     let done = 0;
     await Promise.all(

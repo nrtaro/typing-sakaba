@@ -1,0 +1,242 @@
+[
+  {
+    "id": "bg-fishing",
+    "beforeBytes": 1651662,
+    "afterBytes": 240598,
+    "quality": 88,
+    "compositePsnrDb": [
+      33.87,
+      33.87
+    ],
+    "alphaExact": true,
+    "file": "bg-fishing.webp"
+  },
+  {
+    "id": "bg-gathering",
+    "beforeBytes": 2380512,
+    "afterBytes": 485244,
+    "quality": 88,
+    "compositePsnrDb": [
+      31.84,
+      31.84
+    ],
+    "alphaExact": true,
+    "file": "bg-gathering.webp"
+  },
+  {
+    "id": "bg-hunting",
+    "beforeBytes": 1961216,
+    "afterBytes": 337030,
+    "quality": 88,
+    "compositePsnrDb": [
+      34.69,
+      34.69
+    ],
+    "alphaExact": true,
+    "file": "bg-hunting.webp"
+  },
+  {
+    "id": "bg-tavern-night",
+    "beforeBytes": 1394956,
+    "afterBytes": 161612,
+    "quality": 88,
+    "compositePsnrDb": [
+      36.42,
+      36.42
+    ],
+    "alphaExact": true,
+    "file": "bg-tavern-night.webp"
+  },
+  {
+    "id": "bg-tavern",
+    "beforeBytes": 1519922,
+    "afterBytes": 188542,
+    "quality": 88,
+    "compositePsnrDb": [
+      35.64,
+      35.64
+    ],
+    "alphaExact": true,
+    "file": "bg-tavern.webp"
+  },
+  {
+    "id": "bg-trading",
+    "beforeBytes": 1928200,
+    "afterBytes": 329516,
+    "quality": 88,
+    "compositePsnrDb": [
+      33.95,
+      33.95
+    ],
+    "alphaExact": true,
+    "file": "bg-trading.webp"
+  },
+  {
+    "id": "family-daughter",
+    "beforeBytes": 1296162,
+    "afterBytes": 629814,
+    "quality": 94,
+    "compositePsnrDb": [
+      38.31,
+      38.31
+    ],
+    "alphaExact": true,
+    "file": "family-daughter.webp"
+  },
+  {
+    "id": "family-master",
+    "beforeBytes": 1199274,
+    "afterBytes": 522628,
+    "quality": 94,
+    "compositePsnrDb": [
+      38.56,
+      38.56
+    ],
+    "alphaExact": true,
+    "file": "family-master.webp"
+  },
+  {
+    "id": "family-wife",
+    "beforeBytes": 1199892,
+    "afterBytes": 544134,
+    "quality": 94,
+    "compositePsnrDb": [
+      39.19,
+      39.19
+    ],
+    "alphaExact": true,
+    "file": "family-wife.webp"
+  },
+  {
+    "id": "fx",
+    "beforeBytes": 689390,
+    "afterBytes": 494702,
+    "quality": 94,
+    "compositePsnrDb": [
+      41.7,
+      41.7
+    ],
+    "alphaExact": true,
+    "file": "fx.webp"
+  },
+  {
+    "id": "guests-seated",
+    "beforeBytes": 1737762,
+    "afterBytes": 695774,
+    "quality": 94,
+    "compositePsnrDb": [
+      38.15,
+      38.15
+    ],
+    "alphaExact": true,
+    "file": "guests-seated.webp"
+  },
+  {
+    "id": "guests-walk",
+    "beforeBytes": 1472394,
+    "afterBytes": 633452,
+    "quality": 94,
+    "compositePsnrDb": [
+      39.16,
+      39.16
+    ],
+    "alphaExact": true,
+    "file": "guests-walk-v4.webp"
+  },
+  {
+    "id": "icons-dishes",
+    "beforeBytes": 1083278,
+    "afterBytes": 429292,
+    "quality": 94,
+    "compositePsnrDb": [
+      38.41,
+      38.41
+    ],
+    "alphaExact": true,
+    "file": "icons-dishes.webp"
+  },
+  {
+    "id": "props-actions",
+    "beforeBytes": 1189320,
+    "afterBytes": 486072,
+    "quality": 94,
+    "compositePsnrDb": [
+      38.46,
+      38.46
+    ],
+    "alphaExact": true,
+    "file": "props-actions.webp"
+  },
+  {
+    "id": "wildlife",
+    "beforeBytes": 877384,
+    "afterBytes": 432676,
+    "quality": 94,
+    "compositePsnrDb": [
+      44.75,
+      44.75
+    ],
+    "alphaExact": true,
+    "file": "wildlife.webp"
+  },
+  {
+    "id": "master-stir",
+    "beforeBytes": 797124,
+    "afterBytes": 253088,
+    "quality": 94,
+    "compositePsnrDb": [
+      41.7,
+      41.7
+    ],
+    "alphaExact": true,
+    "file": "master-stir.webp"
+  },
+  {
+    "id": "wife-fishing",
+    "beforeBytes": 677272,
+    "afterBytes": 245704,
+    "quality": 94,
+    "compositePsnrDb": [
+      43.73,
+      43.73
+    ],
+    "alphaExact": true,
+    "file": "wife-fishing.webp"
+  },
+  {
+    "id": "family-master-walk",
+    "beforeBytes": 1237178,
+    "afterBytes": 488990,
+    "quality": 94,
+    "compositePsnrDb": [
+      39.35,
+      39.35
+    ],
+    "alphaExact": true,
+    "file": "family-walk.webp"
+  },
+  {
+    "id": "family-wife-walk",
+    "beforeBytes": 1237178,
+    "afterBytes": 488990,
+    "quality": 94,
+    "compositePsnrDb": [
+      39.35,
+      39.35
+    ],
+    "alphaExact": true,
+    "file": "family-walk.webp"
+  },
+  {
+    "id": "family-daughter-walk",
+    "beforeBytes": 1237178,
+    "afterBytes": 488990,
+    "quality": 94,
+    "compositePsnrDb": [
+      39.35,
+      39.35
+    ],
+    "alphaExact": true,
+    "file": "family-walk.webp"
+  }
+]
