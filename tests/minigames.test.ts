@@ -164,7 +164,7 @@ describe('調達ミニゲーム', () => {
     }
   });
 
-  it('狩り：速く打つほど多く仕留め、大物は3語', () => {
+  it('狩り：速く打つほど多く仕留め、大物の基準は3語', () => {
     const slow = play(new HuntingGame(new Rng(7)), 2.5);
     const fast = play(new HuntingGame(new Rng(7)), 7);
     expect(fast.gains.meat ?? 0).toBeGreaterThan(slow.gains.meat ?? 0);

@@ -2,7 +2,7 @@ import { CandidateInput, type Target } from './candidates';
 import { defaultRomaji, firstKeys } from './romaji';
 import { Rng } from './rng';
 import { procurementReward, rewardKeys } from './procurementRewards';
-import { DIFFICULTIES, MINIGAME_SECONDS, type Difficulty, type IngredientId, type TripId } from './shopConfig';
+import { DIFFICULTIES, EASY_MINIGAME_SECONDS, MINIGAME_SECONDS, type Difficulty, type IngredientId, type TripId } from './shopConfig';
 
 export interface Word {
   text: string;
@@ -26,8 +26,8 @@ export interface MinigameResult {
 /** 4つの調達ミニゲームの共通部分。時間・入力・成果・演出用のイベント */
 export abstract class Minigame<T = unknown> {
   abstract readonly kind: TripId;
-  readonly duration = MINIGAME_SECONDS;
-  timeLeft = MINIGAME_SECONDS;
+  readonly duration: number;
+  timeLeft: number;
   gains: Partial<Record<IngredientId, number>> = {};
   correctKeys = 0;
   missKeys = 0;
@@ -35,6 +35,8 @@ export abstract class Minigame<T = unknown> {
   protected events: MinigameEvent[] = [];
 
   constructor(protected readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1]) {
+    this.duration = difficulty.id === 'easy' ? EASY_MINIGAME_SECONDS : MINIGAME_SECONDS;
+    this.timeLeft = this.duration;
     this.input = new CandidateInput(() => this.targets());
   }
 
@@ -90,6 +92,11 @@ export abstract class Minigame<T = unknown> {
 function pickWord<W extends Word>(rng: Rng, list: W[], avoidFirst: Set<string>, avoid?: Word): W {
   const ok = list.filter((w) => w !== avoid && [...firstKeys(w.kana)].every((k) => !avoidFirst.has(k)));
   return rng.pick(ok.length ? ok : list.filter((w) => w !== avoid));
+}
+
+/** 初心者は短めの語で、表示を読んで入力する時間を確保する。 */
+function wordsForDifficulty<W extends Word>(list: W[], difficulty: Difficulty): W[] {
+  return difficulty.id === 'easy' ? list.filter(word => defaultRomaji(word.kana).length <= 7) : list;
 }
 
 // ================= つり（女将）：あわせて、巻き上げる =================
@@ -353,10 +360,11 @@ export class HuntingGame extends Minigame<Prey> {
 
   private addPrey(kind: 'rabbit' | 'deer', band: number) {
     const def = HUNTING[kind];
+    const hp = kind === 'deer' && this.difficulty.id !== 'hard' ? 2 : def.hp;
     const [lo, hi] = HUNTING.bands[band];
     this.prey.push({
       id: `p${this.n++}`, kind, x: 1.05, band, lane: this.rng.range(lo, hi), speed: (1.1 / def.crossTime) * this.difficulty.preyMult,
-      hp: def.hp, maxHp: def.hp, word: pickWord(this.rng, HUNTING_WORDS, this.usedFirst()), flash: 0,
+      hp, maxHp: hp, word: pickWord(this.rng, wordsForDifficulty(HUNTING_WORDS, this.difficulty), this.usedFirst()), flash: 0,
     });
   }
 
@@ -375,7 +383,7 @@ export class HuntingGame extends Minigame<Prey> {
       this.add('meat', procurementReward('hunting', p.rewardKeys, p.kind === 'deer', this.difficulty.id), p.x, p.lane, p.kind === 'deer');
       this.prey = this.prey.filter((q) => q !== p);
     } else {
-      p.word = pickWord(this.rng, HUNTING_WORDS, this.usedFirst(p), p.word);
+      p.word = pickWord(this.rng, wordsForDifficulty(HUNTING_WORDS, this.difficulty), this.usedFirst(p), p.word);
     }
   }
 }
@@ -439,7 +447,7 @@ export class GatheringGame extends Minigame<Sprout> {
         const present = new Set(this.sprouts.map(s => s.ing));
         const wanted = !present.has('veg') ? 'veg' : !present.has('mush') ? 'mush' : null;
         const good = wanted ? GATHER_GOOD.filter(w => w.ing === wanted) : GATHER_GOOD;
-        const w = bad ? pickWord(this.rng, GATHER_BAD, used) : pickWord(this.rng, good, used);
+        const w = bad ? pickWord(this.rng, GATHER_BAD, used) : pickWord(this.rng, wordsForDifficulty(good, this.difficulty), used);
         const life = this.rng.range(GATHER.life[0], GATHER.life[1]) * this.difficulty.sproutLifeMult;
         this.sprouts.push({ id: `s${this.n++}`, word: w, ing: bad ? null : (w as unknown as { ing: IngredientId }).ing, slot: this.rng.pick(free), life, maxLife: life });
       }
@@ -538,7 +546,7 @@ export class TradingGame extends Minigame<null> {
   private makeLot(index: number, avoid?: Word): Lot {
     const item = index % 2 === 0 ? 'ale' : 'spice';
     const list = item === 'ale' ? ALE_GOODS : SPICE_GOODS;
-    const word = pickWord(this.rng, list, new Set(), avoid);
+    const word = pickWord(this.rng, wordsForDifficulty(list, this.difficulty), new Set(), avoid);
     return {
       item, word, rival: 0, rivalKeys: defaultRomaji(word.kana).length, delay: TRADING.rivalDelay, missed: false, outcome: 'open',
       rivalSpeed: Math.min(TRADING.rivalMax, TRADING.rivalSpeed + index * TRADING.rivalGrow) * this.difficulty.rivalMult,

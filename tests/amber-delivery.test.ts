@@ -6,7 +6,7 @@ import { Shop } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
 import { DISHES, SHOP, TRIPS } from '../src/core/shopConfig';
 import { RomajiMatcher } from '../src/core/romaji';
-import { HUNTING, HuntingGame } from '../src/core/minigames';
+import { HuntingGame } from '../src/core/minigames';
 import { AMBER, ORDER_CARD, TAVERN_SEATS, entryPosition } from '../src/ui/amber/layout';
 import type { Art } from '../src/ui/amber/art';
 import { MinigameView } from '../src/ui/minigameView';
@@ -110,15 +110,15 @@ describe('狩りのゲージと報酬', () => {
     expect(y).toBeCloseTo(118 + deer.lane * 106 - 48 + 8);
   });
 
-  it('小物は1語、大物は3語の文字数に応じて肉を得る', () => {
+  it('ふつうは小物1語、大物2語の文字数に応じて肉を得る', () => {
     const game = new HuntingGame(new Rng(7));
     for (let i = 0; i < 600 && !(game.prey.some((p) => p.kind === 'deer') && game.prey.some((p) => p.kind === 'rabbit')); i++) game.update(1 / 60);
     for (const kind of ['rabbit', 'deer'] as const) {
       const prey = game.prey.find((p) => p.kind === kind)!;
-      expect(prey.maxHp).toBe(kind === 'rabbit' ? 1 : 3);
+      expect(prey.maxHp).toBe(kind === 'rabbit' ? 1 : 2);
       const before = game.gains.meat ?? 0;
       let keys = 0;
-      for (let hit = 0; hit < HUNTING[kind].hp; hit++) {
+      for (let hit = 0; hit < prey.maxHp; hit++) {
         keys += rewardKeys(prey.word.kana);
         for (const key of new RomajiMatcher(prey.word.kana).remaining) game.key(key);
       }

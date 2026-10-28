@@ -319,6 +319,7 @@ export class MinigameView {
     // お店の残り時間は右端に小さく（お客の待ち時間は止まっているので、急がせる表示にしない）
     const left = shop.timeLeft;
     sc.T(`店 ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 312, 9, 8, C.cream, 'left', 0.7);
+    if (game.difficulty.id === 'easy') sc.TB('店の時計がゆっくり進む', 8, 31, 8, C.gold3, 'left');
   }
 
   /** 中央の大きな語句 */
