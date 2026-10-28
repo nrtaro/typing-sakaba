@@ -36,6 +36,9 @@ function splitHot(line: string): [string, boolean][] {
   return line.split(/(【[^】]*】)/).filter(Boolean).map((part) => (part.startsWith('【') ? [part.slice(1, -1), true] : [part, false]));
 }
 
+/** 「キーボードで打ってね」を出しておく秒数 */
+const CLICK_HINT = 2.4;
+
 /** 時間帯ごとの曲 */
 const PHASE_TRACK = ['morning', 'noon', 'night'] as const;
 /** 結果画面の演出が終わるまでの秒数（この後にメニューを出す） */
@@ -86,6 +89,10 @@ export class Game {
   private cheerNext = 0.6;
   /** 遊び方で試し打ちしたときの演出（料理は提供、調達は出発） */
   private helpFx: { kind: 'dish' | 'fishing' | 'hunting'; x: number; y: number; start: number }[] = [];
+  /** 最後にキーを押した（またはクリックした）時刻。しばらく何もしないと、打ち方の見本を見せる */
+  private lastInput = 0;
+  /** メニューでクリックされた時刻（「キーボードで打ってね」を出す） */
+  private clickHintAt = -10;
   /** 遊び方のページ（0=基本、1=調達のしかた） */
   helpPage = 0;
   /** 結果画面の演出の開始時刻と、鳴らした音の記録 */
@@ -115,7 +122,14 @@ export class Game {
     this.menu = new CandidateInput(() => this.menuItems().map((it) => ({ id: it.kana, kana: it.kana, data: it })));
     window.addEventListener('keydown', (e) => this.onKey(e));
     // クリックでも音を鳴らせるようにする（ブラウザは操作の前に音を出させない）
-    window.addEventListener('pointerdown', () => this.sound.unlock());
+    // クリックしても反応しないと戸惑うので、メニューでクリックされたら「キーボードで打つ」ことを知らせる
+    window.addEventListener('pointerdown', () => {
+      this.sound.unlock();
+      if (this.mode !== 'play' || this.paused) {
+        this.clickHintAt = this.t;
+        this.lastInput = this.t;
+      }
+    });
     this.sound.play('title');
     window.addEventListener('blur', () => this.autoPause());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.autoPause(); });
@@ -229,6 +243,8 @@ export class Game {
   private onKey(e: KeyboardEvent) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     this.sound.unlock();
+    this.lastInput = this.t;
+    this.clickHintAt = -10;
     if (e.isComposing || e.key === 'Process') return;
     if (this.artState === 'loading') return;
     const k = e.key;
@@ -546,6 +562,7 @@ export class Game {
         this.drawCountdown();
       }
       if (this.paused) this.drawMenuScreen('一時停止中', '');
+      if (this.paused) this.drawClickHint();
       this.drawVolume();
       return;
     }
@@ -582,6 +599,7 @@ export class Game {
     else this.drawResult();
     if (this.mode !== 'result' || this.t - this.resultAt > RESULT_READY - 0.3) this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 200 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);
+    this.drawClickHint();
     this.drawVolume();
   }
 
@@ -694,7 +712,17 @@ export class Game {
     sc.T(label, left ? x + 12 : x + w / 2, yy + (primary ? 4 : 3), size, primary ? '#3a2414' : C.cream, left ? 'left' : 'center', a);
     const romaW = sc.W(m.typed + m.remaining, romaSize);
     const romaX = left ? x + 12 + (mark ? sc.W(`${mark} `, size) : 0) + romaW / 2 : x + w / 2;
-    sc.roma(m.typed, m.remaining, romaX, yy + (primary ? 23 : 17), romaSize, live ? 'active' : dim ? 'dim' : 'idle', 1, primary);
+    const romaY = yy + (primary ? 23 : 17);
+    // クリックされた直後は、打つべきローマ字を光らせて「ここを打つ」と示す
+    const clicked = this.t - this.clickHintAt < CLICK_HINT;
+    if (clicked && !live) sc.glow(romaX - romaW / 2 - 2, romaY - 1, romaW + 4, romaSize + 3, C.gold, 0.6 + 0.4 * Math.sin(this.t * 12));
+    // 何もしないで待っていると、一番上の札が自分で打たれていく見本を見せる
+    const ghost = primary && !typing && this.mode === 'title' ? this.ghostCount(m.remaining.length) : 0;
+    if (ghost > 0) {
+      const full = m.remaining;
+      sc.roma(full.slice(0, ghost), full.slice(ghost), romaX, romaY, romaSize, 'active', 1, primary);
+      sc.PR(x + 3, yy + h - 3, (w - 6) * (ghost / full.length), 2, '#3f8a6c', 0.7);
+    } else sc.roma(m.typed, m.remaining, romaX, romaY, romaSize, live ? 'active' : dim ? 'dim' : 'idle', 1, primary);
     // 打った分だけ伸びる帯（どの札に向かって打っているかを一目で見せる）
     const total = m.typed.length + m.remaining.length;
     if (live && total) sc.PR(x + 3, yy + h - 3, (w - 6) * (m.typed.length / total), 2, primary ? '#3f8a6c' : C.teal3);
@@ -704,6 +732,47 @@ export class Game {
     }
     // 合わない札は、透かさずに暗い幕をかけて沈める
     if (dim) sc.PR(x, yy, w, h, '#0e0805', 0.62);
+  }
+
+  /**
+   * 打ち方の見本：最後の操作から少し待つと、1文字ずつ打たれていき、打ち終わると少し止まって最初から。
+   * 返すのは「打った」ことにする文字数（0 なら見本なし）。
+   */
+  private ghostCount(len: number) {
+    const idle = this.t - this.lastInput - 2.5;
+    if (idle < 0 || len === 0) return 0;
+    const cycle = len * 0.22 + 1.2;
+    const p = idle % cycle;
+    return Math.min(len, Math.floor(p / 0.22) + 1);
+  }
+
+  /** 小さなキーボードの絵 */
+  private drawKeyboard(x: number, y: number, a = 1) {
+    const sc = this.sc;
+    sc.panel(x, y, 22, 11, '#f1dcae', '#8a6232', a);
+    const press = Math.floor(this.t * 4) % 7;
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) {
+      const on = r * 6 + c === press;
+      sc.PR(x + 2.5 + c * 3, y + 2.5 + r * 3, 2, 2, on ? C.gold2 : '#8a6232', a);
+    }
+    sc.PR(x + 6, y + 8.5, 10, 1.5, '#8a6232', a);
+  }
+
+  /** メニューでクリックされたとき：画面の中央下に「キーボードで打ってね」 */
+  private drawClickHint() {
+    const age = this.t - this.clickHintAt;
+    if (age >= CLICK_HINT) return;
+    const sc = this.sc;
+    const a = Math.min(1, age * 6, (CLICK_HINT - age) * 2);
+    const bob = Math.sin(age * 10) * Math.max(0, 1 - age * 2) * 3;
+    const text = 'クリックではなく、キーボードで打って選びます';
+    const w = sc.W(text, 10) + 44;
+    const x = LW / 2 - w / 2;
+    const y = 150 + bob;
+    sc.PR(x + 2, y + 3, w, 24, '#0c0604', 0.5 * a);
+    sc.panel(x, y, w, 24, '#fff3d6', C.gold2, a);
+    this.drawKeyboard(x + 8, y + 6.5, a);
+    sc.T(text, x + 36, y + 6, 10, '#3a2414', 'left', a);
   }
 
   /** 吊り看板：鎖で下がった木の板に店名を彫る */
@@ -754,6 +823,9 @@ export class Game {
     sc.T(tag, LW / 2, 207.5, 8, C.gold3, 'center');
     sc.shifted(0, (e.y1 - 270) / 2, () => {
       if (!this.sound.ready && this.volume > 0) sc.T('♪ キーかクリックで音楽が流れます', 470, 205, 7, C.cream2, 'right', 0.8);
+      // メニューは打って選ぶ：キーボードの絵と短い一言
+      this.drawKeyboard(30, 212);
+      sc.T('打って選ぶ', 56, 213.5, 8, C.cream, 'left', 0.95);
       const [start, help, sound] = this.menuItems();
       this.button(start, 30, 224, 180, 38, 'primary', 'Enter');
       this.button(help, 218, 228, 130, 30, 'plain');
@@ -852,10 +924,10 @@ export class Game {
   /** 遊び方の試し打ち：料理は提供の演出、調達は家族が出かける演出（本番と同じ音） */
   private helpPlay(kind: 'dish' | 'fishing' | 'hunting') {
     if (kind === 'dish') {
-      this.helpFx.push({ kind, x: 116, y: 70, start: this.t });
+      this.helpFx.push({ kind, x: 106, y: 76, start: this.t });
       this.sound.serve();
     } else {
-      this.helpFx.push({ kind, x: kind === 'fishing' ? 196 : 260, y: 86, start: this.t });
+      this.helpFx.push({ kind, x: kind === 'fishing' ? 241 : 277, y: 94, start: this.t });
       this.sound.tripStart();
     }
   }
@@ -890,35 +962,80 @@ export class Game {
     }
   }
 
+  /**
+   * 遊び方：①料理を出す → ②足りなくなったら調達 → ③3分で売上勝負、の流れを矢印でつなぐ。
+   * ①②の札は実際に打って試せる。
+   */
   private drawHelp() {
     const sc = this.sc;
-    sc.TB('遊び方', 24, 18, 22, C.gold3, 'left');
-    const titles = ['料理名を打つ', '減ったら調達', 'たくさん出そう'];
-    const lines = [['お客の頭上のローマ字を', '打つと、料理を出せます。'], ['下の言葉を打って食材集め。', 'Enterで途中帰還できます。'], ['お客を待たせすぎず、', '３分間の売上に挑戦！']];
-    titles.forEach((title, i) => {
-      const x = 24 + i * 146;
-      sc.panel(x, 54, 138, 128, 'rgba(55,37,23,0.94)', C.wood4);
-      sc.T(`0${i + 1}`, x + 12, 63, 9, C.gold3);
+    sc.TB('遊び方', 24, 16, 22, C.gold3, 'left');
+    sc.T('注文の料理を出して、３分間でたくさん売り上げよう', 112, 24, 10, C.cream);
+    const steps = [
+      { title: '料理を出す', lines: ['お客の頭上の料理名を', '打つと、料理を出せる'] },
+      { title: '素材を調達', lines: ['素材が足りなくなったら', '下の言葉で集めに行く'] },
+      { title: '3分で売上勝負', lines: ['閉店までにたくさん出して', '売上を伸ばそう'] },
+    ];
+    steps.forEach((st, i) => {
+      const x = 22 + i * 147;
+      const w = 132;
+      const y = 50;
+      const h = 132;
+      sc.panel(x, y, w, h, 'rgba(55,37,23,0.94)', i === 0 ? C.gold2 : C.wood4);
+      // 番号の丸と見出し
+      sc.panel(x + 8, y + 7, 16, 16, C.gold2, C.ink);
+      sc.TB(String(i + 1), x + 16, y + 9, 11, C.w, 'center', C.ink);
+      sc.T(st.title, x + 29, y + 8, 12, C.cream);
       if (i === 0) {
-        this.art?.drawIcon(sc, 'icons-dishes', 7, x + 8, 84, 32);
-        this.helpWord('やきざかな', '焼き魚', x + 90, 82, 8);
+        // お客と注文の札
+        if (this.art) this.art.drawFrame(sc, 'guests-seated', 0, x + 22, y + 74, this.art.scaleFor('guests-seated', 0, 22));
+        this.helpWord('やきざかな', '焼き魚', x + 84, y + 32, 8);
+        sc.T('+120円', x + 84, y + 66, 9, C.gold, 'center');
       } else if (i === 1) {
-        // 出かけている間は、元の場所の顔を消す
+        // 残りわずかの素材 → 家族が集めに行く
         const away = (k: string) => this.helpFx.some((f) => f.kind === k);
-        if (this.art && !away('fishing')) this.art.drawHead(sc, 'family-wife', 0, x + 26, 70, 18);
-        if (this.art && !away('hunting')) this.art.drawHead(sc, 'family-master', 0, x + 90, 70, 18);
-        this.helpWord('つり', 'つり', x + 35, 96, 8);
-        this.helpWord('かり', 'かり', x + 99, 96, 8);
-      } else sc.T('3:00', x + 69, 86, 25, C.gold3, 'center');
-      sc.T(title, x + 12, 130, 13, C.cream);
-      lines[i].forEach((line, j) => sc.T(line, x + 12, 152 + j * 13, 8, C.cream2));
+        if (this.art) {
+          sc.panel(x + 8, y + 30, 40, 22, 'rgba(90,16,24,0.6)', '#ff5a4a');
+          this.art.drawIcon(sc, 'icons-dishes', 0, x + 10, y + 32, 18);
+          sc.TB('×0', x + 30, y + 35, 10, '#ff7a6a', 'left');
+          if (!away('fishing')) this.art.drawHead(sc, 'family-wife', 0, x + 64, y + 28, 16);
+          if (!away('hunting')) this.art.drawHead(sc, 'family-master', 0, x + 100, y + 28, 16);
+        }
+        sc.T('▶', x + 52, y + 36, 8, C.gold3);
+        this.helpWord('つり', 'つり', x + 72, y + 52, 8);
+        this.helpWord('かり', 'かり', x + 108, y + 52, 8);
+      } else {
+        sc.T('3:00', x + w / 2, y + 32, 24, C.gold3, 'center');
+        // 売上が伸びていく棒グラフ
+        for (let k = 0; k < 4; k++) {
+          const bh = 6 + k * 6;
+          sc.PR(x + 40 + k * 14, y + 84 - bh, 10, bh, k === 3 ? C.gold : C.gold2);
+        }
+        sc.T('売上', x + 22, y + 74, 8, C.cream, 'center');
+      }
+      st.lines.forEach((line, k) => sc.T(line, x + 10, y + 96 + k * 14, 9, C.cream2));
+      // 次の手順への矢印
+      if (i < 2) {
+        const ax = x + w + 4;
+        const ay = y + h / 2;
+        for (let r = 0; r < 6; r++) sc.PR(ax + r, ay - (5 - r), 1.5, (5 - r) * 2 + 1, C.gold2);
+      }
     });
+    // ②から①へ戻る流れ：集めたら、また料理を出す
+    const ly = 186;
+    sc.PR(95, ly, 220, 1, C.gold2, 0.8);
+    sc.PR(95, 182, 1, 4, C.gold2, 0.8);
+    sc.PR(314, 182, 1, 4, C.gold2, 0.8);
+    for (let r = 0; r < 4; r++) sc.PR(95 - (3 - r), 182 - r, (3 - r) * 2 + 1, 1, C.gold2, 0.8);
+    const back = '集めたら、また料理を出す';
+    const bw = sc.W(back, 8) + 8;
+    sc.PR(205 - bw / 2, ly - 5, bw, 11, '#24170e');
+    sc.T(back, 205, ly - 4, 8, C.gold3, 'center');
     this.drawHelpFx();
     // 操作キー：キーの形の札で並べる
     let kx = 24;
     for (const [key, label] of [['Backspace', '1文字戻す'], ['Space', '打ち直し'], ['Esc', '一時停止']] as const) {
-      kx += sc.keycap(key, kx, 194, 9) + 5;
-      sc.T(label, kx, 196, 10, C.cream);
+      kx += sc.keycap(key, kx, 198, 9) + 5;
+      sc.T(label, kx, 200, 10, C.cream);
       kx += sc.W(label, 10) + 18;
     }
   }
