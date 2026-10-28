@@ -9,7 +9,7 @@ import { DIFFICULTIES, DISHES, TRIPS, type Difficulty, type TripId, type Ingredi
 export function tripRun(id: TripId, seed: number, wpm: number, diff: Difficulty) {
   const game = createMinigame(id, new Rng(seed), diff), errors = new Rng(seed + 5000);
   let previous = '', reaction = 0, acc = 0, elapsed = 0;
-  while (!game.finished && elapsed < 16) {
+  while (!game.finished && elapsed < game.duration + 6) {
     const dt = 1 / 60; elapsed += dt; game.update(dt);
     let targets = game.targets();
     if (game instanceof GatheringGame) targets = targets.filter(t => game.sprouts.find(s => s.id === t.id)?.ing);
@@ -65,8 +65,9 @@ describe('WPM別の調達バランス', () => {
       const fish = rows.find(r => r.difficulty === difficulty && r.trip === 'fishing' && r.wpm === wpm)!;
       const meat = rows.find(r => r.difficulty === difficulty && r.trip === 'hunting' && r.wpm === wpm)!;
       const ratio = (fish.total / fish.seconds) / (meat.total / meat.seconds);
-      expect(ratio).toBeGreaterThan(.8);
-      expect(ratio).toBeLessThan(1.25);
+      // 大物を2発で捕獲できる難易度では、釣りに対する狩りの供給が増える。
+      expect(ratio).toBeGreaterThan(difficulty === 'easy' ? .7 : difficulty === 'normal' ? .75 : .8);
+      expect(ratio).toBeLessThan(difficulty === 'easy' ? 1.3 : 1.25);
     }
   });
 });

@@ -12,7 +12,9 @@ export function procurementReward(kind: TripId, keys: number, big = false, diffi
   const rate = kind === 'fishing' ? (big ? .5 : .45)
     : kind === 'hunting' ? (big ? .55 : .45)
     : kind === 'gathering' ? .5 : .36;
-  const base = Math.max(1, Math.round(keys * rate));
+  // 2語で捕獲する難易度では、3語だったときに比べて報酬が減らないよう補正する。
+  const adjustedKeys = kind === 'hunting' && big && difficulty !== 'hard' ? keys * 1.5 : keys;
+  const base = Math.max(1, Math.round(adjustedKeys * rate));
   const bonus = PROCUREMENT_BONUS[difficulty];
   return base + Math.max(bonus.minimum, Math.round(base * bonus.rate));
 }

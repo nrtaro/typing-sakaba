@@ -14,7 +14,7 @@ import { Rng } from '../core/rng';
 import { RomajiMatcher, defaultRomaji } from '../core/romaji';
 import { SaveStore, type DayRecord } from '../core/save';
 import {
-  DAY_LENGTH, DIFFICULTIES, FAMILY_NAME, GAME_SUBTITLE, GAME_TITLE, INGREDIENT_NAME, PHASES, SHOP, TRIPS, difficultyOf, rankFor,
+  MINIGAME_SECONDS, DIFFICULTIES, FAMILY_NAME, GAME_SUBTITLE, GAME_TITLE, INGREDIENT_NAME, PHASES, SHOP, TRIPS, difficultyOf, rankFor,
   type DifficultyId,
 } from '../core/shopConfig';
 
@@ -74,6 +74,7 @@ export class Game {
   result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string }) | null = null;
   readonly menu: CandidateInput<MenuItem>;
   private t = 0;
+  private playElapsed = 0;
   private last = performance.now();
   private readyMarked = false;
   private missFlash = 0;
@@ -224,6 +225,7 @@ export class Game {
     this.paused = false;
     this.mode = 'play';
     this.result = null;
+    this.playElapsed = 0;
     // 開店まで3秒数える。その間は時間が進まず、打っても反応しない
     this.countdown = COUNTDOWN;
     this.goShown = 0;
@@ -363,7 +365,9 @@ export class Game {
     // 背景の読み込み待ちで営業時間を消費しない。
     if (this.trip?.phase === 'intro' && this.trip.t <= 0 && this.tripView.art && !this.tripView.art.hasTrip(this.trip.game.kind)) return;
     const shop = this.shop;
-    shop.update(dt);
+    this.playElapsed += dt;
+    const shopDt = this.trip?.phase === 'game' ? dt * MINIGAME_SECONDS / this.trip.game.duration : dt;
+    shop.update(shopDt);
     this.view.update(dt, shop);
     this.tripView.update(dt);
     if (this.trip) this.stepTrip(dt);
@@ -455,7 +459,7 @@ export class Game {
     const total = s.correctKeys + s.missKeys;
     const rec: DayRecord = {
       score: shop.score, served: s.served, maxCombo: s.maxCombo, angry: s.angry,
-      kps: s.correctKeys / DAY_LENGTH, accuracy: total ? s.correctKeys / total : 1, finishedAt: new Date().toISOString(),
+      kps: this.playElapsed > 0 ? s.correctKeys / this.playElapsed : 0, accuracy: total ? s.correctKeys / total : 1, finishedAt: new Date().toISOString(),
     };
     const diff = shop.difficulty;
     const best = this.store.record(rec, diff.id);
