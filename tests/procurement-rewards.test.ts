@@ -19,15 +19,16 @@ describe('文字数に応じた調達報酬', () => {
         if (!keys) { expect(normal).toBe(0); expect(easy).toBe(0); continue; }
         expect(normal).toBeGreaterThan(hard);
         expect(easy).toBeGreaterThan(normal);
-        expect(normal).toBeLessThanOrEqual(hard * 1.25 + 1);
-        expect(easy).toBeLessThanOrEqual(hard * 1.5 + 2);
+        // 2発で仕留める場合は入力した2語を3語相当に補正する。
+        expect(normal).toBeLessThanOrEqual(hard * (kind === 'hunting' && big ? 1.875 : 1.25) + (kind === 'hunting' && big ? 3 : 1));
+        expect(easy).toBeLessThanOrEqual(hard * (kind === 'hunting' && big ? 2.7 : 1.8) + (kind === 'hunting' && big ? 4 : 3));
       }
     }
   });
 
   it.each(['hard', 'normal', 'easy'] as const)('%s：4種の調達で難易度別の報酬を実際に獲得する', id => {
     const difficulty = difficultyOf(id);
-    const small = { hard: 2, normal: 3, easy: 4 }[id];
+    const small = { hard: 2, normal: 3, easy: 5 }[id];
     const fish = new FishingGame(new Rng(1), difficulty);
     fish.update(.5);
     let keys = 0;
@@ -72,15 +73,16 @@ describe('文字数に応じた調達報酬', () => {
     expect(fish.gains.fish).toBe(procurementReward('fishing', keys, true, id));
 
     const hunt = new HuntingGame(new Rng(1), difficulty);
+    const shots = id === 'hard' ? 3 : 2;
     const prey = { id: 'a', kind: 'deer' as const, x: .7, lane: 0, band: 0, speed: 0,
-      hp: 3, maxHp: 3, word: { text: '砂', kana: 'すな' }, flash: 0 };
+      hp: shots, maxHp: shots, word: { text: '砂', kana: 'すな' }, flash: 0 };
     hunt.prey = [prey];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < shots; i++) {
       prey.word = { text: '砂', kana: 'すな' };
       for (const key of defaultRomaji('すな')) hunt.key(key);
-      if (i < 2) expect(hunt.gains.meat ?? 0).toBe(0);
+      if (i < shots - 1) expect(hunt.gains.meat ?? 0).toBe(0);
     }
-    expect(hunt.gains.meat).toBe(procurementReward('hunting', rewardKeys('すな') * 3, true, id));
+    expect(hunt.gains.meat).toBe(procurementReward('hunting', rewardKeys('すな') * shots, true, id));
   });
 
   it.each(TRIPS.map(t => t.id))('%s：長い語ほど報酬が下がらず、短い語より多くなる', kind => {
