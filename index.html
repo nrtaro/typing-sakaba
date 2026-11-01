@@ -4,19 +4,85 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google-site-verification" content="zpJAD5uBHLz_lMrkJTqZ7_uLqKdTQYNuJp-5Trxx2Ss" />
+    <title>タイピング酒場｜無料で遊べるタイピングゲーム</title>
     <meta name="description" content="タイピング酒場は、料理の注文をさばきながら素材を集める、ブラウザで遊べる無料のタイピングゲーム。家族で営む酒場の3分間の営業に挑戦しよう。" />
+    <link rel="canonical" href="https://typing-sakaba.nr-lab.workers.dev/" />
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#2a1b26" />
-    <title>タイピング酒場｜無料で遊べるタイピングゲーム</title>
+
+    <!-- SNSで共有したときの見え方 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="タイピング酒場" />
+    <meta property="og:title" content="タイピング酒場 ～おやじと女将と看板娘～" />
+    <meta property="og:description" content="注文の料理名を打って出し、足りない素材は家族が調達。3分間でどれだけ売り上げられるか挑戦する、無料のブラウザタイピングゲーム。" />
+    <meta property="og:url" content="https://typing-sakaba.nr-lab.workers.dev/" />
+    <meta property="og:image" content="https://typing-sakaba.nr-lab.workers.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="にぎわう酒場の店内とタイトル「タイピング酒場」" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="タイピング酒場 ～おやじと女将と看板娘～" />
+    <meta name="twitter:description" content="注文の料理名を打って出し、足りない素材は家族が調達。3分間の売上に挑戦する無料タイピングゲーム。" />
+    <meta name="twitter:image" content="https://typing-sakaba.nr-lab.workers.dev/og.png" />
+
+    <!-- 検索エンジン向け：ブラウザで遊べる無料ゲームであることを伝える -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "タイピング酒場 ～おやじと女将と看板娘～",
+        "alternateName": ["タイピング酒場", "Typing Sakaba"],
+        "url": "https://typing-sakaba.nr-lab.workers.dev/",
+        "image": "https://typing-sakaba.nr-lab.workers.dev/og.png",
+        "description": "料理の注文をさばきながら素材を集める、ブラウザで遊べる無料のタイピングゲーム。家族で営む酒場の3分間の営業に挑戦しよう。",
+        "genre": ["タイピングゲーム", "経営シミュレーション"],
+        "gamePlatform": "Web browser",
+        "applicationCategory": "Game",
+        "operatingSystem": "Windows, macOS, Linux",
+        "inLanguage": "ja",
+        "playMode": "SinglePlayer",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" }
+      }
+    </script>
     <style>
       html, body { margin: 0; height: 100%; background: #17101c; overflow: hidden; }
       canvas { display: block; width: 100%; height: 100%; outline: none; }
     </style>
   </head>
   <body>
-    <canvas id="game" tabindex="0" aria-label="タイピング酒場。キーボードで打って遊ぶタイピングゲーム"></canvas>
+    <main>
+      <h1 style="position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">タイピング酒場 ～おやじと女将と看板娘～</h1>
+      <!-- キャンバスの中身：絵が描けない環境や読み上げソフト、検索エンジン向けの説明 -->
+      <canvas id="game" tabindex="0" aria-label="タイピング酒場。キーボードで打って遊ぶタイピングゲーム">
+        <section>
+          <h2>どんなゲーム？</h2>
+          <p>タイピング酒場は、おやじ・女将・看板娘の家族3人で営む小さな酒場を舞台にした、ブラウザで遊べる無料のタイピングゲームです。お客の頭上に出る料理名をローマ字で打つと、料理を出せます。朝・昼・夜と時間が進むほどお客が増え、3分間の営業でどれだけ売り上げられるかを競います。</p>
+          <h2>遊び方</h2>
+          <ol>
+            <li>料理を出す：お客の頭上の料理名を打つと、料理を出せます。</li>
+            <li>素材を調達：素材が足りなくなったら「つり」「かり」「さいしゅ」「しいれ」と打って、家族を調達に送り出します。</li>
+            <li>3分で売上勝負：閉店までにたくさん料理を出して、売上を伸ばしましょう。</li>
+          </ol>
+          <h2>4つの調達ミニゲーム</h2>
+          <ul>
+            <li>つり（女将）：浮きが沈んだら「あわせ」、かかったら巻き上げて魚を釣ります。</li>
+            <li>かり（おやじ）：荒野を走るウサギやシカを、言葉を打って仕留めます。</li>
+            <li>さいしゅ（看板娘）：温室で野菜やきのこを摘みます。毒きのこに注意。</li>
+            <li>しいれ（おやじ）：隊商の競りで、ライバルより先に品物の名前を打ち切ります。</li>
+          </ul>
+          <h2>特徴</h2>
+          <ul>
+            <li>インストール不要。パソコンのブラウザとキーボードですぐ遊べます。</li>
+            <li>難易度は「やさしい」「ふつう」「むずかしい」の3段階。自己ベストは難易度ごとに記録されます。</li>
+            <li>連続で料理を出すとコンボが続き、売上がアップします。</li>
+          </ul>
+        </section>
+      </canvas>
+    </main>
     <noscript>このゲームを遊ぶには JavaScript を有効にしてください。</noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>

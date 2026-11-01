@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://typing-sakaba.nr-lab.workers.dev/sitemap.xml
