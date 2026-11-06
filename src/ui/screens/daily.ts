@@ -1,8 +1,8 @@
 // 画面：今日のお題（ひがわり営業で、開店の前に見せる）
 import { C } from '../palette';
 import { LW } from '../screen';
-import { dateLabel } from '../../core/daily';
-import { difficultyOf } from '../../core/shopConfig';
+import { dateLabel, rulesFor } from '../../core/daily';
+import { PHASES, TRIPS, difficultyOf } from '../../core/shopConfig';
 import type { Game } from '../game';
 import { button, drawSignboard } from './common';
 import { drawCondIcon } from './conditions';
@@ -35,6 +35,12 @@ export function drawDaily(g: Game) {
       drawCondIcon(sc, g.art, c.id, x + 12, y + 14, 40);
       sc.TB(c.title(diff.id), x + 62, y + 24, sc.fitSize(c.title(diff.id), 15, w - 66), C.gold3, 'left', C.ink);
       c.lines(diff.id).forEach((line, k) => sc.T(line, x + 12, y + 64 + k * 13, sc.fitSize(line, 9, w - 20), C.cream2));
+      // 時間帯の当たり：朝・昼・夜の当たりを先に見せて、段取りを考えられるようにする
+      if (c.id === 'luckyTrip') {
+        const plan = rulesFor([c], diff.id, daily.date).luckyTrips ?? [];
+        const text = plan.map((id, k) => `${PHASES[k].name} ${TRIPS.find((t) => t.id === id)!.text}`).join(' → ');
+        sc.T(text, x + 62, y + 44, sc.fitSize(text, 8, w - 70), '#ffe7a0');
+      }
     });
     // 今日の自分のベスト
     const best = g.store.loadDailyBest(daily.date, diff.id);

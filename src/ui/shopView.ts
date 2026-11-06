@@ -13,7 +13,7 @@ import { entryPose, WALK_SPEED, SERVER_WALK_SPEED, serverWalkSpeed } from '../co
 import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/layout';
 import { RomajiMatcher } from '../core/romaji';
 import {
-  DAY_LENGTH, FAMILY_NAME, PHASES, SHOP, SOURCE, TRIPS, type FamilyId, type IngredientId, type TripId,
+  DAY_LENGTH, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
 } from '../core/shopConfig';
 
 /** 席の位置（斜め上視点：2列×4席）。ty はテーブルの高さ */
@@ -78,7 +78,9 @@ export class ShopView {
   lackTrip: { id: TripId; t: number } | null = null;
   /** ノーミス営業：ミスでコンボが切れた時刻（印が割れる演出） */
   breakAt = -10;
-  gotTrip: { id: TripId; t: number; gains: Partial<Record<IngredientId, number>> } | null = null;
+  /** ミスで素材をこぼした時刻 */
+  spillAt = -10;
+  gotTrip: { id: TripId; t: number; gains: Partial<Record<IngredientId, number>>; overflow: Partial<Record<IngredientId, number>>; lucky: boolean } | null = null;
   /** 出かけている／帰ってきた家族のひとこと */
   banner: { text: string; t: number; col: Color } | null = null;
 
@@ -164,12 +166,33 @@ export class ShopView {
         this.banner = { text: `${FAMILY_NAME[ev.trip.who]}「${ev.trip.act}に行ってくる！」`, t: 1.6, col: C.w };
         break;
       case 'tripEnd':
-        this.banner = { text: `${FAMILY_NAME[ev.trip.who]}「ただいま！」`, t: 1.6, col: C.gold3 };
-        this.gotTrip = { id: ev.trip.id, t: 1.4, gains: ev.gains };
+        this.banner = ev.lucky
+          ? { text: `${FAMILY_NAME[ev.trip.who]}「大当たり！たくさん取れたよ」`, t: 1.8, col: C.gold3 }
+          : Object.keys(ev.overflow).length
+            ? { text: `${FAMILY_NAME[ev.trip.who]}「倉庫に入りきらない…」`, t: 1.8, col: '#ff9a8a' }
+            : { text: `${FAMILY_NAME[ev.trip.who]}「ただいま！」`, t: 1.6, col: C.gold3 };
+        this.gotTrip = { id: ev.trip.id, t: 1.6, gains: ev.gains, overflow: ev.overflow, lucky: ev.lucky };
         break;
-      case 'phase':
-        this.banner = { text: `― ${PHASES[ev.index].name}の部 ―`, t: 1.6, col: C.gold3 };
+      case 'phase': {
+        const lucky = shop.luckyTrip(ev.index);
+        const name = lucky ? TRIPS.find((tr) => tr.id === lucky)!.text : '';
+        this.banner = { text: `― ${PHASES[ev.index].name}の部 ―${lucky ? `　当たりは「${name}」` : ''}`, t: lucky ? 2.2 : 1.6, col: C.gold3 };
         break;
+      }
+      case 'spill':
+        this.pop('spill', { x: LW / 2, y: 192, t: 0, text: `${INGREDIENT_NAME[ev.ing]}をこぼした！ −1`, col: '#ff8a7a', big: true });
+        this.spillAt = this.time;
+        break;
+      case 'refill': {
+        const rs = SEATS[ev.seat];
+        this.pop(`refill${ev.seat}`, { x: rs.x, y: rs.ty - 22, t: 0, text: 'おかわり！', col: C.gold3, big: true });
+        break;
+      }
+      case 'leave': {
+        const ls = SEATS[ev.seat];
+        this.pop(`refill${ev.seat}`, { x: ls.x, y: ls.ty - 22, t: 0, text: 'ごちそうさま', col: C.cream });
+        break;
+      }
       default:
         break;
     }
@@ -456,7 +479,7 @@ export class ShopView {
     });
     shop.queue.forEach((q, i) => items.push({ y: 205 - i * 10, d: () => g.drawImage(WALKERS[q.look % WALKERS.length][0], 446 + (i % 2) * 8, 182 - i * 11) }));
     items.sort((a, b) => a.y - b.y).forEach((it) => it.d());
-    if (shop.away) {
+    if (shop.away && !shop.rules.awayWaitRate) {
       // 残った二人が客の機嫌を取っている（音符とハート）
       for (let i = 0; i < 6; i++) {
         const p = (t * 0.7 + i / 6) % 1;
@@ -520,9 +543,30 @@ export class ShopView {
     }
   }
 
-  /** ひがわりのお題：上の帯の下に「ノーミス」の印 */
+  /** ひがわりのお題：上の帯の下に、お題ごとの小さな印。ノーミスは右端 */
   private drawRules(sc: Screen, shop: Shop) {
     const e = sc.ext;
+    const r = shop.rules;
+    let x = e.x0 + 6;
+    const chip = (text: string, col: Color, edge: Color = C.wood3, extra = 0) => {
+      const w = sc.W(text, 8) + 12 + extra;
+      sc.panel(x, 28, w, 13, 'rgba(42,27,38,0.94)', edge);
+      sc.T(text, x + 6, 30, 8, col);
+      const at = x + sc.W(text, 8) + 8;
+      x += w + 4;
+      return at;
+    };
+    if (r.storageCap !== null) chip(`倉庫は${r.storageCap}個まで`, C.cream);
+    if (r.awayWaitRate > 0) chip('調達中もお客が待つ', '#ffc9a0');
+    const lucky = shop.luckyTrip();
+    if (lucky) chip(`当たり：${TRIPS.find((t) => t.id === lucky)!.text} ×${r.luckyMult}`, C.gold3, C.gold2);
+    if (r.spillEvery !== null) {
+      // 次にこぼすまでのミスの数を、丸で見せる（こぼした直後は赤く光る）
+      const left = r.spillEvery - shop.missSinceSpill;
+      const hot = this.time - this.spillAt < 0.8;
+      const at = chip('こぼすまで', hot ? '#ff8a7a' : C.cream, hot ? '#ff5a4a' : C.wood3, r.spillEvery * 6);
+      for (let k = 0; k < r.spillEvery; k++) sc.PR(at + 2 + k * 6, 32, 4, 4, k < left ? C.teal3 : '#5a1018');
+    }
     if (shop.rules.comboMissAllowance !== null) {
       // 割れた直後は赤く震え、ひびが入る。少しすると元に戻る
       const age = this.time - this.breakAt;
@@ -615,6 +659,8 @@ export class ShopView {
     sc.PR(x + 4, y + bh - 3, bw - 8, 2, C.ink, a);
     sc.PR(x + 4, y + bh - 3, (bw - 8) * p, 2, p > 0.5 ? C.green : p > 0.25 ? C.gold : C.red, a);
     if (first) sc.TB('▼先に出す', cx, y - 10, 8, C.gold3, 'center');
+    if (gst.extra) this.drawExtraTag(sc, gst.extra, x + bw, first || (big && shop.combo >= 2) ? y - 22 : y - 9, dim);
+    if (gst.refill && !typing && !first) sc.TB('おかわり', x + 2, y - 9, 8, C.gold3, 'left', C.ink);
     // 打っている札の上にコンボを付ける（目線を動かさずに見えるように）
     if (big && shop.combo >= 2) {
       const fx = comboFx(shop.combo);
@@ -625,6 +671,17 @@ export class ShopView {
       const allow = shop.comboMissAllowance;
       for (let n = 0; n < allow; n++) sc.PR(x + tw + 2 + n * 6, y - 7, 4, 4, n < shop.comboMissesLeft ? C.teal3 : C.ink);
     }
+  }
+
+  /** おかわりの札：「もう1品」と2品目の素材の絵（右端をそろえる） */
+  private drawExtraTag(sc: Screen, extra: Dish, right: number, y: number, dim: boolean) {
+    const ids = Object.keys(extra.need) as IngredientId[];
+    const tw = sc.W('＋もう1品', 8) + 8 + ids.length * 11;
+    const x = Math.min(LW - 2, right + 4) - tw;
+    const a = dim ? 0.45 : 1;
+    sc.panel(x, y - 3, tw, 13, '#3a2a10', C.gold2, a);
+    sc.T('＋もう1品', x + 3, y - 0.5, 8, C.gold3, 'left', a);
+    ids.forEach((id, k) => this.icon(sc, id, x + sc.W('＋もう1品', 8) + 5 + k * 11, y - 1.5, 10, a));
   }
 
   /** はじめての営業の案内：吹き出しと、指し示す矢印 */
@@ -720,13 +777,29 @@ export class ShopView {
         }
         this.icon(sc, ing, ex - 1 + shake, ey - 1, 24, dim ? 0.5 : n === 0 ? 0.55 : 1);
         sc.TB(`×${n}`, ex + 24, ey + 4, 13, low ? '#ff7a6a' : C.w, 'left', C.ink, dim ? 0.5 : 1);
+        // 狭い倉庫：上限まで入っていたら「満」
+        if (shop.rules.storageCap !== null && n >= shop.rules.storageCap) {
+          const mx = ex + 26 + sc.W(`×${n}`, 13);
+          sc.panel(mx, ey + 5, 10, 10, '#5a3a14', C.gold2, dim ? 0.5 : 1);
+          sc.T('満', mx + 5, ey + 6.5, 7, C.gold3, 'center', dim ? 0.5 : 1);
+        }
         if (low && !dim) {
           sc.panel(ex - 4, ey - 4, 9, 10, '#ff5a4a', C.ink);
           sc.T('!', ex + 0.5, ey - 3, 8, C.w, 'center');
         }
         const got = this.gotTrip?.id === tr.id ? this.gotTrip : null;
-        if (got && got.gains[ing]) sc.TB(`+${got.gains[ing]}`, ex + 44, ey - 2 - (1.4 - got.t) * 5, 8, C.gold3, 'center');
+        if (got && got.gains[ing]) sc.TB(`+${got.gains[ing]}`, ex + 44, ey - 2 - (1.6 - got.t) * 5, 8, C.gold3, 'center');
+        if (got && got.overflow[ing]) sc.TB(`あふれ−${got.overflow[ing]}`, ex + 30, ey + 14 - (1.6 - got.t) * 4, 7, '#ff8a7a', 'center');
       });
+      // 時間帯の当たり：欄の上の境目に札を掛ける
+      if (shop.luckyTrip() === tr.id) {
+        const tag = `当たり ×${shop.rules.luckyMult}`;
+        const tw = sc.W(tag, 7) + 8;
+        const pulse = 0.75 + 0.25 * Math.sin(t * 5);
+        sc.glow(x + w - tw - 4, y - 6, tw, 11, C.gold3, 0.5 * pulse);
+        sc.panel(x + w - tw - 4, y - 6, tw, 11, '#7a4a10', C.gold3);
+        sc.T(tag, x + w - tw / 2 - 4, y - 4.5, 7, '#fff0b0', 'center');
+      }
       if (isAway) {
         sc.PR(x + 1, y + 1, w - 2, h - 2, '#000000', 0.45);
         sc.TB(`${tr.act}中…`, x + w / 2, y + 20, 11, C.gold3, 'center');
@@ -832,7 +905,7 @@ export class ShopView {
     items.sort((a, b) => a.y - b.y).forEach((it) => it.d());
 
     for (const f of this.fxs) art.drawAnim(sc, 'fx', f.anim, t - f.start, f.x, f.y, art.scaleFor('fx', 14, f.h));
-    if (shop.away) {
+    if (shop.away && !shop.rules.awayWaitRate) {
       // 残った二人が客の機嫌を取っている（ハート）
       for (let i = 0; i < 6; i++) {
         const p = (t * 0.7 + i / 6) % 1;

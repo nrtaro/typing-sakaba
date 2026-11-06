@@ -320,6 +320,22 @@ export class MinigameView {
     const left = shop.timeLeft;
     sc.T(`店 ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 312, 9, 8, C.cream, 'left', 0.7);
     if (game.difficulty.id === 'easy') sc.TB('店の時計がゆっくり進む', 8, 31, 8, C.gold3, 'left');
+    // 調達中もお客は待たない日：店で待っている人数と、一番待たせている人の残り
+    if (shop.rules.awayWaitRate > 0) {
+      const waiting = shop.seats.filter((g) => g && g.state === 'wait');
+      if (waiting.length) {
+        const worst = Math.min(...waiting.map((g) => g!.wait / g!.maxWait));
+        const urgent = worst < 0.3;
+        const blink = urgent && Math.floor(this.time * 4) % 2 === 0;
+        const text = `店で${waiting.length}人が待っている${urgent ? '！' : ''}`;
+        const w = sc.W(text, 8) + 46;
+        const x = e.x1 - 6 - w;
+        sc.panel(x, 31, w, 13, urgent ? '#5a1018' : 'rgba(42,27,38,0.92)', urgent ? '#ff5a4a' : C.wood3);
+        sc.T(text, x + 5, 33, 8, blink ? C.w : urgent ? '#ff9a8a' : C.cream, 'left');
+        sc.PR(x + w - 36, 35.5, 30, 4, C.ink);
+        sc.PR(x + w - 36, 35.5, 30 * worst, 4, worst > 0.5 ? C.green : worst > 0.25 ? C.gold : C.red);
+      }
+    }
   }
 
   /** 中央の大きな語句 */

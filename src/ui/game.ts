@@ -244,7 +244,7 @@ export class Game {
       const date = jstDate();
       this.daily = { date, conds: dailyConditions(date) };
     }
-    const rules = this.daily ? rulesFor(this.daily.conds, difficulty) : NORMAL_RULES;
+    const rules = this.daily ? rulesFor(this.daily.conds, difficulty, this.daily.date) : NORMAL_RULES;
     this.seed = (this.seed * 1103515245 + 12345) >>> 0;
     this.shop = new Shop(new Rng(this.seed), difficultyOf(difficulty), rules);
     this.view = new ShopView();
@@ -447,6 +447,8 @@ export class Game {
         case 'serve': this.sound.serve(); if (ev.combo >= 1) this.sound.combo(ev.combo); break;
         case 'lack': this.sound.lack(); break;
         case 'angry': this.sound.angry(); break;
+        case 'spill': this.sound.loss(); break;
+        case 'refill': this.sound.select(); break;
         case 'tripStart':
           this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
           this.tripView = new MinigameView();

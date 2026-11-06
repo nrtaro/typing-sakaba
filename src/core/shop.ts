@@ -5,7 +5,7 @@ import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
 import {
   DAY_LENGTH, DIFFICULTIES, DISHES, INGREDIENT_ORDER, PHASES, SHOP, TRIPS, dishGroup,
-  type Difficulty, type Dish, type IngredientId, type Trip,
+  type Difficulty, type Dish, type IngredientId, type Trip, type TripId,
 } from './shopConfig';
 
 export const LOOK_COUNT = 7;
@@ -25,6 +25,10 @@ export interface Guest {
   awaitingDelivery?: boolean;
   /** 素材が足りないと言われた演出の残り時間 */
   lack: number;
+  /** おかわり注文：食べ終わったあとに頼むもう1品（見えている） */
+  extra?: Dish;
+  /** おかわりの2品目を待っている（待たせても怒らずに帰る） */
+  refill?: boolean;
 }
 
 export type TargetData = { kind: 'order'; seat: number } | { kind: 'trip'; trip: Trip };
@@ -34,7 +38,13 @@ export type ShopEvent =
   | { type: 'serve'; seat: number; gain: number; combo: number }
   | { type: 'lack'; seat: number; missing: IngredientId[] }
   | { type: 'tripStart'; trip: Trip }
-  | { type: 'tripEnd'; trip: Trip; gains: Partial<Record<IngredientId, number>> }
+  | { type: 'tripEnd'; trip: Trip; gains: Partial<Record<IngredientId, number>>; overflow: Partial<Record<IngredientId, number>>; lucky: boolean }
+  /** ミスで素材をこぼした */
+  | { type: 'spill'; ing: IngredientId }
+  /** おかわり：食べ終わったお客がもう1品たのんだ */
+  | { type: 'refill'; seat: number }
+  /** おかわりを待ちきれず、怒らずに帰った */
+  | { type: 'leave'; seat: number }
   | { type: 'arrive'; seat: number }
   | { type: 'angry'; seat: number }
   /** ミスでコンボが切れた */
@@ -71,9 +81,14 @@ export class Shop {
   private nextId = 1;
   private events: ShopEvent[] = [];
   private lastPhase = 0;
+  /** 調達に出た時間帯（当たりの判定に使う） */
+  private awayPhase = 0;
+  /** 前にこぼしてからのミスの数 */
+  missSinceSpill = 0;
 
   constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1], readonly rules: DayRules = NORMAL_RULES) {
     this.stock = startingStock(this.rng);
+    if (rules.storageCap !== null) for (const id of INGREDIENT_ORDER) this.stock[id] = Math.min(this.stock[id], rules.storageCap);
     this.input = new CandidateInput(() => this.targets());
   }
 
@@ -103,6 +118,16 @@ export class Shop {
     return Math.max(0, this.comboMissAllowance - this.comboMistakes);
   }
 
+  /** 1種類の素材を置ける数（狭い倉庫の日だけ制限がある） */
+  get storageCap() {
+    return this.rules.storageCap ?? Infinity;
+  }
+
+  /** 時間帯の当たりの調達先（その日でなければ null） */
+  luckyTrip(phase = this.phaseIndex): TripId | null {
+    return this.rules.luckyTrips?.[phase] ?? null;
+  }
+
   /** 今打てる候補：注文中の客と、調達の言葉（誰も出かけていないとき） */
   targets(): Target<TargetData>[] {
     const out: Target<TargetData>[] = [];
@@ -130,6 +155,10 @@ export class Shop {
     const r = this.input.key(ch);
     if (r.kind === 'miss') {
       this.stats.missKeys++;
+      if (this.rules.spillEvery !== null && ++this.missSinceSpill >= this.rules.spillEvery) {
+        this.missSinceSpill = 0;
+        this.spill();
+      }
       if (this.combo > 0 && ++this.comboMistakes > this.comboMissAllowance) {
         this.combo = 0;
         this.comboMistakes = 0;
@@ -187,9 +216,25 @@ export class Shop {
     this.events.push({ type: 'serve', seat, gain, combo: this.combo });
   }
 
+  /** ミスで素材をこぼす：打っている料理の素材から。打っていなければ一番多い素材から */
+  private spill() {
+    const dishes = this.input.active
+      .map((l) => l.target.data)
+      .filter((d): d is { kind: 'order'; seat: number } => d.kind === 'order')
+      .map((d) => this.seats[d.seat]?.dish)
+      .filter((d): d is Dish => !!d);
+    const fromDish = dishes.flatMap((d) => Object.keys(d.need) as IngredientId[]).find((id) => this.stock[id] > 0);
+    const most = [...INGREDIENT_ORDER].sort((a, b) => this.stock[b] - this.stock[a])[0];
+    const ing = fromDish ?? (this.stock[most] > 0 ? most : null);
+    if (!ing) return;
+    this.stock[ing]--;
+    this.events.push({ type: 'spill', ing });
+  }
+
   private startTrip(trip: Trip) {
     if (this.away) return;
     this.away = trip;
+    this.awayPhase = this.phaseIndex;
     this.stats.trips++;
     this.input.reset();
     this.events.push({ type: 'tripStart', trip });
@@ -200,13 +245,24 @@ export class Shop {
     const trip = this.away;
     if (!trip) return;
     const final: Partial<Record<IngredientId, number>> = {};
+    const overflow: Partial<Record<IngredientId, number>> = {};
+    // 時間帯の当たり：出かけた時間帯の当たりなら多く、それ以外は少なく持ち帰る
+    const lucky = this.luckyTrip(this.awayPhase) === trip.id;
+    const mult = this.rules.luckyTrips ? (lucky ? this.rules.luckyMult : this.rules.unluckyMult) : 1;
     for (const id of trip.gives) {
-      const n = Math.max(earlyReturn ? 0 : trip.minimum[id] ?? 0, Math.floor(gains[id] ?? 0));
+      const got = Math.max(earlyReturn ? 0 : trip.minimum[id] ?? 0, Math.floor(gains[id] ?? 0));
+      let n = mult === 1 ? got : Math.max(earlyReturn ? 0 : 1, Math.round(got * mult));
+      // 狭い倉庫：置ききれない分は持ち帰れない
+      const room = Math.max(0, this.storageCap - this.stock[id]);
+      if (n > room) {
+        overflow[id] = n - room;
+        n = room;
+      }
       this.stock[id] += n;
       final[id] = n;
     }
     this.away = null;
-    this.events.push({ type: 'tripEnd', trip, gains: final });
+    this.events.push({ type: 'tripEnd', trip, gains: final, overflow, lucky });
   }
 
   // ---------- 時間 ----------
@@ -254,9 +310,14 @@ export class Shop {
         g.t -= dt;
         if (g.t <= 0) g.state = 'wait';
       } else if (g.state === 'wait') {
-        if (this.away) return; // 調達中は残り二人が機嫌を取るので待ち時間が止まる
-        g.wait -= dt;
-        if (g.wait <= 0) {
+        // 調達中は残り二人が機嫌を取るので待ち時間が止まる（お題によっては減り続ける）
+        if (this.away && !this.rules.awayWaitRate) return;
+        g.wait -= this.away ? dt * this.rules.awayWaitRate : dt;
+        if (g.wait <= 0 && g.refill) {
+          // おかわりの2品目は、待たせても怒らずに帰る
+          this.seats[i] = null;
+          this.events.push({ type: 'leave', seat: i });
+        } else if (g.wait <= 0) {
           this.seats[i] = null;
           this.stats.angry++;
           this.combo = 0;
@@ -267,7 +328,16 @@ export class Shop {
       } else if (g.state === 'eat') {
         if (g.awaitingDelivery) return;
         g.t -= dt;
-        if (g.t <= 0) this.seats[i] = null;
+        if (g.t <= 0 && g.extra && !this.ended) {
+          // おかわり：食べ終わったら、見せていたもう1品をたのむ
+          g.dish = g.extra;
+          g.extra = undefined;
+          g.refill = true;
+          g.state = 'wait';
+          g.wait = g.maxWait;
+          g.lack = 0;
+          this.events.push({ type: 'refill', seat: i });
+        } else if (g.t <= 0) this.seats[i] = null;
       }
     });
     this.input.prune(new Set(this.targets().map((t) => t.id)));
@@ -277,6 +347,16 @@ export class Shop {
     const ph = this.phaseIndex;
     // 今テーブルにある注文・並んでいる客と同じ料理は出さない（全部出ている時だけ重複を許す）
     const taken = new Set([...this.seats, ...this.queue].filter((g): g is Guest => !!g).map((g) => g.dish.id));
+    const dish = this.pickDish(taken);
+    const maxWait = PHASES[ph].maxWait * this.difficulty.waitMult;
+    const guest: Guest = { id: this.nextId++, dish, look: this.rng.int(0, LOOK_COUNT - 1), wait: maxWait, maxWait, state: 'walk', t: 0, lack: 0 };
+    // おかわり注文の日だけ乱数を使う（通常営業のお客の並びは変えない）
+    if (this.rules.refillChance > 0 && this.rng.next() < this.rules.refillChance) guest.extra = this.pickDish(new Set([...taken, dish.id]));
+    return guest;
+  }
+
+  private pickDish(taken: Set<string>): Dish {
+    const ph = this.phaseIndex;
     const open = DISHES.filter((d) => d.from <= ph && !taken.has(d.id));
     const menu = open.length ? open : DISHES.filter((d) => d.from <= ph);
     // 新しく出る料理と、夜のエールを少し多めに
@@ -293,8 +373,7 @@ export class Shop {
         break;
       }
     }
-    const maxWait = PHASES[ph].maxWait * this.difficulty.waitMult;
-    return { id: this.nextId++, dish, look: this.rng.int(0, LOOK_COUNT - 1), wait: maxWait, maxWait, state: 'walk', t: 0, lack: 0 };
+    return dish;
   }
 }
 

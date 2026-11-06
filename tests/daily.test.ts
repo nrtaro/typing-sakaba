@@ -1,16 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { CONDITIONS, NORMAL_RULES, dailyConditions, dateLabel, jstDate, rulesFor } from '../src/core/daily';
+import { CONDITIONS, NORMAL_RULES, dailyConditions, dateLabel, isBanned, jstDate, luckySchedule, rulesFor } from '../src/core/daily';
 import { Shop } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
-import { DIFFICULTIES, DISHES, SHOP, difficultyOf } from '../src/core/shopConfig';
+import { defaultRomaji } from '../src/core/romaji';
+import { DIFFICULTIES, DISHES, SHOP, TRIPS, difficultyOf } from '../src/core/shopConfig';
 import { DAILY_KEEP_DAYS, SaveStore, type DayRecord } from '../src/core/save';
 
 const dish = (id: string) => DISHES.find((d) => d.id === id)!;
+const trip = (id: string) => TRIPS.find((t) => t.id === id)!;
+function type(shop: Shop, kana: string) {
+  for (const c of defaultRomaji(kana)) shop.key(c);
+}
 function memory() {
   const m = new Map<string, string>();
   return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
 }
 const rec = (score: number): DayRecord => ({ score, served: 1, maxCombo: 1, angry: 0, kps: 1, accuracy: 1, finishedAt: '' });
+const day = (i: number) => new Date(Date.UTC(2026, 10, 1 + i)).toISOString().slice(0, 10);
 
 describe('ひがわり：日付', () => {
   it('日本時間の0時で日付が変わる', () => {
@@ -27,17 +33,30 @@ describe('ひがわり：日付', () => {
 describe('ひがわり：お題の決まり方', () => {
   it('同じ日付なら同じお題', () => {
     for (const d of ['2026-11-08', '2026-12-24', '2027-02-28']) {
-      const a = dailyConditions(d);
-      expect(a.length).toBeGreaterThan(0);
-      expect(a.map((c) => c.id)).toEqual(dailyConditions(d).map((c) => c.id));
+      expect(dailyConditions(d).map((c) => c.id)).toEqual(dailyConditions(d).map((c) => c.id));
     }
   });
 
+  it('大きいお題と小さいお題が1つずつ出て、除外の組み合わせは出ない', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      const [a, b] = dailyConditions(day(i));
+      expect([a.kind, b.kind]).toEqual(['major', 'minor']);
+      expect(isBanned(a.id, b.id)).toBe(false);
+      seen.add(`${a.id}+${b.id}`);
+    }
+    // 大3つ×小3つ＝9通りすべてが、いずれかの日に出る
+    expect(seen.size).toBe(9);
+  });
+
   it('難易度で強さが変わる', () => {
-    const conds = [CONDITIONS.noMiss];
-    expect(rulesFor(conds, 'easy')).toEqual({ comboMissAllowance: 1, angryPenaltyMult: 1 });
-    expect(rulesFor(conds, 'normal')).toEqual({ comboMissAllowance: 0, angryPenaltyMult: 1 });
-    expect(rulesFor(conds, 'hard')).toEqual({ comboMissAllowance: 0, angryPenaltyMult: 2 });
+    expect(rulesFor([CONDITIONS.noMiss], 'easy')).toMatchObject({ comboMissAllowance: 1, angryPenaltyMult: 1 });
+    expect(rulesFor([CONDITIONS.noMiss], 'hard')).toMatchObject({ comboMissAllowance: 0, angryPenaltyMult: 2 });
+    expect(DIFFICULTIES.map((d) => rulesFor([CONDITIONS.smallStore], d.id).storageCap)).toEqual([10, 8, 6]);
+    expect(DIFFICULTIES.map((d) => rulesFor([CONDITIONS.busyAway], d.id).awayWaitRate)).toEqual([0.5, 0.75, 1]);
+    expect(DIFFICULTIES.map((d) => rulesFor([CONDITIONS.luckyTrip], d.id, '2026-11-08').unluckyMult)).toEqual([1, 0.85, 0.7]);
+    expect(DIFFICULTIES.map((d) => rulesFor([CONDITIONS.spill], d.id).spillEvery)).toEqual([3, 2, 1]);
+    expect(DIFFICULTIES.map((d) => rulesFor([CONDITIONS.refill], d.id).refillChance)).toEqual([0.15, 0.2, 0.25]);
   });
 
   it('お題の2行の説明は、どの難易度でもある', () => {
@@ -45,6 +64,16 @@ describe('ひがわり：お題の決まり方', () => {
       const lines = c.lines(d.id);
       expect(lines).toHaveLength(2);
       expect(lines.every((l) => l.length > 0 && l.length <= 22)).toBe(true);
+    }
+  });
+
+  it('当たりの調達先は日付で決まり、続けて同じ所にならない', () => {
+    for (let i = 0; i < 60; i++) {
+      const s = luckySchedule(day(i));
+      expect(s).toEqual(luckySchedule(day(i)));
+      expect(s).toHaveLength(3);
+      expect(s[0]).not.toBe(s[1]);
+      expect(s[1]).not.toBe(s[2]);
     }
   });
 });
@@ -80,6 +109,116 @@ describe('ひがわり：ノーミス営業', () => {
     shop.seats[0] = { id: 1, dish: dish('ale'), look: 0, wait: 0.01, maxWait: 20, state: 'wait', t: 0, lack: 0 };
     shop.update(0.05);
     expect(shop.score).toBe(1000 - SHOP.angryPenalty * 2);
+  });
+});
+
+describe('ひがわり：狭い倉庫', () => {
+  it('置ける数を超えた分は持ち帰れず、あふれた数を知らせる', () => {
+    const shop = new Shop(new Rng(3), difficultyOf('normal'), rulesFor([CONDITIONS.smallStore], 'normal'));
+    expect(Math.max(...Object.values(shop.stock))).toBeLessThanOrEqual(8);
+    shop.stock.fish = 5;
+    type(shop, 'つり');
+    shop.drainEvents();
+    shop.returnFromTrip({ fish: 6 });
+    expect(shop.stock.fish).toBe(8);
+    const end = shop.drainEvents().find((e) => e.type === 'tripEnd');
+    expect(end).toMatchObject({ gains: { fish: 3 }, overflow: { fish: 3 } });
+  });
+});
+
+describe('ひがわり：調達中もお客は待たない', () => {
+  it('調達中も待ち時間が決まった速さで減る（通常は止まる）', () => {
+    for (const [rules, expected] of [[NORMAL_RULES, 20], [rulesFor([CONDITIONS.busyAway], 'normal'), 20 - 0.75]] as const) {
+      const shop = new Shop(new Rng(1), difficultyOf('normal'), rules);
+      shop.seats[0] = { id: 1, dish: dish('ale'), look: 0, wait: 20, maxWait: 26, state: 'wait', t: 0, lack: 0 };
+      type(shop, 'つり');
+      expect(shop.away).not.toBeNull();
+      shop.update(1);
+      expect(shop.seats[0]!.wait).toBeCloseTo(expected);
+    }
+  });
+});
+
+describe('ひがわり：時間帯で当たりが変わる調達先', () => {
+  it('出かけた時間帯の当たりなら多く、ほかは少なく持ち帰る', () => {
+    const rules = rulesFor([CONDITIONS.luckyTrip], 'hard', '2026-11-08');
+    const lucky = rules.luckyTrips![0];
+    const other = TRIPS.find((t) => t.id !== lucky)!;
+    const shop = new Shop(new Rng(1), difficultyOf('hard'), rules);
+    expect(shop.luckyTrip()).toBe(lucky);
+    const before = { ...shop.stock };
+    type(shop, trip(lucky).kana);
+    shop.returnFromTrip(Object.fromEntries(trip(lucky).gives.map((g) => [g, 10])));
+    for (const g of trip(lucky).gives) expect(shop.stock[g] - before[g]).toBe(15);
+    const mid = { ...shop.stock };
+    type(shop, other.kana);
+    shop.returnFromTrip(Object.fromEntries(other.gives.map((g) => [g, 10])));
+    for (const g of other.gives) expect(shop.stock[g] - mid[g]).toBe(7);
+  });
+});
+
+describe('ひがわり：ミスで素材をこぼす', () => {
+  it('決まった回数のミスで、打っている料理の素材を1つこぼす', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rulesFor([CONDITIONS.spill], 'normal'));
+    shop.seats[0] = { id: 1, dish: dish('ale'), look: 0, wait: 20, maxWait: 26, state: 'wait', t: 0, lack: 0 };
+    const ale = shop.stock.ale;
+    shop.key('e');
+    shop.key('q');
+    expect(shop.stock.ale).toBe(ale);
+    shop.key('q');
+    expect(shop.stock.ale).toBe(ale - 1);
+    expect(shop.drainEvents().filter((e) => e.type === 'spill')).toEqual([{ type: 'spill', ing: 'ale' }]);
+  });
+
+  it('何も打っていなければ、一番多い素材をこぼす', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('hard'), rulesFor([CONDITIONS.spill], 'hard'));
+    const most = (Object.keys(shop.stock) as (keyof typeof shop.stock)[]).sort((a, b) => shop.stock[b] - shop.stock[a])[0];
+    const n = shop.stock[most];
+    shop.key('x');
+    expect(shop.stock[most]).toBe(n - 1);
+  });
+});
+
+describe('ひがわり：おかわり注文', () => {
+  it('食べ終わると見せていた2品目をたのみ、待たせても怒らずに帰る', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rulesFor([CONDITIONS.refill], 'normal'));
+    shop.seats[0] = { id: 1, dish: dish('ale'), extra: dish('grilledFish'), look: 0, wait: 20, maxWait: 26, state: 'eat', t: 0.01, lack: 0 };
+    shop.update(0.05);
+    const g = shop.seats[0]!;
+    expect(g.state).toBe('wait');
+    expect(g.dish.id).toBe('grilledFish');
+    expect(g.refill).toBe(true);
+    expect(shop.drainEvents().some((e) => e.type === 'refill')).toBe(true);
+    shop.score = 500;
+    shop.combo = 4;
+    g.wait = 0.01;
+    shop.update(0.05);
+    expect(shop.seats[0]).toBeNull();
+    expect(shop.stats.angry).toBe(0);
+    expect(shop.score).toBe(500);
+    expect(shop.combo).toBe(4);
+  });
+
+  it('おかわりを頼むお客が、ときどき来る（通常営業では来ない）', () => {
+    const count = (rules = NORMAL_RULES) => {
+      const shop = new Shop(new Rng(5), difficultyOf('hard'), rules);
+      const seen = new Set<number>();
+      let extra = 0;
+      for (let i = 0; i < 180 * 20 && !shop.ended; i++) {
+        shop.update(0.05);
+        for (const g of [...shop.seats, ...shop.queue]) {
+          if (g && !seen.has(g.id)) {
+            seen.add(g.id);
+            if (g.extra) extra++;
+          }
+        }
+      }
+      return { extra, all: seen.size };
+    };
+    expect(count().extra).toBe(0);
+    const r = count(rulesFor([CONDITIONS.refill], 'hard'));
+    expect(r.extra).toBeGreaterThan(0);
+    expect(r.extra).toBeLessThan(r.all / 2);
   });
 });
 
