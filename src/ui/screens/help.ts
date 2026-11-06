@@ -3,7 +3,9 @@ import { C, TRIP_COLOR } from '../palette';
 import { AMBER } from '../amber/layout';
 import { RomajiMatcher } from '../../core/romaji';
 import { FAMILY_NAME, INGREDIENT_NAME, TRIPS } from '../../core/shopConfig';
+import { dailyConditions, jstDate } from '../../core/daily';
 import type { Game } from '../game';
+import { drawCondChip } from './conditions';
 
 import { TRIP_HELP, ICON_FOR, splitHot } from './shared';
 
@@ -270,4 +272,35 @@ export function drawHelpFx(g: Game) {
       sc.T(say, x, f.y - 30 - hop, 7, C.ink, 'center', a);
     }
   }
+}
+
+/**
+ * ひがわり営業の説明：左に通常営業、右にひがわり営業。右には今日のお題も出す。
+ */
+export function drawModeHelp(g: Game) {
+  const sc = g.sc;
+  sc.TB('2つの営業', 24, 16, 22, C.gold3, 'left');
+  sc.T('「はじめる」のあとで、どちらの営業にするかを選べます', 142, 24, 10, C.cream);
+  const cols = [
+    { name: '通常営業', kana: 'つうじょう', lines: ['3分間で、売上の自己ベストに挑戦', 'お客の来かたは、遊ぶたびに変わる', '自己ベストは難易度ごとに残る'] },
+    { name: 'ひがわり営業', kana: 'ひがわり', lines: ['毎日変わる「お題」つきの営業', 'お題は大小1つずつ。0時に変わる', '難易度でお題の強さが変わる', '何度でも挑戦でき、その日のベストが残る', '記録は通常営業とは別'] },
+  ];
+  cols.forEach((col, i) => {
+    const x = i === 0 ? 22 : 214;
+    const w = i === 0 ? 184 : 244;
+    const y = 48;
+    const h = 156;
+    sc.panel(x, y, w, h, 'rgba(55,37,23,0.94)', i === 1 ? C.gold2 : C.wood4);
+    sc.TB(col.name, x + 10, y + 8, 14, C.gold3, 'left');
+    sc.T(`（${new RomajiMatcher(col.kana).remaining}）`, x + 12 + sc.W(col.name, 14), y + 12, 8, C.cream2);
+    col.lines.forEach((line, k) => {
+      sc.PR(x + 11, y + 35 + k * 15, 3, 3, C.gold2);
+      sc.T(line, x + 18, y + 31 + k * 15, sc.fitSize(line, 9, w - 26), C.cream);
+    });
+    if (i === 1) {
+      const d = g.settings.difficulty;
+      sc.T('今日のお題', x + 10, y + 112, 9, C.gold3);
+      dailyConditions(jstDate()).forEach((c, k) => drawCondChip(sc, g.art, c, d, x + 10 + k * 116, y + 128));
+    }
+  });
 }

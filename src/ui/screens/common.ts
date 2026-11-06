@@ -23,10 +23,13 @@ export function drawMenu(g: Game, y: number) {
   const sc = g.sc;
   const items = g.menuItems();
   if (g.mode === 'title') return;
-  if (g.mode === 'difficulty') return;
+  if (g.mode === 'difficulty' || g.mode === 'modeSelect' || g.mode === 'daily') return;
   if (g.mode === 'help') {
     button(g, items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
-    if (g.helpPage === 0) button(g, items[items.length - 2], 300, 222, 158, 38, 'primary');
+    if (g.helpPage === 0) {
+      button(g, items[items.length - 2], 300, 222, 158, 38, 'primary');
+      button(g, items[items.length - 3], 152, 226, 136, 30, 'plain', undefined, '▶');
+    }
     return;
   }
   const iw = items.length >= 4 ? 108 : 124;

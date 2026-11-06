@@ -1,4 +1,5 @@
 import { startingStock } from './startingStock';
+import { NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
@@ -36,6 +37,8 @@ export type ShopEvent =
   | { type: 'tripEnd'; trip: Trip; gains: Partial<Record<IngredientId, number>> }
   | { type: 'arrive'; seat: number }
   | { type: 'angry'; seat: number }
+  /** ミスでコンボが切れた */
+  | { type: 'comboBreak' }
   | { type: 'phase'; index: number }
   | { type: 'end' };
 
@@ -69,8 +72,11 @@ export class Shop {
   private events: ShopEvent[] = [];
   private lastPhase = 0;
 
-  constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1]) {
+  constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1], readonly rules: DayRules = NORMAL_RULES) {
     this.stock = startingStock(this.rng);
+    if (rules.startStockScale !== 1) {
+      for (const id of INGREDIENT_ORDER) this.stock[id] = Math.max(1, Math.round(this.stock[id] * rules.startStockScale));
+    }
     this.input = new CandidateInput(() => this.targets());
   }
 
@@ -91,8 +97,18 @@ export class Shop {
     return Math.min(SHOP.comboMaxMult, 1 + Math.floor(this.combo / SHOP.comboStep) * SHOP.comboBonus);
   }
 
+  /** ミスしてもコンボが続く回数（ひがわりのお題で変わる） */
+  get comboMissAllowance() {
+    return this.rules.comboMissAllowance ?? this.difficulty.comboMissAllowance;
+  }
+
   get comboMissesLeft() {
-    return Math.max(0, this.difficulty.comboMissAllowance - this.comboMistakes);
+    return Math.max(0, this.comboMissAllowance - this.comboMistakes);
+  }
+
+  /** あと何回調達に出られるか（制限のない日は null） */
+  get tripsLeft(): number | null {
+    return this.rules.tripLimit === null ? null : Math.max(0, this.rules.tripLimit - this.stats.trips);
   }
 
   /** 今打てる候補：注文中の客と、調達の言葉（誰も出かけていないとき） */
@@ -101,7 +117,7 @@ export class Shop {
     this.seats.forEach((g, i) => {
       if (g && g.state === 'wait') out.push({ id: `seat:${i}`, kana: g.dish.kana, data: { kind: 'order', seat: i } });
     });
-    if (!this.away) for (const t of TRIPS) out.push({ id: `trip:${t.id}`, kana: t.kana, data: { kind: 'trip', trip: t } });
+    if (!this.away && this.tripsLeft !== 0) for (const t of TRIPS) out.push({ id: `trip:${t.id}`, kana: t.kana, data: { kind: 'trip', trip: t } });
     return out;
   }
 
@@ -122,9 +138,10 @@ export class Shop {
     const r = this.input.key(ch);
     if (r.kind === 'miss') {
       this.stats.missKeys++;
-      if (this.combo > 0 && ++this.comboMistakes > this.difficulty.comboMissAllowance) {
+      if (this.combo > 0 && ++this.comboMistakes > this.comboMissAllowance) {
         this.combo = 0;
         this.comboMistakes = 0;
+        this.events.push({ type: 'comboBreak' });
       }
       this.events.push({ type: 'key', ok: false, count: 0 });
       return;
@@ -179,7 +196,7 @@ export class Shop {
   }
 
   private startTrip(trip: Trip) {
-    if (this.away) return;
+    if (this.away || this.tripsLeft === 0) return;
     this.away = trip;
     this.stats.trips++;
     this.input.reset();
@@ -252,7 +269,7 @@ export class Shop {
           this.stats.angry++;
           this.combo = 0;
           this.comboMistakes = 0;
-          this.score = Math.max(0, this.score - SHOP.angryPenalty);
+          this.score = Math.max(0, this.score - SHOP.angryPenalty * this.rules.angryPenaltyMult);
           this.events.push({ type: 'angry', seat: i });
         }
       } else if (g.state === 'eat') {

@@ -1,7 +1,9 @@
 // 画面：result
 import { C } from '../palette';
 import { LW } from '../screen';
+import { dateLabel } from '../../core/daily';
 import type { Game } from '../game';
+import { chipWidth, drawCondChip } from './conditions';
 
 /** 結果画面の演出が終わって、選べるようになるまでの時間 */
 export function resultStep(g: Game) {
@@ -31,7 +33,14 @@ export function drawResult(g: Game) {
   const ease = (v: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
   // 売上の後ろに、あたたかい明かり
   sc.radialGlow(LW / 2, 62, 140, '#ffb45a', 0.22 * ease(age / 0.6), 0.45);
-  sc.TB('本日の営業終了', LW / 2, 16, 16, C.gold3, 'center', C.ink, ease(age / 0.3));
+  const daily = r.daily;
+  sc.TB(daily ? `ひがわり営業 ${dateLabel(daily.date)}` : '本日の営業終了', LW / 2, 16, daily ? 14 : 16, C.gold3, 'center', C.ink, ease(age / 0.3));
+  // ひがわり：上の両端に今日のお題
+  if (daily) {
+    const d = g.settings.difficulty;
+    const a = ease(age / 0.3);
+    daily.conds.forEach((c, i) => drawCondChip(sc, g.art, c, d, i === 0 ? 10 : LW - 10 - chipWidth(sc, c, d), 6, a));
+  }
   // 売上：数字が駆け上がり、止まった瞬間に少し弾む
   const count = Math.round(r.score * ease((age - 0.3) / 1.3));
   const pop = age > 1.6 && age < 1.8 ? 1 + (1.8 - age) * 0.6 : 1;
@@ -54,7 +63,7 @@ export function drawResult(g: Game) {
     const p = ease((age - 2.3) / 0.25);
     const bw = 140 * p;
     sc.panel(LW / 2 - bw / 2, 112, bw, 16, '#7a2a3a', C.gold3, p);
-    sc.TB('自己ベスト更新！', LW / 2, 114, 11, C.gold3, 'center', C.ink, p);
+    sc.TB(daily ? '今日のベスト更新！' : '自己ベスト更新！', LW / 2, 114, 11, C.gold3, 'center', C.ink, p);
     const colors = ['#ffd25c', '#ff7fb0', '#7fc8ff', '#7ff0d8', '#fff7ea'];
     for (let k = 0; k < 36; k++) {
       const t = age - 2.3 - (k % 6) * 0.08;
@@ -64,6 +73,11 @@ export function drawResult(g: Game) {
       const y = -6 + life * 280;
       sc.PR(x, y, 2, 1 + Math.abs(Math.sin(t * 6 + k)) * 2, colors[k % colors.length], 0.9 * (1 - life));
     }
+  }
+  // ひがわりで更新しなかったときは、今日のベストを小さく見せる
+  if (daily && !r.best && age > 2.3) {
+    const best = g.store.loadDailyBest(daily.date, g.settings.difficulty);
+    if (best) sc.T(`今日のベスト ${best.score.toLocaleString()}円`, LW / 2, 116, 9, C.cream2, 'center', ease((age - 2.3) / 0.25));
   }
   // 成績：左から順に浮かび上がる
   const stats = [

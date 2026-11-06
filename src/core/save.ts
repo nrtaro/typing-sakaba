@@ -16,9 +16,11 @@ export interface Settings {
   volume: number;
   /** 最初の営業で、注文と調達の案内を見せ終えたか */
   guided: boolean;
+  /** 前回選んだ営業（Enter で選ぶときに使う） */
+  playMode: 'normal' | 'daily';
 }
 
-export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3 };
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal' };
 
 export interface DayRecord {
   score: number;
@@ -30,7 +32,13 @@ export interface DayRecord {
   finishedAt: string;
 }
 
-const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last' };
+const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily' };
+
+/** ひがわり営業の記録は、直近の何日分を残すか */
+export const DAILY_KEEP_DAYS = 30;
+
+/** ひがわりの記録：日付 → 難易度 → その日のベスト */
+type DailyBook = Record<string, Partial<Record<string, DayRecord>>>;
 
 function safe<T>(fn: () => T, fallback: T): T {
   try {
@@ -46,7 +54,7 @@ export class SaveStore {
   /** slot を指定すると別の保存枠を使う（動作確認用） */
   constructor(private store: KeyValueStore | null, slot = '') {
     const sfx = slot ? `.${slot.replace(/[^a-z0-9_-]/gi, '')}` : '';
-    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx };
+    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx };
   }
 
   private read<T>(key: string): T | null {
@@ -92,5 +100,33 @@ export class SaveStore {
       return true;
     }
     return false;
+  }
+
+  private loadDailyBook(): DailyBook {
+    const d = this.read<DailyBook>(this.keys.daily);
+    return d && typeof d === 'object' && !Array.isArray(d) ? d : {};
+  }
+
+  /** ひがわり営業の、その日・その難易度のベスト（通常営業の記録とは別） */
+  loadDailyBest(date: string, difficulty: string): DayRecord | null {
+    const r = this.loadDailyBook()[date]?.[difficulty];
+    return r && typeof r.score === 'number' ? r : null;
+  }
+
+  /** ひがわり営業の結果を記録し、その日のベストを更新したら true */
+  recordDaily(r: DayRecord, date: string, difficulty: string): boolean {
+    const book = this.loadDailyBook();
+    const day = book[date] ?? {};
+    const best = day[difficulty];
+    const isBest = !best || typeof best.score !== 'number' || r.score > best.score;
+    if (isBest) {
+      day[difficulty] = r;
+      book[date] = day;
+      // 古い日の記録は消す（日付の文字列は並べ替えるとそのまま古い順になる）
+      const dates = Object.keys(book).sort();
+      for (const old of dates.slice(0, Math.max(0, dates.length - DAILY_KEEP_DAYS))) delete book[old];
+      this.write(this.keys.daily, book);
+    }
+    return isBest;
   }
 }

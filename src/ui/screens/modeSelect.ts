@@ -1,0 +1,89 @@
+// 画面：営業をえらぶ（通常営業／ひがわり営業）
+import { C } from '../palette';
+import { LW } from '../screen';
+import { RomajiMatcher } from '../../core/romaji';
+import { dailyConditions, dateLabel, jstDate } from '../../core/daily';
+import { difficultyOf } from '../../core/shopConfig';
+import type { Game } from '../game';
+import { button, drawSignboard } from './common';
+import { drawCondChip } from './conditions';
+
+const MODES = [
+  { kana: 'つうじょう', name: '通常営業', line: '3分間で、売上の自己ベストに挑戦' },
+  { kana: 'ひがわり', name: 'ひがわり営業', line: '毎日変わるお題で、みんなと腕比べ' },
+] as const;
+
+/** 鎖：上の端から札まで */
+function chain(g: Game, cx: number, from: number, to: number) {
+  const sc = g.sc;
+  for (let cy = from; cy < to; cy += 4) {
+    sc.PR(cx - 1.5, cy, 3, 2.5, '#8a6a44');
+    sc.PR(cx - 0.5, cy + 2.5, 1, 1.5, '#5a4128');
+  }
+}
+
+/**
+ * 難易度の画面と同じ作り：店を背景に、看板から木の札を2枚下げる。
+ * 札には一言の説明。ひがわりの札には今日の日付とお題を小さく出す。
+ */
+export function drawModeSelect(g: Game) {
+  const sc = g.sc;
+  const e = sc.ext;
+  const typing = g.menu.typed.length > 0;
+  const diff = difficultyOf(g.settings.difficulty);
+  sc.shifted(0, e.y0 / 2, () => {
+    drawSignboard(g, 160, 6, 160, 34);
+    sc.TB('営業をえらぶ', LW / 2, 13, 16, '#ffd98a', 'center', '#3a1408');
+    MODES.forEach((md, i) => {
+      const live = g.menu.active.find((l) => l.target.id === md.kana);
+      const last = (g.settings.playMode === 'daily') === (i === 1);
+      const dim = typing && !live;
+      const w = 196;
+      const h = 150;
+      const x = i === 0 ? 34 : LW - 34 - w;
+      const y = (live ? 50 : 52) + Math.sin(g.t * 1.6 + i * 1.3) * (typing ? 0 : 0.8);
+      // 外側の鎖は上の端から、内側の鎖は看板から下げる
+      chain(g, x + 28, i === 0 ? sc.ext.y0 - e.y0 / 2 : 40, y);
+      chain(g, x + w - 28, i === 0 ? 40 : sc.ext.y0 - e.y0 / 2, y);
+      if (live) sc.glow(x, y, w, h, C.gold3);
+      else if (last && !typing) sc.glow(x, y, w, h, C.gold3, 0.35 + 0.25 * Math.sin(g.t * 3));
+      drawSignboard(g, x, y, w, h, y);
+      sc.TB(md.name, x + w / 2, y + 22, 20, '#ffe7b0', 'center', '#3a1408');
+      sc.T(md.line, x + w / 2, y + 50, 9, '#f3dcb0', 'center');
+      // ローマ字の札：次に打つ文字が光り、キーが押される絵が動く
+      const m = live?.matcher ?? new RomajiMatcher(md.kana);
+      const rw = sc.W(m.typed + m.remaining, 11) + 14;
+      sc.panel(x + w / 2 - rw / 2, y + 66, rw, 18, '#211712', live ? C.gold : C.gold2);
+      sc.roma(m.typed, m.remaining, x + w / 2, y + 69, 11, dim ? 'dim' : 'active');
+      if (!dim) {
+        const down = Math.floor(g.t * 2.5 + i) % 2 === 0;
+        const kx = x + w / 2 + rw / 2 - 5;
+        const ky = y + 60 + (down ? 1.5 : 0);
+        sc.panel(kx, ky, 12, 12, down ? '#e3c890' : '#f6e2b8', '#8a6232');
+        sc.T((m.remaining[0] ?? '').toUpperCase(), kx + 6, ky + 2, 8, '#3a2414', 'center');
+      }
+      // 下の黒板：通常は自己ベスト、ひがわりは今日の日付とお題
+      sc.panel(x + 12, y + 92, w - 24, 48, '#22322a', '#6b4422');
+      if (i === 0) {
+        sc.T('営業時間 3:00', x + w / 2, y + 98, 9, '#f2efe2', 'center');
+        const best = g.store.loadBest(diff.id);
+        sc.T(`${diff.name}のベスト ${best ? `${best.score.toLocaleString()}円` : '―'}`, x + w / 2, y + 118, 8, '#d9e4cf', 'center');
+      } else {
+        const date = jstDate();
+        sc.T(`${dateLabel(date)}のお題`, x + w / 2, y + 96, 9, '#f2efe2', 'center');
+        dailyConditions(date).forEach((c, k) => drawCondChip(sc, g.art, c, diff.id, x + 20, y + 108 + k * 15));
+      }
+      if (last && !typing) sc.keycap('Enter', x + w - 38, y + 10, 7);
+      if (dim) sc.PR(x, y, w, h, '#0e0805', 0.6);
+    });
+  });
+  // 下：タイトルと同じ木のカウンター
+  sc.PR(e.x0, 212, e.w, e.y1 - 212, '#2a1a10');
+  sc.PR(e.x0, 212, e.w, 2, '#a8743f');
+  sc.PR(e.x0, 214, e.w, 1, '#5a3a1c');
+  for (let yy = 232; yy < e.y1; yy += 18) sc.PR(e.x0, yy, e.w, 0.6, '#3a2414', 0.8);
+  sc.shifted(0, (e.y1 - 270) / 2, () => {
+    const items = g.menuItems();
+    button(g, items[items.length - 1], 26, 228, 120, 30, 'plain', 'Esc', '◀');
+  });
+}
