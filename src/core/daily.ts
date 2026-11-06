@@ -6,19 +6,15 @@ import type { DifficultyId } from './shopConfig';
 
 /** お題が営業に与える変更。Shop はこれを見てふるまいを変える */
 export interface DayRules {
-  /** 1日に調達へ出られる回数（null は無制限） */
-  tripLimit: number | null;
   /** ミスしてもコンボが続く回数（難易度の値を上書き） */
   comboMissAllowance: number | null;
-  /** 開店時の在庫の量（1 で通常） */
-  startStockScale: number;
   /** 客が怒って帰ったときの減点の倍率 */
   angryPenaltyMult: number;
 }
 
-export const NORMAL_RULES: DayRules = { tripLimit: null, comboMissAllowance: null, startStockScale: 1, angryPenaltyMult: 1 };
+export const NORMAL_RULES: DayRules = { comboMissAllowance: null, angryPenaltyMult: 1 };
 
-export type ConditionId = 'tripLimit' | 'noMiss';
+export type ConditionId = 'noMiss';
 
 export interface Condition {
   id: ConditionId;
@@ -27,38 +23,19 @@ export interface Condition {
   name: string;
   /** 難易度に合わせた名前（「調達は3回まで」など） */
   title: (d: DifficultyId) => string;
-  /** 絵に添える数字（調達の回数など。なければ 0） */
-  count: (d: DifficultyId) => number;
   /** お題の画面に出す2行の説明（難易度で数字が変わる） */
   lines: (d: DifficultyId) => [string, string];
   apply: (r: DayRules, d: DifficultyId) => void;
 }
 
-const TRIP_LIMIT: Record<DifficultyId, number> = { easy: 3, normal: 2, hard: 2 };
 const NO_MISS_ALLOWANCE: Record<DifficultyId, number> = { easy: 1, normal: 0, hard: 0 };
 
 export const CONDITIONS: Record<ConditionId, Condition> = {
-  tripLimit: {
-    id: 'tripLimit',
-    kind: 'major',
-    name: '調達は2回まで',
-    title: (d) => `調達は${TRIP_LIMIT[d]}回まで`,
-    count: (d) => TRIP_LIMIT[d],
-    lines: (d) => [
-      '足りない素材を、まとめて取りに行こう',
-      d === 'hard' ? '開店時の在庫も少なめ。行き先を見極めて' : 'どの素材を、いつ取りに行くかが勝負',
-    ],
-    apply: (r, d) => {
-      r.tripLimit = TRIP_LIMIT[d];
-      if (d === 'hard') r.startStockScale = 0.75;
-    },
-  },
   noMiss: {
     id: 'noMiss',
     kind: 'minor',
     name: 'ノーミス営業',
     title: () => 'ノーミス営業',
-    count: () => 0,
     lines: (d) => [
       NO_MISS_ALLOWANCE[d] ? `ミスが${NO_MISS_ALLOWANCE[d] + 1}回でコンボが切れる` : 'ミスするとすぐコンボが切れる',
       d === 'hard' ? '怒って帰る客の減点も2倍' : '一打ずつ、ていねいに',
@@ -98,17 +75,19 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-/** その日のお題：大きい条件1つと小さい条件1つ */
+/** その日のお題：大きい条件と小さい条件を1つずつ（まだない種類は出さない） */
 export function dailyConditions(date: string): Condition[] {
   const all = Object.values(CONDITIONS);
   const majors = all.filter((c) => c.kind === 'major');
   const minors = all.filter((c) => c.kind === 'minor');
   const h = hash(`sakaba:${date}`);
-  const major = majors[h % majors.length];
-  const ok = minors.filter((m) => !DISALLOWED_PAIRS.some(([a, b]) => (a === major.id && b === m.id) || (b === major.id && a === m.id)));
+  const out: Condition[] = [];
+  const major = majors.length ? majors[h % majors.length] : null;
+  if (major) out.push(major);
+  const ok = minors.filter((m) => !major || !DISALLOWED_PAIRS.some(([a, b]) => (a === major.id && b === m.id) || (b === major.id && a === m.id)));
   const pool = ok.length ? ok : minors;
-  const minor = pool[Math.floor(h / majors.length) % pool.length];
-  return [major, minor];
+  if (pool.length) out.push(pool[Math.floor(h / Math.max(1, majors.length)) % pool.length]);
+  return out;
 }
 
 export function rulesFor(conds: Condition[], d: DifficultyId): DayRules {

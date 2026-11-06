@@ -2,14 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { CONDITIONS, NORMAL_RULES, dailyConditions, dateLabel, jstDate, rulesFor } from '../src/core/daily';
 import { Shop } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
-import { DIFFICULTIES, DISHES, SHOP, TRIPS, difficultyOf } from '../src/core/shopConfig';
-import { defaultRomaji } from '../src/core/romaji';
+import { DIFFICULTIES, DISHES, SHOP, difficultyOf } from '../src/core/shopConfig';
 import { DAILY_KEEP_DAYS, SaveStore, type DayRecord } from '../src/core/save';
 
 const dish = (id: string) => DISHES.find((d) => d.id === id)!;
-function type(shop: Shop, kana: string) {
-  for (const c of defaultRomaji(kana)) shop.key(c);
-}
 function memory() {
   const m = new Map<string, string>();
   return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) };
@@ -29,21 +25,19 @@ describe('ひがわり：日付', () => {
 });
 
 describe('ひがわり：お題の決まり方', () => {
-  it('同じ日付なら同じお題（大1つ・小1つ）', () => {
+  it('同じ日付なら同じお題', () => {
     for (const d of ['2026-11-08', '2026-12-24', '2027-02-28']) {
       const a = dailyConditions(d);
+      expect(a.length).toBeGreaterThan(0);
       expect(a.map((c) => c.id)).toEqual(dailyConditions(d).map((c) => c.id));
-      expect(a.map((c) => c.kind)).toEqual(['major', 'minor']);
     }
   });
 
   it('難易度で強さが変わる', () => {
-    const conds = [CONDITIONS.tripLimit, CONDITIONS.noMiss];
-    expect(rulesFor(conds, 'easy')).toMatchObject({ tripLimit: 3, comboMissAllowance: 1, startStockScale: 1, angryPenaltyMult: 1 });
-    expect(rulesFor(conds, 'normal')).toMatchObject({ tripLimit: 2, comboMissAllowance: 0, startStockScale: 1, angryPenaltyMult: 1 });
-    expect(rulesFor(conds, 'hard')).toMatchObject({ tripLimit: 2, comboMissAllowance: 0, startStockScale: 0.75, angryPenaltyMult: 2 });
-    expect(CONDITIONS.tripLimit.title('easy')).toBe('調達は3回まで');
-    expect(CONDITIONS.tripLimit.title('normal')).toBe('調達は2回まで');
+    const conds = [CONDITIONS.noMiss];
+    expect(rulesFor(conds, 'easy')).toEqual({ comboMissAllowance: 1, angryPenaltyMult: 1 });
+    expect(rulesFor(conds, 'normal')).toEqual({ comboMissAllowance: 0, angryPenaltyMult: 1 });
+    expect(rulesFor(conds, 'hard')).toEqual({ comboMissAllowance: 0, angryPenaltyMult: 2 });
   });
 
   it('お題の2行の説明は、どの難易度でもある', () => {
@@ -52,39 +46,6 @@ describe('ひがわり：お題の決まり方', () => {
       expect(lines).toHaveLength(2);
       expect(lines.every((l) => l.length > 0 && l.length <= 22)).toBe(true);
     }
-  });
-});
-
-describe('ひがわり：調達は2回まで', () => {
-  it('回数を使い切ると、調達の言葉が打てなくなる', () => {
-    const shop = new Shop(new Rng(1), difficultyOf('normal'), rulesFor([CONDITIONS.tripLimit], 'normal'));
-    expect(shop.tripsLeft).toBe(2);
-    for (let n = 0; n < 2; n++) {
-      type(shop, 'つり');
-      expect(shop.away?.id).toBe('fishing');
-      shop.returnFromTrip({});
-    }
-    expect(shop.tripsLeft).toBe(0);
-    expect(shop.targets().some((t) => t.data.kind === 'trip')).toBe(false);
-    type(shop, 'つり');
-    expect(shop.away).toBeNull();
-    expect(shop.stats.trips).toBe(2);
-  });
-
-  it('通常営業では回数の制限がない', () => {
-    const shop = new Shop(new Rng(1));
-    expect(shop.tripsLeft).toBeNull();
-    for (let n = 0; n < 5; n++) { type(shop, 'つり'); shop.returnFromTrip({}); }
-    expect(shop.stats.trips).toBe(5);
-    expect(shop.targets().filter((t) => t.data.kind === 'trip')).toHaveLength(TRIPS.length);
-  });
-
-  it('むずかしいは開店時の在庫が少なめ', () => {
-    const normal = new Shop(new Rng(7), difficultyOf('hard'));
-    const daily = new Shop(new Rng(7), difficultyOf('hard'), rulesFor([CONDITIONS.tripLimit], 'hard'));
-    const sum = (s: Shop) => Object.values(s.stock).reduce((a, b) => a + b, 0);
-    expect(sum(daily)).toBeLessThan(sum(normal));
-    expect(Object.values(daily.stock).every((n) => n >= 1)).toBe(true);
   });
 });
 

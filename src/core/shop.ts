@@ -74,9 +74,6 @@ export class Shop {
 
   constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1], readonly rules: DayRules = NORMAL_RULES) {
     this.stock = startingStock(this.rng);
-    if (rules.startStockScale !== 1) {
-      for (const id of INGREDIENT_ORDER) this.stock[id] = Math.max(1, Math.round(this.stock[id] * rules.startStockScale));
-    }
     this.input = new CandidateInput(() => this.targets());
   }
 
@@ -106,18 +103,13 @@ export class Shop {
     return Math.max(0, this.comboMissAllowance - this.comboMistakes);
   }
 
-  /** あと何回調達に出られるか（制限のない日は null） */
-  get tripsLeft(): number | null {
-    return this.rules.tripLimit === null ? null : Math.max(0, this.rules.tripLimit - this.stats.trips);
-  }
-
   /** 今打てる候補：注文中の客と、調達の言葉（誰も出かけていないとき） */
   targets(): Target<TargetData>[] {
     const out: Target<TargetData>[] = [];
     this.seats.forEach((g, i) => {
       if (g && g.state === 'wait') out.push({ id: `seat:${i}`, kana: g.dish.kana, data: { kind: 'order', seat: i } });
     });
-    if (!this.away && this.tripsLeft !== 0) for (const t of TRIPS) out.push({ id: `trip:${t.id}`, kana: t.kana, data: { kind: 'trip', trip: t } });
+    if (!this.away) for (const t of TRIPS) out.push({ id: `trip:${t.id}`, kana: t.kana, data: { kind: 'trip', trip: t } });
     return out;
   }
 
@@ -196,7 +188,7 @@ export class Shop {
   }
 
   private startTrip(trip: Trip) {
-    if (this.away || this.tripsLeft === 0) return;
+    if (this.away) return;
     this.away = trip;
     this.stats.trips++;
     this.input.reset();

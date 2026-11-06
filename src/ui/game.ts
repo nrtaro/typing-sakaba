@@ -166,7 +166,7 @@ export class Game {
         ];
       case 'daily':
         return [
-          { text: 'ひらく', kana: 'ひらく', act: () => this.start() },
+          { text: 'はじめる', kana: 'はじめる', act: () => this.start() },
           { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'difficulty'; } },
         ];
       case 'result':

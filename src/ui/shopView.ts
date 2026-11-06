@@ -520,27 +520,9 @@ export class ShopView {
     }
   }
 
-  /** ひがわりのお題：上の帯の下に、調達の残り回数と「ノーミス」の印 */
+  /** ひがわりのお題：上の帯の下に「ノーミス」の印 */
   private drawRules(sc: Screen, shop: Shop) {
     const e = sc.ext;
-    const left = shop.tripsLeft;
-    if (left !== null && shop.rules.tripLimit !== null) {
-      const total = shop.rules.tripLimit;
-      const text = left > 0 ? `調達 あと${left}回` : '本日の調達は終わり';
-      const w = sc.W(text, 8) + 12 + (left > 0 ? total * 9 + 2 : 0);
-      const x = e.x0 + 6;
-      sc.panel(x, 28, w, 13, 'rgba(42,27,38,0.94)', left > 0 ? C.wood3 : C.red2);
-      sc.T(text, x + 6, 30, 8, left > 0 ? C.cream : '#ff8a7a');
-      // かごの絵：残っている分は明るく、使った分は暗く
-      if (left > 0) for (let k = 0; k < total; k++) {
-        const bx = x + sc.W(text, 8) + 10 + k * 9;
-        const on = k < left;
-        sc.PR(bx + 1, 31, 1, 3, on ? '#d8a458' : '#5a4630');
-        sc.PR(bx + 5, 31, 1, 3, on ? '#d8a458' : '#5a4630');
-        sc.PR(bx + 1, 31, 5, 1, on ? '#d8a458' : '#5a4630');
-        sc.PR(bx, 34, 7, 4, on ? '#b07a3a' : '#3a2a1c');
-      }
-    }
     if (shop.rules.comboMissAllowance !== null) {
       // 割れた直後は赤く震え、ひびが入る。少しすると元に戻る
       const age = this.time - this.breakAt;
@@ -711,7 +693,7 @@ export class ShopView {
       const col = TRIP_COLOR[tr.id];
       const live = shop.input.active.find((l) => l.target.id === `trip:${tr.id}`);
       const isAway = shop.away?.id === tr.id;
-      const blocked = (!!shop.away && !isAway) || shop.tripsLeft === 0;
+      const blocked = !!shop.away && !isAway;
       const dim = blocked || (typing && !live);
       const lackHere = this.lackTrip?.id === tr.id && Math.floor(t * 6) % 2 === 0;
       const a = dim ? 0.55 : 1;
@@ -750,14 +732,6 @@ export class ShopView {
         sc.TB(`${tr.act}中…`, x + w / 2, y + 20, 11, C.gold3, 'center');
       }
     });
-    if (shop.tripsLeft === 0) {
-      const text = '本日の調達は終わり';
-      const w = sc.W(text, 11) + 24;
-      const cx = e.x0 + e.w / 2;
-      // 欄の上の境目に掛けて、素材の数を隠さない
-      sc.panel(cx - w / 2, 201, w, 17, 'rgba(26,14,10,0.96)', C.red2);
-      sc.TB(text, cx, 203, 11, '#ffb0a0', 'center', C.ink);
-    }
   }
 
   /** 食材アイコン：素材があれば画像、なければコードで描いた絵 */

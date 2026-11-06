@@ -11,7 +11,6 @@ export function guideFor(g: Game, shop: Shop): 'order' | 'supply' | null {
   if (shop.away || g.trip) return null;
   if (shop.stats.served === 0) return shop.seats.some((g) => g && g.state === 'wait') ? 'order' : null;
   const low = Object.values(shop.stock).some((n) => n <= 3);
-  if (shop.tripsLeft === 0) return null;
   return low || shop.stats.served >= 3 ? 'supply' : null;
 }
 
