@@ -543,17 +543,18 @@ export class ShopView {
     }
   }
 
-  /** ひがわりのお題：上の帯の下に、お題ごとの小さな印。ノーミスは右端 */
+  /** ひがわりのお題：上の帯の下、画面の左に、お題ごとの小さな札を縦に並べる */
   private drawRules(sc: Screen, shop: Shop) {
     const e = sc.ext;
     const r = shop.rules;
-    let x = e.x0 + 6;
-    const chip = (text: string, col: Color, edge: Color = C.wood3, extra = 0) => {
+    const x0 = e.x0 + 6;
+    let y = 28;
+    const chip = (text: string, col: Color, edge: Color = C.wood3, extra = 0, dx = 0, fill: Color = 'rgba(42,27,38,0.94)') => {
       const w = sc.W(text, 8) + 12 + extra;
-      sc.panel(x, 28, w, 13, 'rgba(42,27,38,0.94)', edge);
-      sc.T(text, x + 6, 30, 8, col);
-      const at = x + sc.W(text, 8) + 8;
-      x += w + 4;
+      sc.panel(x0 + dx, y, w, 13, fill, edge);
+      sc.T(text, x0 + dx + 6, y + 2, 8, col);
+      const at = { x: x0 + dx + sc.W(text, 8) + 8, y, w };
+      y += 15;
       return at;
     };
     if (r.storageCap !== null) chip(`倉庫は${r.storageCap}個まで`, C.cream);
@@ -565,23 +566,20 @@ export class ShopView {
       const left = r.spillEvery - shop.missSinceSpill;
       const hot = this.time - this.spillAt < 0.8;
       const at = chip('こぼすまで', hot ? '#ff8a7a' : C.cream, hot ? '#ff5a4a' : C.wood3, r.spillEvery * 6);
-      for (let k = 0; k < r.spillEvery; k++) sc.PR(at + 2 + k * 6, 32, 4, 4, k < left ? C.teal3 : '#5a1018');
+      for (let k = 0; k < r.spillEvery; k++) sc.PR(at.x + 2 + k * 6, at.y + 4, 4, 4, k < left ? C.teal3 : '#5a1018');
     }
-    if (shop.rules.comboMissAllowance !== null) {
+    if (r.refillChance > 0) chip('おかわり注文あり', C.cream);
+    if (r.comboMissAllowance !== null) {
       // 割れた直後は赤く震え、ひびが入る。少しすると元に戻る
       const age = this.time - this.breakAt;
       const broken = age < 1.2;
       const shake = broken && age < 0.4 ? Math.sin(age * 80) * 1.5 * (1 - age / 0.4) : 0;
-      const text = 'ノーミス';
-      const w = sc.W(text, 8) + 12;
-      const x = e.x1 - 6 - w + shake;
-      sc.panel(x, 28, w, 13, broken ? '#5a1018' : 'rgba(42,27,38,0.94)', broken ? '#ff5a4a' : C.teal3);
-      sc.T(text, x + w / 2, 30, 8, broken ? '#ff8a7a' : C.teal3, 'center');
+      const at = chip('ノーミス', broken ? '#ff8a7a' : C.teal3, broken ? '#ff5a4a' : C.teal3, 0, shake, broken ? '#5a1018' : 'rgba(42,27,38,0.94)');
       if (broken) {
         const a = Math.min(1, (1.2 - age) * 2);
-        // ひび：斜めに走る線
-        for (let k = 0; k < 6; k++) sc.PR(x + w / 2 - 3 + k * 1.2, 28 + k * 2.2, 1, 2.4, C.w, a);
-        sc.TB('コンボが切れた', e.x1 - 6, 43 + Math.min(age, 0.3) * 6, 8, '#ff8a7a', 'right', C.ink, a);
+        // ひび：斜めに走る線と、札の右に「コンボが切れた」
+        for (let k = 0; k < 6; k++) sc.PR(x0 + shake + at.w / 2 - 3 + k * 1.2, at.y + k * 2.2, 1, 2.4, C.w, a);
+        sc.TB('コンボが切れた', x0 + at.w + 4 + Math.min(age, 0.3) * 6, at.y + 2, 8, '#ff8a7a', 'left', C.ink, a);
       }
     }
   }
