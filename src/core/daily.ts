@@ -24,14 +24,32 @@ export interface DayRules {
   spillEvery: number | null;
   /** おかわり注文：もう1品たのむお客が来る割合 */
   refillChance: number;
+  /** 品切れ札：「しなぎれ」で作れない注文を断れる回数（0 は使えない） */
+  shinagire: number;
+  /** ひでんの：「ひでんの」で次の1皿を売上2倍にできる回数（0 は使えない） */
+  hiden: number;
+  /** 届くまで時間がかかる：調達から帰って素材が届くまでの秒数（0 はすぐ） */
+  deliveryDelay: number;
+  /** 素材が傷む：手に入れてから傷むまでの秒数（null は傷まない） */
+  spoilAfter: number | null;
+  /** 予約の宴会：来店する時刻（営業開始からの秒）と料理 */
+  banquets: { at: number; dish: string }[];
 }
 
 export const NORMAL_RULES: DayRules = {
   comboMissAllowance: null, angryPenaltyMult: 1, storageCap: null, awayWaitRate: 0,
   luckyTrips: null, luckyMult: 1, unluckyMult: 1, spillEvery: null, refillChance: 0,
+  shinagire: 0, hiden: 0, deliveryDelay: 0, spoilAfter: null, banquets: [],
 };
 
-export type ConditionId = 'noMiss' | 'smallStore' | 'busyAway' | 'luckyTrip' | 'spill' | 'refill';
+/** ひでんの・予約の宴会の売上の倍率 */
+export const HIDEN_MULT = 2;
+export const BANQUET_MULT = 2;
+/** 宴会のお客は、ふつうの何倍まで待ってくれるか／怒って帰ったときの減点は何倍か */
+export const BANQUET_WAIT_MULT = 2;
+export const BANQUET_PENALTY_MULT = 3;
+
+export type ConditionId = 'noMiss' | 'smallStore' | 'busyAway' | 'luckyTrip' | 'spill' | 'refill' | 'shinagire' | 'hiden' | 'delivery' | 'spoil' | 'banquet';
 
 export interface Condition {
   id: ConditionId;
@@ -52,6 +70,14 @@ const UNLUCKY_MULT: Record<DifficultyId, number> = { easy: 1, normal: 0.85, hard
 const SPILL_EVERY: Record<DifficultyId, number> = { easy: 3, normal: 2, hard: 1 };
 const REFILL_CHANCE: Record<DifficultyId, number> = { easy: 0.15, normal: 0.2, hard: 0.25 };
 export const LUCKY_MULT = 1.5;
+const SHINAGIRE: Record<DifficultyId, number> = { easy: 5, normal: 3, hard: 2 };
+const HIDEN: Record<DifficultyId, number> = { easy: 4, normal: 3, hard: 2 };
+const DELIVERY_DELAY: Record<DifficultyId, number> = { easy: 10, normal: 20, hard: 30 };
+const SPOIL_AFTER: Record<DifficultyId, number> = { easy: 90, normal: 75, hard: 60 };
+/** 宴会の時刻（営業開始からの秒）。朝0〜50・昼50〜110・夜110〜180 */
+const BANQUET_TIMES: Record<DifficultyId, number[]> = { easy: [120], normal: [90, 150], hard: [60, 110, 160] };
+/** 宴会の料理：素材をたくさん使う大皿と大鍋 */
+const BANQUET_DISHES = ['feast', 'banquet', 'everything', 'hunterStew', 'spicyPot', 'paella'];
 
 export const CONDITIONS: Record<ConditionId, Condition> = {
   smallStore: {
@@ -121,7 +147,59 @@ export const CONDITIONS: Record<ConditionId, Condition> = {
     lines: () => ['ときどき、もう1品たのむお客が来る', '2品目は待たせても怒らない'],
     apply: (r, d) => { r.refillChance = REFILL_CHANCE[d]; },
   },
+  shinagire: {
+    id: 'shinagire',
+    kind: 'minor',
+    name: '品切れ札',
+    title: () => '品切れ札',
+    lines: (d) => ['「しなぎれ」と打つと、作れない注文を断れる', `1日${SHINAGIRE[d]}回まで。断っても怒られない`],
+    apply: (r, d) => { r.shinagire = SHINAGIRE[d]; },
+  },
+  hiden: {
+    id: 'hiden',
+    kind: 'minor',
+    name: 'ひでんの',
+    title: () => 'ひでんの',
+    lines: (d) => [`「ひでんの」と打つと、次の1皿が売上${HIDEN_MULT}倍`, `1日${HIDEN[d]}回まで。ここぞで使おう`],
+    apply: (r, d) => { r.hiden = HIDEN[d]; },
+  },
+  delivery: {
+    id: 'delivery',
+    kind: 'major',
+    name: '届くまで時間がかかる',
+    title: () => '届くまで時間がかかる',
+    lines: (d) => [`調達した素材が届くまで${DELIVERY_DELAY[d]}秒かかる`, '足りなくなる前に、早めに取りに行こう'],
+    apply: (r, d) => { r.deliveryDelay = DELIVERY_DELAY[d]; },
+  },
+  spoil: {
+    id: 'spoil',
+    kind: 'major',
+    name: '素材が傷む',
+    title: () => '素材が傷む',
+    lines: (d) => [`手に入れた素材は${SPOIL_AFTER[d]}秒で傷む`, '古いものから使われる。ためこみすぎに注意'],
+    apply: (r, d) => { r.spoilAfter = SPOIL_AFTER[d]; },
+  },
+  banquet: {
+    id: 'banquet',
+    kind: 'major',
+    name: '予約の宴会',
+    title: () => '予約の宴会',
+    lines: () => ['決まった時刻に、宴会の大口注文が入る', `時刻と料理は先に分かる。売上${BANQUET_MULT}倍`],
+    apply: (r, d, date) => { r.banquets = banquetPlan(date, d); },
+  },
 };
+
+/** 宴会の予定：時刻は難易度で決まり、料理は日付で決まる（同じ日に同じ料理は続けない） */
+export function banquetPlan(date: string, d: DifficultyId): { at: number; dish: string }[] {
+  let h = hash(`banquet:${date}`);
+  const out: { at: number; dish: string }[] = [];
+  for (const at of BANQUET_TIMES[d]) {
+    const pool = BANQUET_DISHES.filter((id) => !out.some((b) => b.dish === id));
+    out.push({ at, dish: pool[h % pool.length] });
+    h = Math.floor(h / pool.length) + 13;
+  }
+  return out;
+}
 
 /**
  * 一緒に出さない組み合わせ。
@@ -130,6 +208,8 @@ export const CONDITIONS: Record<ConditionId, Condition> = {
  */
 export const DISALLOWED_PAIRS: [ConditionId, ConditionId][] = [
   ['noMiss', 'spill'],
+  // 素材が傷む＋届くまで時間がかかる：届いたころには傷みかけで、取りに行く意味が薄れる（どちらも大なので今は同じ日に出ない）
+  ['spoil', 'delivery'],
 ];
 
 /** 日本時間の日付（YYYY-MM-DD） */

@@ -39,14 +39,14 @@ describe('ひがわり：お題の決まり方', () => {
 
   it('大きいお題と小さいお題が1つずつ出て、除外の組み合わせは出ない', () => {
     const seen = new Set<string>();
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 1500; i++) {
       const [a, b] = dailyConditions(day(i));
       expect([a.kind, b.kind]).toEqual(['major', 'minor']);
       expect(isBanned(a.id, b.id)).toBe(false);
       seen.add(`${a.id}+${b.id}`);
     }
-    // 大3つ×小3つ＝9通りすべてが、いずれかの日に出る
-    expect(seen.size).toBe(9);
+    // 大6つ×小5つ＝30通りすべてが、いずれかの日に出る
+    expect(seen.size).toBe(30);
   });
 
   it('難易度で強さが変わる', () => {
@@ -219,6 +219,158 @@ describe('ひがわり：おかわり注文', () => {
     const r = count(rulesFor([CONDITIONS.refill], 'hard'));
     expect(r.extra).toBeGreaterThan(0);
     expect(r.extra).toBeLessThan(r.all / 2);
+  });
+});
+
+const wait = (d: string, w = 20, extra: object = {}) => ({ id: Math.floor(Math.random() * 1e6), dish: dish(d), look: 0, wait: w, maxWait: 26, state: 'wait' as const, t: 0, lack: 0, ...extra });
+
+describe('ひがわり：品切れ札', () => {
+  it('作れない注文があるときだけ打てて、一番待たせている客を怒らせずに断る', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rulesFor([CONDITIONS.shinagire], 'normal'));
+    shop.seats[0] = wait('ale');
+    expect(shop.canUseSkill('shinagire')).toBe(false);
+    shop.stock.fish = 0;
+    shop.seats[1] = wait('grilledFish', 18);
+    shop.seats[2] = wait('driedFish', 9);
+    shop.combo = 5;
+    expect(shop.declineSeat()).toBe(2);
+    type(shop, 'しなぎれ');
+    expect(shop.seats[2]).toBeNull();
+    expect(shop.seats[1]).not.toBeNull();
+    expect(shop.combo).toBe(5);
+    expect(shop.stats.angry).toBe(0);
+    expect(shop.skillLeft('shinagire')).toBe(2);
+    expect(shop.drainEvents().some((e) => e.type === 'decline')).toBe(true);
+  });
+
+  it('回数を使い切ると打てない。宴会のお客は断れない', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('hard'), rulesFor([CONDITIONS.shinagire], 'hard'));
+    shop.stock.fish = 0;
+    shop.seats[0] = wait('grilledFish', 10, { banquet: true });
+    expect(shop.declineSeat()).toBeNull();
+    shop.seats[1] = wait('grilledFish', 12);
+    type(shop, 'しなぎれ');
+    shop.seats[1] = wait('grilledFish', 12);
+    type(shop, 'しなぎれ');
+    shop.seats[1] = wait('grilledFish', 12);
+    expect(shop.skillLeft('shinagire')).toBe(0);
+    expect(shop.targets().some((t) => t.id === 'skill:shinagire')).toBe(false);
+  });
+
+  it('「しいれ」と最初の音が同じでも、どちらも打てる', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rulesFor([CONDITIONS.shinagire], 'normal'));
+    shop.stock.fish = 0;
+    shop.seats[0] = wait('grilledFish', 10);
+    type(shop, 'しいれ');
+    expect(shop.away?.id).toBe('trading');
+    shop.returnFromTrip({});
+    type(shop, 'しなぎれ');
+    expect(shop.seats[0]).toBeNull();
+  });
+});
+
+describe('ひがわり：ひでんの', () => {
+  it('打つと構え、次に出す1皿だけ売上が2倍になる', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rulesFor([CONDITIONS.hiden], 'normal'));
+    shop.stock.ale = 9;
+    type(shop, 'ひでんの');
+    expect(shop.hidenArmed).toBe(true);
+    expect(shop.canUseSkill('hiden')).toBe(false);
+    shop.seats[0] = wait('ale', 26);
+    type(shop, 'えーる');
+    const first = shop.drainEvents().find((e) => e.type === 'serve');
+    shop.seats[1] = wait('ale', 26);
+    type(shop, 'えーる');
+    const second = shop.drainEvents().find((e) => e.type === 'serve');
+    expect(first).toMatchObject({ hiden: true });
+    expect(second).toMatchObject({ hiden: false });
+    expect(first!.type === 'serve' && second!.type === 'serve' && first!.gain).toBe(2 * (second as { gain: number }).gain);
+    expect(shop.skillLeft('hiden')).toBe(2);
+  });
+
+  it('「ひものやき」と最初の音が同じでも、どちらも打てる', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rulesFor([CONDITIONS.hiden], 'normal'));
+    shop.stock.fish = 9;
+    shop.seats[0] = wait('driedFish', 26);
+    type(shop, 'ひものやき');
+    expect(shop.seats[0]!.state).toBe('eat');
+    expect(shop.hidenArmed).toBe(false);
+    type(shop, 'ひでんの');
+    expect(shop.hidenArmed).toBe(true);
+    expect(shop.stats.missKeys).toBe(0);
+  });
+});
+
+describe('ひがわり：届くまで時間がかかる', () => {
+  it('帰ってきてから決まった秒数のあとに素材が届く', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rulesFor([CONDITIONS.delivery], 'normal'));
+    const fish = shop.stock.fish;
+    type(shop, 'つり');
+    shop.returnFromTrip({ fish: 6 });
+    expect(shop.stock.fish).toBe(fish);
+    expect(shop.pendingFor('fish')).toMatchObject({ n: 6 });
+    expect(shop.drainEvents().find((e) => e.type === 'tripEnd')).toMatchObject({ delayed: true });
+    for (let i = 0; i < 19 * 10; i++) shop.update(0.1);
+    expect(shop.stock.fish).toBe(fish);
+    for (let i = 0; i < 12; i++) shop.update(0.1);
+    expect(shop.stock.fish).toBe(fish + 6);
+    expect(shop.pendingFor('fish')).toBeNull();
+    expect(shop.drainEvents().some((e) => e.type === 'delivery')).toBe(true);
+  });
+});
+
+describe('ひがわり：素材が傷む', () => {
+  it('手に入れてから決まった秒数で傷み、使うときは古いものから使う', () => {
+    const shop = new Shop(new Rng(1), difficultyOf('hard'), rulesFor([CONDITIONS.spoil], 'hard'));
+    const start = shop.stock.ale;
+    shop.update(30);
+    type(shop, 'しいれ');
+    shop.returnFromTrip({ ale: 5, spice: 0 });
+    expect(shop.stock.ale).toBe(start + 5);
+    // 開店時の分から1つ使う
+    shop.seats[0] = wait('ale', 26);
+    type(shop, 'えーる');
+    expect(shop.spoilsIn('ale')).toBeCloseTo(30);
+    shop.update(31);
+    expect(shop.stock.ale).toBe(5);
+    expect(shop.drainEvents().find((e) => e.type === 'spoil' && e.ing === 'ale')).toMatchObject({ n: start - 1 });
+    shop.update(30);
+    expect(shop.stock.ale).toBe(0);
+  });
+});
+
+describe('ひがわり：予約の宴会', () => {
+  it('決まった時刻に宴会のお客が列の先頭に来て、売上は2倍、怒ると減点も大きい', () => {
+    const rules = rulesFor([CONDITIONS.banquet], 'normal', '2026-11-08');
+    expect(rules.banquets.map((b) => b.at)).toEqual([90, 150]);
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rules);
+    for (let i = 0; i < 90 * 10 + 1; i++) {
+      shop.update(0.1);
+      if (shop.queue[0]?.banquet) break;
+    }
+    const b = shop.queue[0];
+    expect(b.banquet).toBe(true);
+    expect(b.dish.id).toBe(rules.banquets[0].dish);
+    expect(shop.drainEvents().some((e) => e.type === 'banquet')).toBe(true);
+
+    // 売上2倍
+    const plain = new Shop(new Rng(1), difficultyOf('normal'));
+    for (const s of [shop, plain]) {
+      for (const id of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[id] = 9;
+      s.combo = 0;
+      s.seats[7] = wait('feast', 26, s === shop ? { banquet: true } : {});
+      s.drainEvents();
+      type(s, 'ふるこーすりょうり');
+    }
+    const g1 = shop.drainEvents().find((e) => e.type === 'serve') as { gain: number };
+    const g2 = plain.drainEvents().find((e) => e.type === 'serve') as { gain: number };
+    expect(g1.gain).toBe(g2.gain * 2);
+
+    // 怒ると減点3倍
+    shop.score = 1000;
+    shop.seats[6] = wait('feast', 0.01, { banquet: true });
+    shop.update(0.05);
+    expect(shop.score).toBe(1000 - SHOP.angryPenalty * 3);
   });
 });
 

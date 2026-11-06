@@ -6,14 +6,14 @@ import { C, TRIP_COLOR, type Color } from './palette';
 import { Screen, LW } from './screen';
 import { FAM, guestSprite, ICON, PORTRAIT, WALKERS } from './sprites';
 import { drawChair, drawLights, drawRoomLive, drawTable, pen, roomLayer, shadow } from './room';
-import { Shop, type Guest, type ShopEvent } from '../core/shop';
+import { SKILL_KANA, Shop, type Guest, type ShopEvent, type SkillId } from '../core/shop';
 import type { Art } from './amber/art';
 import { animLength, walkFrame } from './amber/manifest';
 import { entryPose, WALK_SPEED, SERVER_WALK_SPEED, serverWalkSpeed } from '../core/tavernNavigation';
 import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/layout';
 import { RomajiMatcher } from '../core/romaji';
 import {
-  DAY_LENGTH, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
+  DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
 } from '../core/shopConfig';
 
 /** 席の位置（斜め上視点：2列×4席）。ty はテーブルの高さ */
@@ -80,6 +80,8 @@ export class ShopView {
   breakAt = -10;
   /** ミスで素材をこぼした時刻 */
   spillAt = -10;
+  /** 品切れ札・ひでんのの札の位置（打ったときの火花を出す場所） */
+  skillPos: Record<SkillId, { x: number; y: number }> = { shinagire: { x: 40, y: 34 }, hiden: { x: 40, y: 34 } };
   gotTrip: { id: TripId; t: number; gains: Partial<Record<IngredientId, number>>; overflow: Partial<Record<IngredientId, number>>; lucky: boolean } | null = null;
   /** 出かけている／帰ってきた家族のひとこと */
   banner: { text: string; t: number; col: Color } | null = null;
@@ -134,6 +136,11 @@ export class ShopView {
           this.sparkAt({ x: seat.x, y: y + 28 }, C.gold3, Math.floor(fx.particles / 2), fx.spread * 0.8, bounds);
           this.pop('combo', { x: seat.x, y, t: 0, text: `${ev.combo} COMBO`, col, count: ev.combo });
         }
+        if (ev.hiden || ev.banquet) {
+          const label = ev.hiden && ev.banquet ? '秘伝×宴会 4倍！' : ev.hiden ? '秘伝の味 2倍！' : '宴会 2倍！';
+          this.pop(`bonus${ev.seat}`, { x: seat.x, y: seat.ty - 40, t: 0, text: label, col: '#ffe27a', big: true });
+          this.sparkAt({ x: seat.x, y: seat.ty - 30 }, '#ffe27a', 16, 90);
+        }
         this.stirUntil = this.time + 2.4;
         this.fxs.push({ anim: 'きらめき', x: seat.x, y: seat.ty - 8, h: 22, start: this.time });
         this.pop('income', { x: seat.x, y: seat.ty - 18, t: 0, text: `+${ev.gain}円`, col: C.gold, big: true });
@@ -166,6 +173,10 @@ export class ShopView {
         this.banner = { text: `${FAMILY_NAME[ev.trip.who]}「${ev.trip.act}に行ってくる！」`, t: 1.6, col: C.w };
         break;
       case 'tripEnd':
+        if (ev.delayed) {
+          this.banner = { text: `${FAMILY_NAME[ev.trip.who]}「あとで届くよ！」`, t: 1.6, col: C.gold3 };
+          break;
+        }
         this.banner = ev.lucky
           ? { text: `${FAMILY_NAME[ev.trip.who]}「大当たり！たくさん取れたよ」`, t: 1.8, col: C.gold3 }
           : Object.keys(ev.overflow).length
@@ -179,6 +190,28 @@ export class ShopView {
         this.banner = { text: `― ${PHASES[ev.index].name}の部 ―${lucky ? `　当たりは「${name}」` : ''}`, t: lucky ? 2.2 : 1.6, col: C.gold3 };
         break;
       }
+      case 'delivery':
+        this.banner = Object.keys(ev.overflow).length
+          ? { text: `${TRIPS.find((tr) => tr.id === ev.trip.id)!.act}の素材が届いた（倉庫に入りきらない…）`, t: 1.8, col: '#ff9a8a' }
+          : { text: `${TRIPS.find((tr) => tr.id === ev.trip.id)!.act}の素材が届いた！`, t: 1.6, col: C.gold3 };
+        this.gotTrip = { id: ev.trip.id, t: 1.6, gains: ev.gains, overflow: ev.overflow, lucky: false };
+        break;
+      case 'spoil':
+        this.pop('spoil', { x: LW / 2, y: 182, t: 0, text: `${INGREDIENT_NAME[ev.ing]}が${ev.n}つ傷んだ…`, col: '#b8d870', big: true });
+        break;
+      case 'decline': {
+        const ds = SEATS[ev.seat];
+        this.pop(`refill${ev.seat}`, { x: ds.x, y: ds.ty - 22, t: 0, text: '品切れです、ごめんね', col: C.cream });
+        this.sparkAt(this.skillPos.shinagire, C.cream, 6);
+        break;
+      }
+      case 'hiden':
+        this.banner = { text: '秘伝の味、仕込んだ！ 次の1皿が売上2倍', t: 1.6, col: '#ffe27a' };
+        this.sparkAt(this.skillPos.hiden, '#ffe27a', 14, 70);
+        break;
+      case 'banquet':
+        this.banner = { text: `予約の宴会のお客が来た！「${ev.dish.text}」`, t: 2.2, col: '#ffe27a' };
+        break;
       case 'spill':
         this.pop('spill', { x: LW / 2, y: 192, t: 0, text: `${INGREDIENT_NAME[ev.ing]}をこぼした！ −1`, col: '#ff8a7a', big: true });
         this.spillAt = this.time;
@@ -213,6 +246,7 @@ export class ShopView {
       const s = SEATS[Number(id.slice(5))];
       return { x: s.x, y: s.ty - 52 };
     }
+    if (id.startsWith('skill:')) return this.skillPos[id.slice(6) as SkillId];
     const i = TRIPS.findIndex((t) => `trip:${t.id}` === id);
     return { x: 60 + i * 118, y: 222 };
   }
@@ -569,6 +603,42 @@ export class ShopView {
       for (let k = 0; k < r.spillEvery; k++) sc.PR(at.x + 2 + k * 6, at.y + 4, 4, 4, k < left ? C.teal3 : '#5a1018');
     }
     if (r.refillChance > 0) chip('おかわり注文あり', C.cream);
+    if (r.deliveryDelay > 0) chip(`素材が届くまで${r.deliveryDelay}秒`, '#ffc9a0');
+    if (r.spoilAfter !== null) chip(`素材は${r.spoilAfter}秒で傷む`, '#c8e08a');
+    if (r.banquets.length) {
+      // 次の宴会：時刻と料理と素材（来店中なら、そう出す）
+      const here = [...shop.seats, ...shop.queue].some((g) => g?.banquet && g.state !== 'eat');
+      const next = shop.banquetsLeft[0];
+      if (here) chip('宴会のお客が来店中！ 売上2倍', '#ffe27a', C.gold3);
+      else if (next) {
+        const dish = DISHES.find((d) => d.id === next.dish)!;
+        const left = Math.max(0, next.at - shop.clock);
+        const ids = Object.keys(dish.need) as IngredientId[];
+        const text = `宴会まで ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}「${dish.text}」`;
+        const at = chip(text, left < 15 ? '#ffe27a' : C.cream, left < 15 ? C.gold3 : C.wood3, ids.length * 11);
+        ids.forEach((id, k) => this.icon(sc, id, at.x + 2 + k * 11, at.y + 1.5, 10));
+      }
+    }
+    // 品切れ札・ひでんの：打つ言葉の札。今使えないときは暗く、ひでんのを構えたら光る
+    for (const skill of ['shinagire', 'hiden'] as const) {
+      if (r[skill] <= 0) continue;
+      const leftN = shop.skillLeft(skill);
+      if (skill === 'hiden' && shop.hidenArmed) {
+        const at = chip('秘伝の味：次の1皿が売上2倍！', '#ffe27a', C.gold3);
+        sc.glow(x0, at.y, at.w, 13, C.gold3, 0.4 + 0.3 * Math.sin(this.time * 6));
+        this.skillPos[skill] = { x: x0 + at.w / 2, y: at.y + 6 };
+        continue;
+      }
+      const usable = shop.canUseSkill(skill);
+      const live = shop.input.active.find((l) => l.target.id === `skill:${skill}`);
+      const m = live?.matcher ?? new RomajiMatcher(SKILL_KANA[skill]);
+      const label = `${skill === 'shinagire' ? '品切れ札' : 'ひでんの'} ×${leftN}`;
+      const rw = sc.W(m.typed + m.remaining, 7) + 4;
+      const at = chip(label, usable ? C.cream : C.gray, live ? C.gold : usable ? C.gold2 : C.wood3, rw + 4);
+      if (live) sc.glow(x0, at.y, at.w, 13, C.gold);
+      sc.roma(m.typed, m.remaining, at.x + 4 + rw / 2, at.y + 3, 7, live ? 'active' : usable ? 'idle' : 'dim');
+      this.skillPos[skill] = { x: x0 + at.w / 2, y: at.y + 6 };
+    }
     if (r.comboMissAllowance !== null) {
       // 割れた直後は赤く震え、ひびが入る。少しすると元に戻る
       const age = this.time - this.breakAt;
@@ -657,6 +727,17 @@ export class ShopView {
     sc.PR(x + 4, y + bh - 3, bw - 8, 2, C.ink, a);
     sc.PR(x + 4, y + bh - 3, (bw - 8) * p, 2, p > 0.5 ? C.green : p > 0.25 ? C.gold : C.red, a);
     if (first) sc.TB('▼先に出す', cx, y - 10, 8, C.gold3, 'center');
+    if (gst.banquet) {
+      // 宴会の札：金の縁と「予約の宴会」の帯
+      sc.glow(x, y, bw, bh, '#ffe27a', 0.35 + 0.2 * Math.sin(this.time * 4));
+      const tag = '予約の宴会 2倍';
+      const tw2 = sc.W(tag, 7) + 8;
+      sc.panel(x + bw / 2 - tw2 / 2, y + bh - 1, tw2, 10, '#7a4a10', C.gold3, a);
+      sc.T(tag, x + bw / 2, y + bh + 0.5, 7, '#fff0b0', 'center', a);
+    } else if (shop.canUseSkill('shinagire') && shop.declineSeat() === i && !typing) {
+      sc.panel(x + 1, y + bh - 1, sc.W('しなぎれで断れる', 6) + 6, 9, '#3a1418', '#c06060');
+      sc.T('しなぎれで断れる', x + 4, y + bh + 0.5, 6, '#ffb0a0', 'left');
+    }
     if (gst.extra) this.drawExtraTag(sc, gst.extra, x + bw, first || (big && shop.combo >= 2) ? y - 22 : y - 9, dim);
     if (gst.refill && !typing && !first) sc.TB('おかわり', x + 2, y - 9, 8, C.gold3, 'left', C.ink);
     // 打っている札の上にコンボを付ける（目線を動かさずに見えるように）
@@ -775,6 +856,15 @@ export class ShopView {
         }
         this.icon(sc, ing, ex - 1 + shake, ey - 1, 24, dim ? 0.5 : n === 0 ? 0.55 : 1);
         sc.TB(`×${n}`, ex + 24, ey + 4, 13, low ? '#ff7a6a' : C.w, 'left', C.ink, dim ? 0.5 : 1);
+        // 届くまで時間がかかる：届く途中の量。素材が傷む：一番古い分が傷むまでの秒数
+        const coming = shop.pendingFor(ing);
+        const rots = n > 0 ? shop.spoilsIn(ing) : null;
+        // 素材の絵の真下に小さく出す（隣の素材の欄にはみ出さない）
+        if (coming) sc.TB(`+${coming.n} ${Math.ceil(coming.in)}秒後`, ex + 11, ey + 22.5, 6.5, '#ffd9a0', 'center', C.ink, dim ? 0.5 : 1);
+        else if (rots !== null && rots <= 12) {
+          const blink = rots < 5 && Math.floor(t * 4) % 2 === 0;
+          sc.TB(`傷む${Math.ceil(rots)}秒`, ex + 11, ey + 22.5, 6.5, blink ? C.w : '#c8e08a', 'center', C.ink, dim ? 0.5 : 1);
+        }
         // 狭い倉庫：上限まで入っていたら「満」
         if (shop.rules.storageCap !== null && n >= shop.rules.storageCap) {
           const mx = ex + 26 + sc.W(`×${n}`, 13);

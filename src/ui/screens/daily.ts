@@ -2,7 +2,7 @@
 import { C } from '../palette';
 import { LW } from '../screen';
 import { dateLabel, rulesFor } from '../../core/daily';
-import { PHASES, TRIPS, difficultyOf } from '../../core/shopConfig';
+import { DAY_LENGTH, DISHES, PHASES, TRIPS, difficultyOf } from '../../core/shopConfig';
 import type { Game } from '../game';
 import { button, drawSignboard } from './common';
 import { drawCondIcon } from './conditions';
@@ -40,6 +40,15 @@ export function drawDaily(g: Game) {
         const plan = rulesFor([c], diff.id, daily.date).luckyTrips ?? [];
         const text = plan.map((id, k) => `${PHASES[k].name} ${TRIPS.find((t) => t.id === id)!.text}`).join(' → ');
         sc.T(text, x + 62, y + 44, sc.fitSize(text, 8, w - 70), '#ffe7a0');
+      }
+      // 予約の宴会：来る時刻（残り時間で）と料理を先に見せる
+      if (c.id === 'banquet') {
+        const plan = rulesFor([c], diff.id, daily.date).banquets;
+        const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+        plan.forEach((b, k) => {
+          const text = `残り${fmt(DAY_LENGTH - b.at)}に「${DISHES.find((d) => d.id === b.dish)!.text}」`;
+          sc.T(text, x + 62, y + 41 + k * 8, sc.fitSize(text, 7, w - 70), '#ffe7a0');
+        });
       }
     });
     // 今日の自分のベスト

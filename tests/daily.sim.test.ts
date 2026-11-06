@@ -45,10 +45,11 @@ describe('ひがわりのバランス', () => {
     }
     console.log(_n);
     console.table(rows);
-    // どの組み合わせも、通常営業から極端に外れない（売上が4割を切る・1.5倍を超える日は作らない）
+    // どの組み合わせも、通常営業から極端に外れない（売上が4割を切る・1.7倍を超える日は作らない）。
+    // 予約の宴会＋おかわり注文の やさしい は、お客の少なさを埋める「ごほうびの日」になる
     for (const r of ratios) {
       expect(r).toBeGreaterThan(40);
-      expect(r).toBeLessThan(150);
+      expect(r).toBeLessThan(170);
     }
-  }, 120000);
+  }, 400000);
 });

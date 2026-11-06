@@ -59,11 +59,19 @@ export function playDay(seed: number, kps: number, missRate = 0.04, diffId: Diff
         const makeable = waiting.filter((x) => shop.canMake(x.g!.dish).length === 0).sort((a, b) => a.g!.wait - b.g!.wait);
         const blocked = waiting.filter((x) => shop.canMake(x.g!.dish).length > 0).sort((a, b) => a.g!.wait - b.g!.wait);
         let want: string | null = null;
-        if (blocked.length && (blocked[0].g!.wait / blocked[0].g!.maxWait < 0.6 || makeable.length === 0)) want = `trip:${SOURCE[shop.canMake(blocked[0].g!.dish)[0]]}`;
-        else if (makeable.length) want = `seat:${makeable[0].i}`;
+        const tripFor = (id: string) => (shop.away ? null : `trip:${id}`);
+        // お題で増える言葉：作れない注文が怒りそうなら品切れ札、高い料理を出す前にひでんの
+        if (blocked.length && shop.canUseSkill('shinagire') && blocked[0].g!.wait / blocked[0].g!.maxWait < 0.25) want = 'skill:shinagire';
+        else if (makeable.length && makeable[0].g!.dish.price >= 230 && shop.canUseSkill('hiden')) want = 'skill:hiden';
+        else if (blocked.length && (blocked[0].g!.wait / blocked[0].g!.maxWait < 0.6 || makeable.length === 0)) {
+          // 届くのを待っている素材は、もう一度取りに行かない
+          const need = shop.canMake(blocked[0].g!.dish)[0];
+          want = shop.pendingFor(need) ? (makeable.length ? `seat:${makeable[0].i}` : null) : tripFor(SOURCE[need]);
+        } else if (makeable.length) want = `seat:${makeable[0].i}`;
         else {
-          const low = (Object.keys(shop.stock) as (keyof typeof shop.stock)[]).sort((a, b) => shop.stock[a] - shop.stock[b])[0];
-          if (shop.stock[low] <= 1) want = `trip:${SOURCE[low]}`;
+          // 届くまで時間がかかる日は、早めに取りに行く
+          const low = (Object.keys(shop.stock) as (keyof typeof shop.stock)[]).filter((id) => !shop.pendingFor(id)).sort((a, b) => shop.stock[a] - shop.stock[b])[0];
+          if (low && shop.stock[low] <= (shop.rules.deliveryDelay ? 3 : 1)) want = tripFor(SOURCE[low]);
         }
         if (want) {
           k = nextKey(shop.input, shop.targets(), (id) => id === want);

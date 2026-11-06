@@ -448,6 +448,11 @@ export class Game {
         case 'lack': this.sound.lack(); break;
         case 'angry': this.sound.angry(); break;
         case 'spill': this.sound.loss(); break;
+        case 'spoil': this.sound.loss(); break;
+        case 'decline': this.sound.select(); break;
+        case 'hiden': this.sound.sparkle(); break;
+        case 'delivery': this.sound.tripReturn(); break;
+        case 'banquet': this.sound.bell(); break;
         case 'refill': this.sound.select(); break;
         case 'tripStart':
           this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
