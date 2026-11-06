@@ -1,5 +1,6 @@
 import '@fontsource/dotgothic16/400.css';
 import { Game } from './ui/game';
+import { isTouchOnly, showDeviceNotice } from './ui/deviceNotice';
 
 performance.mark('game:boot');
 
@@ -18,6 +19,8 @@ performance.mark('game:fonts-ready');
 loading.remove();
 canvas.style.visibility = 'visible';
 canvas.focus();
+// スマホ・タブレットでは遊べないので、読める大きさで案内する
+if (isTouchOnly()) showDeviceNotice();
 
 // 動作確認用（開発時のみ）
 if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;

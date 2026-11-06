@@ -38,6 +38,8 @@ function splitHot(line: string): [string, boolean][] {
 
 /** 「キーボードで打ってね」を出しておく秒数 */
 const CLICK_HINT = 2.4;
+/** 「日本語入力をオフに」を出しておく秒数 */
+const IME_HINT = 3;
 
 /** 時間帯ごとの曲 */
 const PHASE_TRACK = ['morning', 'noon', 'night'] as const;
@@ -94,6 +96,8 @@ export class Game {
   private lastInput = 0;
   /** メニューでクリックされた時刻（「キーボードで打ってね」を出す） */
   private clickHintAt = -10;
+  /** 日本語入力のまま打たれた時刻（「日本語入力をオフに」を出す） */
+  private imeHintAt = -10;
   /** 遊び方のページ（0=基本、1=調達のしかた） */
   helpPage = 0;
   /** 結果画面の演出の開始時刻と、鳴らした音の記録 */
@@ -247,7 +251,11 @@ export class Game {
     this.sound.unlock();
     this.lastInput = this.t;
     this.clickHintAt = -10;
-    if (e.isComposing || e.key === 'Process') return;
+    // 日本語入力がオンのまま打つと、文字が届かない。黙って無視せず、オフにするよう知らせる
+    if (e.isComposing || e.key === 'Process' || (e.key.length === 1 && /[^ -]/.test(e.key))) {
+      if (this.artState !== 'loading') this.imeHintAt = this.t;
+      return;
+    }
     if (this.artState === 'loading') return;
     const k = e.key;
     if (k === 'Escape' && this.mode === 'play') {
@@ -567,6 +575,7 @@ export class Game {
       }
       if (this.paused) this.drawMenuScreen('一時停止中', '');
       if (this.paused) this.drawClickHint();
+      this.drawImeHint();
       this.drawVolume();
       return;
     }
@@ -604,6 +613,7 @@ export class Game {
     if (this.mode !== 'result' || this.t - this.resultAt > RESULT_READY - 0.3) this.drawMenu(this.mode === 'help' ? 210 : this.mode === 'result' ? 200 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);
     this.drawClickHint();
+    this.drawImeHint();
     this.drawVolume();
   }
 
@@ -763,6 +773,30 @@ export class Game {
   }
 
   /** メニューでクリックされたとき：画面の中央下に「キーボードで打ってね」 */
+  /** 日本語入力がオンのとき：画面の中央に、オフにする方法をはっきり出す（遊んでいる最中も出す） */
+  private drawImeHint() {
+    const age = this.t - this.imeHintAt;
+    if (age >= IME_HINT) return;
+    const sc = this.sc;
+    const a = Math.min(1, age * 8, (IME_HINT - age) * 2);
+    const bob = Math.sin(age * 12) * Math.max(0, 1 - age * 2.5) * 3;
+    const title = '日本語入力がオンになっています';
+    const sub = 'キーボードの「半角/全角」キーで、半角英数にしてください';
+    const w = Math.max(sc.W(title, 12), sc.W(sub, 9)) + 56;
+    const x = LW / 2 - w / 2;
+    const y = 110 + bob;
+    sc.PR(x + 2, y + 3, w, 40, '#0c0604', 0.55 * a);
+    sc.panel(x, y, w, 40, '#fff3d6', '#d9534f', a);
+    // 「あ」→「A」の切り替えの絵
+    sc.panel(x + 9, y + 9, 14, 14, '#f1dcae', '#8a6232', a);
+    sc.T('あ', x + 16, y + 11, 9, '#a8363f', 'center', a);
+    sc.T('▶', x + 26, y + 13, 6, '#8a6232', 'left', a);
+    sc.panel(x + 33, y + 9, 14, 14, '#f1dcae', '#8a6232', a);
+    sc.T('A', x + 40, y + 11, 9, '#215a4a', 'center', a);
+    sc.T(title, x + 54, y + 6, 12, '#a8363f', 'left', a);
+    sc.T(sub, x + 54, y + 24, 9, '#3a2414', 'left', a);
+  }
+
   private drawClickHint() {
     const age = this.t - this.clickHintAt;
     if (age >= CLICK_HINT) return;

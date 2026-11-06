@@ -338,13 +338,61 @@ export class ShopView {
   }
 
   /** 上の帯はウィンドウの上端に、調達欄は下端に付ける（縦に長いウィンドウでも画面の端に揃う） */
+  /** 縦長の画面の上の余白：天井の梁と、吊りランプ */
+  private drawCeiling(sc: Screen, top: number, bottom: number) {
+    const e = sc.ext;
+    sc.PR(e.x0, top, e.w, bottom - top, '#2b1a10');
+    // 天井板
+    for (let y = top + 6; y < bottom - 6; y += 7) sc.PR(e.x0, y, e.w, 0.8, '#3a2414', 0.9);
+    for (let x = Math.floor(e.x0 / 60) * 60; x < e.x1; x += 60) sc.PR(x, top, 1, bottom - top, '#22140b', 0.7);
+    // 店内の絵につながる太い梁
+    sc.PR(e.x0, bottom - 6, e.w, 6, '#5e3b1d');
+    sc.PR(e.x0, bottom - 6, e.w, 1, '#a8743f', 0.8);
+    sc.PR(e.x0, bottom - 1, e.w, 1, '#1a0f08');
+    // 梁から下がる吊りランプ（ゆっくり揺れて、あたたかく光る）
+    // 上の帯（26）の下から梁までの見えている範囲に、天井から吊るす
+    const visTop = top + 26;
+    const room = bottom - 6 - visTop;
+    if (room < 14) return;
+    for (let x = 60; x < e.x1; x += 120) {
+      for (const lx of [x, -x + 480]) {
+        if (lx < e.x0 + 10 || lx > e.x1 - 10) continue;
+        const sway = Math.sin(this.time * 1.3 + lx * 0.05) * 1.2;
+        const ly = visTop + Math.min(room - 10, room * 0.45);
+        sc.PR(lx + sway * 0.3, visTop, 0.8, ly - visTop, '#7a5a34');
+        sc.radialGlow(lx + sway, ly + 4, 22, '#ffb45a', 0.35 + 0.05 * Math.sin(this.time * 3 + lx));
+        sc.PR(lx - 3 + sway, ly, 6, 2, '#8a6232');
+        sc.PR(lx - 2 + sway, ly + 2, 4, 5, '#ffd27a');
+        sc.PR(lx - 3 + sway, ly + 7, 6, 1.5, '#8a6232');
+      }
+    }
+  }
+
+  /** 縦長の画面の下の余白：木のカウンターに料理や酒が並ぶ */
+  private drawCounter(sc: Screen, top: number, bottom: number) {
+    const e = sc.ext;
+    sc.PR(e.x0, top, e.w, bottom - top, '#2a1a10');
+    sc.PR(e.x0, top, e.w, 2, '#a8743f');
+    sc.PR(e.x0, top + 2, e.w, 1, '#5a3a1c');
+    for (let y = top + 12; y < bottom; y += 10) sc.PR(e.x0, y, e.w, 0.6, '#3a2414', 0.8);
+    // カウンターの上に、できあがった料理や酒が並ぶ（店の絵と調達欄の間の飾り）
+    const room = bottom - top;
+    if (!this.art || room < 70) return;
+    const items = [9, 7, 12, 4, 10, 8, 13, 11];
+    let n = 0;
+    for (let x = Math.ceil((e.x0 + 20) / 58) * 58; x < e.x1 - 20; x += 58) {
+      const icon = items[n++ % items.length];
+      sc.PR(x - 8, top + 15, 16, 2, '#120a06', 0.35);
+      this.art.drawIcon(sc, 'icons-dishes', icon, x - 8, top + 3, 14, 0.95);
+    }
+  }
+
   private drawEdges(sc: Screen, shop: Shop, t: number) {
     const e = sc.ext;
     // 縦に長いウィンドウでは、店内の絵の上下（暗い部分）を帯の地の色で覆い、画面の枠として見せる
     if (e.y0 < 0) {
-      sc.PR(e.x0, e.y0, e.w, 26 - e.y0, C.ink);
-      sc.PR(e.x0, 26, e.w, 1, C.wood3);
-      sc.PR(e.x0, 210, e.w, e.y1 - 210, C.ink);
+      this.drawCeiling(sc, e.y0, 26);
+      this.drawCounter(sc, 210, e.y1);
     }
     sc.shifted(0, e.y0, () => this.drawHud(sc, shop));
     sc.shifted(0, e.y1 - 270, () => this.drawSupply(sc, shop, t));
