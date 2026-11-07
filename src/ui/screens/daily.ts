@@ -26,20 +26,20 @@ export function drawDaily(g: Game) {
     sc.T(tag, LW / 2, 46, 8, C.cream, 'center');
     daily.conds.forEach((c, i) => {
       const w = 204;
-      const h = 96;
+      const h = 80;
       const x = daily.conds.length === 1 ? LW / 2 - w / 2 : i === 0 ? 30 : LW - 30 - w;
-      const y = 64 + Math.sin(g.t * 1.6 + i * 1.3) * 0.8;
+      const y = 62 + Math.sin(g.t * 1.6 + i * 1.3) * 0.8;
       sc.PR(x + 3, y + 4, w, h, '#0c0604', 0.6);
       sc.panel(x, y, w, h, 'rgba(48,30,18,0.96)', '#c79a52');
       sc.PR(x + 2, y + 2, w - 4, 1.5, '#a8743f', 0.8);
-      drawCondIcon(sc, g.art, c.id, x + 12, y + 14, 40);
-      sc.TB(c.title(diff.id), x + 62, y + 24, sc.fitSize(c.title(diff.id), 15, w - 66), C.gold3, 'left', C.ink);
-      c.lines(diff.id).forEach((line, k) => sc.T(line, x + 12, y + 64 + k * 13, sc.fitSize(line, 9, w - 20), C.cream2));
+      drawCondIcon(sc, g.art, c.id, x + 10, y + 9, 32);
+      sc.TB(c.title(diff.id), x + 52, y + 13, sc.fitSize(c.title(diff.id), 14, w - 58), C.gold3, 'left', C.ink);
+      c.lines(diff.id).forEach((line, k) => sc.T(line, x + 10, y + 54 + k * 12, sc.fitSize(line, 9, w - 20), C.cream2));
       // 時間帯の当たり：朝・昼・夜の当たりを先に見せて、段取りを考えられるようにする
       if (c.id === 'luckyTrip') {
         const plan = rulesFor([c], diff.id, daily.date).luckyTrips ?? [];
         const text = plan.map((id, k) => `${PHASES[k].name} ${TRIPS.find((t) => t.id === id)!.text}`).join(' → ');
-        sc.T(text, x + 62, y + 44, sc.fitSize(text, 8, w - 70), '#ffe7a0');
+        sc.T(text, x + 52, y + 35, sc.fitSize(text, 8, w - 58), '#ffe7a0');
       }
       // 予約の宴会：来る時刻（残り時間で）と料理を先に見せる
       if (c.id === 'banquet') {
@@ -47,20 +47,30 @@ export function drawDaily(g: Game) {
         const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
         plan.forEach((b, k) => {
           const text = `残り${fmt(DAY_LENGTH - b.at)}に「${DISHES.find((d) => d.id === b.dish)!.text}」`;
-          sc.T(text, x + 62, y + 41 + k * 8, sc.fitSize(text, 7, w - 70), '#ffe7a0');
+          sc.T(text, x + 52, y + 30 + k * 7, sc.fitSize(text, 7, w - 58), '#ffe7a0');
         });
       }
     });
     // 今日の自分のベスト
     const best = g.store.loadDailyBest(daily.date, diff.id);
     const text = best ? `今日のベスト ${best.score.toLocaleString()}円` : '今日のベスト まだなし';
-    const bw = sc.W(text, 10) + 24;
-    sc.panel(LW / 2 - bw / 2, 172, bw, 20, '#22322a', '#6b4422');
-    sc.T(text, LW / 2, 176, 10, '#f2efe2', 'center');
-    const note = 'お題は毎日0時（日本時間）に変わります';
-    const nw = sc.W(note, 7) + 12;
-    sc.PR(LW / 2 - nw / 2, 195, nw, 11, '#120a06', 0.75);
-    sc.T(note, LW / 2, 197, 7, C.cream2, 'center');
+    sc.T(text, LW / 2, 146, 8, '#f2efe2', 'center');
+    sc.panel(30, 158, 420, 52, 'rgba(32,25,18,0.96)', '#a8743f');
+    const board = g.board?.key === `${daily.date}:${diff.id}` ? g.board : null;
+    const total = board?.value?.total;
+    sc.TB(`今日のランキング${total ? `・${total}人` : ''}`, 40, 162, 8, C.gold3, 'left');
+    if (board?.state === 'ready' && board.value?.top.length) {
+      board.value.top.forEach((entry, i) => {
+        const x = 72 + i * 84;
+        const label = `${entry.rank}位 ${entry.name}`;
+        sc.T(label, x, 177, sc.fitSize(label, 9, 76), C.cream, 'center');
+        sc.TB(`${entry.score.toLocaleString()}円`, x, 193, 9, C.gold3, 'center');
+      });
+    } else {
+      const message = board?.state === 'error' ? '今はランキングにつながりません。営業は遊べます'
+        : board?.state === 'ready' ? 'まだ記録がありません。今日の一番乗りになろう' : 'ランキングを読み込み中…';
+      sc.T(message, LW / 2, 185, 8, C.cream2, 'center');
+    }
   });
   // 下：木のカウンター
   sc.PR(e.x0, 212, e.w, e.y1 - 212, '#2a1a10');
@@ -71,5 +81,7 @@ export function drawDaily(g: Game) {
     const items = g.menuItems();
     button(g, items[items.length - 1], 26, 228, 120, 30, 'plain', 'Esc', '◀');
     button(g, items[0], 300, 222, 158, 38, 'primary', 'Enter');
+    sc.T('お題は毎日0時更新', 226, 232, 7, C.cream2, 'center');
+    sc.T('（日本時間）', 226, 243, 7, C.cream2, 'center');
   });
 }

@@ -1,5 +1,7 @@
 // ブラウザへの保存：設定・自己ベスト・直近の結果（3分の一周なので途中経過は保存しない）
 
+import { PLAYER_ID } from './ranking';
+
 export interface KeyValueStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -18,9 +20,11 @@ export interface Settings {
   guided: boolean;
   /** 前回選んだ営業（Enter で選ぶときに使う） */
   playMode: 'normal' | 'daily';
+  /** ランキングで前回使った名前 */
+  rankingName: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal' };
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '' };
 
 export interface DayRecord {
   score: number;
@@ -32,7 +36,7 @@ export interface DayRecord {
   finishedAt: string;
 }
 
-const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily' };
+const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily', player: 'lastorder2.player' };
 
 /** ひがわり営業の記録は、直近の何日分を残すか */
 export const DAILY_KEEP_DAYS = 30;
@@ -50,11 +54,21 @@ function safe<T>(fn: () => T, fallback: T): T {
 
 export class SaveStore {
   private keys: typeof KEYS;
+  private player: string | null = null;
 
   /** slot を指定すると別の保存枠を使う（動作確認用） */
   constructor(private store: KeyValueStore | null, slot = '') {
     const sfx = slot ? `.${slot.replace(/[^a-z0-9_-]/gi, '')}` : '';
-    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx };
+    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx, player: KEYS.player + sfx };
+  }
+
+  /** 保存できないブラウザでも、この起動中は同じ端末IDを使う。 */
+  playerId(): string {
+    if (this.player) return this.player;
+    const saved = this.read<unknown>(this.keys.player);
+    this.player = typeof saved === 'string' && PLAYER_ID.test(saved) ? saved.toLowerCase() : crypto.randomUUID();
+    this.write(this.keys.player, this.player);
+    return this.player;
   }
 
   private read<T>(key: string): T | null {

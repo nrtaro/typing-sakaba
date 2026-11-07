@@ -45,7 +45,7 @@ export function drawMenu(g: Game, y: number) {
     const yy = live ? y - 2 : y;
     if (live) sc.glow(x, yy, iw, 40);
     sc.panel(x, yy, iw, 40, live ? '#4a2c3c' : 'rgba(42,27,38,0.95)', live || isDefault ? C.gold : C.wood4, dim ? 0.4 : 1);
-    sc.T(it.text, x + iw / 2, yy + 3, 14, dim ? C.gray : C.w, 'center', dim ? 0.5 : 1);
+    sc.T(it.text, x + iw / 2, yy + 3, sc.fitSize(it.text, 14, iw - 10), dim ? C.gray : C.w, 'center', dim ? 0.5 : 1);
     const m = live?.matcher ?? new RomajiMatcher(it.kana);
     sc.roma(m.typed, m.remaining, x + iw / 2, yy + 23, 11, live ? 'active' : dim ? 'dim' : 'idle');
     if (k === 0 && !typing) sc.keycap('Enter', x + iw - 30, yy - 7, 6);

@@ -93,6 +93,14 @@ export function drawResult(g: Game) {
     sc.TB(v, x + 33, y + 4, 14, C.gold3, 'center', C.ink, p);
     sc.T(l, x + 33, y + 27, 9, C.cream, 'center', p);
   });
+  if (daily && age > 2.3) {
+    const sent = g.submission;
+    const text = sent.receipt ? `今日${sent.receipt.rank}位 ／ ${sent.receipt.total}人中（自分のベスト）`
+      : sent.state === 'sending' ? 'ランキングに送信中…'
+      : sent.state === 'error' ? `${sent.message}（端末の記録は保存済み）`
+      : '名前を付けて、今日のランキングへ';
+    sc.T(text, LW / 2, 185, sc.fitSize(text, 9, LW - 24), sent.state === 'error' ? '#ffb6a4' : C.gold3, 'center');
+  }
   // 家族が見送る
   if (g.art) {
     const p = ease((age - 0.4) / 0.5);

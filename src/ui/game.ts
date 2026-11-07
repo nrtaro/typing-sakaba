@@ -11,6 +11,9 @@ import { createMinigame, type Minigame } from '../core/minigames';
 import { Rng } from '../core/rng';
 import { RomajiMatcher } from '../core/romaji';
 import { SaveStore, type DayRecord } from '../core/save';
+import type { DailyBoard, RankReceipt } from '../core/ranking';
+import { RankingClient } from './rankingClient';
+import { openRankingName } from './rankingName';
 import { dailyConditions, defaultPrep, jstDate, prepCap, rulesFor, NORMAL_RULES, type Condition, type DayRules } from '../core/daily';
 import { MINIGAME_SECONDS, DIFFICULTIES, GAME_TITLE, INGREDIENT_ORDER, SHOP, difficultyOf, rankFor, type DifficultyId, type IngredientId } from '../core/shopConfig';
 import { drawVolume, drawMenu, drawMenuScreen, drawImeHint, drawClickHint } from './screens/common';
@@ -55,7 +58,11 @@ export class Game {
   trip: { game: Minigame<unknown>; phase: 'intro' | 'game' | 'outro'; t: number; earlyReturn?: boolean } | null = null;
   tripView = new MinigameView();
   paused = false;
-  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; daily: DailyPlay | null }) | null = null;
+  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null }) | null = null;
+  readonly ranking = new RankingClient();
+  board: { key: string; state: 'loading' | 'ready' | 'error'; value: DailyBoard | null } | null = null;
+  submission: { state: 'idle' | 'sending' | 'sent' | 'error'; receipt: RankReceipt | null; message: string } = { state: 'idle', receipt: null, message: '' };
+  nameEntry: ReturnType<typeof openRankingName> | null = null;
   /** ひがわり営業で遊んでいるときの、日付とお題（通常営業では null） */
   daily: DailyPlay | null = null;
   /** 開店前の仕込み：振り分け（同じ日・同じ難易度なら、もういちどのときも前の振り分けから） */
@@ -177,10 +184,14 @@ export class Game {
           { text: 'はじめる', kana: 'はじめる', act: () => this.start() },
           ...INGREDIENT_ORDER.map((id) => ({ text: PREP_WORDS[id], kana: PREP_WORDS[id], act: () => this.prepAdd(id, 1) })),
           { text: 'おまかせ', kana: 'おまかせ', act: () => this.prepReset() },
-          { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'daily'; } },
+          { text: 'もどる', kana: 'もどる', act: () => this.returnToDaily() },
         ];
       case 'result':
         return [
+          ...(this.result?.daily && this.submission.state !== 'sent' ? [{
+            text: this.submission.state === 'sending' ? '送信中…' : this.submission.state === 'error' ? 'もういちど送る' : 'なまえをいれる',
+            kana: 'なまえ', act: () => this.openRankingName(),
+          }] : []),
           // ひがわりは同じお題でもう一度。日付が変わっていたら、新しいお題を見せてから
           { text: 'もういちど', kana: 'もういちど', act: () => (this.daily && this.daily.date !== jstDate() ? this.openDaily() : this.daily ? this.afterDaily() : this.start()) },
           { text: 'たいとる', kana: 'たいとる', act: () => this.toTitle() },
@@ -206,6 +217,7 @@ export class Game {
   }
 
   toTitle() {
+    this.nameEntry?.close();
     this.mode = 'title';
     this.shop = null;
     this.trip = null;
@@ -228,6 +240,58 @@ export class Game {
     const date = jstDate();
     this.daily = { date, conds: dailyConditions(date) };
     this.mode = 'daily';
+    void this.loadBoard(date, difficulty);
+  }
+
+  async loadBoard(date: string, difficulty: DifficultyId) {
+    const board = { key: `${date}:${difficulty}`, state: 'loading' as 'loading' | 'ready' | 'error', value: null as DailyBoard | null };
+    this.board = board;
+    try {
+      const value = await this.ranking.top(date, difficulty, this.store.playerId());
+      if (this.board !== board) return;
+      board.value = value;
+      board.state = 'ready';
+    } catch {
+      if (this.board === board) board.state = 'error';
+    }
+  }
+
+  /** 仕込みから戻るときも、開いているお題の日付のまま順位を読み直す。 */
+  returnToDaily() {
+    this.mode = 'daily';
+    if (this.daily) void this.loadBoard(this.daily.date, this.settings.difficulty);
+  }
+
+  openRankingName() {
+    if (!this.result?.daily || this.nameEntry || this.submission.state === 'sending' || this.submission.state === 'sent') return;
+    this.menu.reset();
+    this.imeHintAt = -10;
+    this.nameEntry = openRankingName({
+      initialName: this.settings.rankingName,
+      onClose: () => { this.nameEntry = null; this.menu.reset(); this.sc.canvas.focus(); },
+      onSubmit: name => { void this.submitRanking(name); },
+    });
+  }
+
+  async submitRanking(name: string) {
+    const result = this.result;
+    if (!result?.daily || this.submission.state === 'sending' || this.submission.state === 'sent') return;
+    this.settings.rankingName = name;
+    this.store.saveSettings(this.settings);
+    this.submission = { state: 'sending', receipt: null, message: '' };
+    try {
+      const receipt = await this.ranking.submit({
+        date: result.daily.date, difficulty: result.difficultyId, name, player: this.store.playerId(),
+        score: result.score, served: result.served, maxCombo: result.maxCombo, angry: result.angry,
+        accuracy: result.accuracy, kps: result.kps, conds: result.daily.conds.map(c => c.id),
+      });
+      if (this.result !== result || this.mode !== 'result') return;
+      this.submission = { state: 'sent', receipt, message: '' };
+      this.menu.reset();
+    } catch (err) {
+      if (this.result !== result || this.mode !== 'result') return;
+      this.submission = { state: 'error', receipt: null, message: err instanceof Error ? err.message : '送信できませんでした' };
+    }
   }
 
   /** 今日のお題のあと：仕込みの日は仕込みの画面へ、それ以外はすぐ開店 */
@@ -293,6 +357,8 @@ export class Game {
   }
 
   start(difficulty: DifficultyId = this.settings.difficulty) {
+    this.nameEntry?.close();
+    this.submission = { state: 'idle', receipt: null, message: '' };
     this.saveDifficulty(difficulty);
     // ひがわりは、お題の画面で見せた日付のお題で開店する（お客の来かたは毎回ちがう）
     if (this.settings.playMode !== 'daily') this.daily = null;
@@ -332,6 +398,7 @@ export class Game {
   // ---------- 入力 ----------
 
   onKey(e: KeyboardEvent) {
+    if (this.nameEntry) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     this.sound.unlock();
     this.lastInput = this.t;
@@ -364,7 +431,7 @@ export class Game {
       else if (this.mode === 'help' && this.helpPage !== 0) this.helpPage = 0;
       else if (this.mode === 'difficulty') this.mode = 'modeSelect';
       else if (this.mode === 'daily') this.mode = 'difficulty';
-      else if (this.mode === 'prep') this.mode = 'daily';
+      else if (this.mode === 'prep') this.returnToDaily();
       else this.mode = 'title';
       this.menu.reset();
       return;
@@ -579,7 +646,8 @@ export class Game {
     // ひがわりの記録は日付×難易度ごと。通常営業の自己ベストとは混ぜない
     const best = this.daily ? this.store.recordDaily(rec, this.daily.date, diff.id) : this.store.record(rec, diff.id);
     const rank = rankFor(rec.score, diff);
-    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: s.trips, difficulty: diff.name, daily: this.daily };
+    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: s.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily };
+    this.submission = { state: 'idle', receipt: null, message: '' };
     this.mode = 'result';
     this.menu.reset();
     this.resultAt = this.t;

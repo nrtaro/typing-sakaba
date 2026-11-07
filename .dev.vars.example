@@ -1,0 +1,2 @@
+# ローカル専用。コピーして .dev.vars にし、十分長いランダムな値に置き換える。
+RANKING_IP_SALT="local-development-change-this-value"

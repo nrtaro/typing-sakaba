@@ -5,3 +5,7 @@ dist/
 .vite/
 coverage/
 .load-benchmark/
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
