@@ -10,7 +10,7 @@ function score(overrides: Record<string, unknown> = {}) {
     date: '2026-11-07', difficulty: 'normal', name: ' おやじ ',
     player: '12345678-1234-4123-8123-123456789abc', score: 18000, served: 35,
     maxCombo: 20, angry: 2, accuracy: 0.98, kps: 5,
-    conds: dailyConditions('2026-11-07').map(c => c.id), ...overrides,
+    conds: dailyConditions('2026-11-07').map(c => c.id), seed: 1, record: '12a0B', prep: null, ...overrides,
   };
 }
 
@@ -101,5 +101,22 @@ describe('ランキングの端末設定', () => {
     expect(settings.rankingName).toBe('');
     store.saveSettings({ ...settings, rankingName: 'おかみ' });
     expect(new SaveStore(mem).loadSettings().rankingName).toBe('おかみ');
+  });
+});
+
+describe('やり直しに要る項目', () => {
+  it.each([
+    { seed: -1 }, { seed: 1.5 }, { seed: 2 ** 32 }, { record: 123 }, { record: 'abc' }, { record: '1a2' },
+    { record: '1A' }, { record: '1a'.repeat(15001) }, { prep: { fish: 1 } }, { prep: [] },
+    { prep: { fish: 1, meat: 1, veg: 1, mush: 1, ale: 1, spice: -1 } },
+  ])('読めない記録を拒否する: %j', (bad) => {
+    expect(validateSubmission(score(bad), now).ok).toBe(false);
+  });
+  it('仕込みのない日は null、ある日は6種類の数で受け取る', () => {
+    const prep = { fish: 6, meat: 6, veg: 5, mush: 3, ale: 4, spice: 2 };
+    const ok = validateSubmission(score({ prep }), now);
+    expect(ok.ok && ok.value.prep).toEqual(prep);
+    const none = validateSubmission(score({ prep: null }), now);
+    expect(none.ok && none.value.prep).toBeNull();
   });
 });

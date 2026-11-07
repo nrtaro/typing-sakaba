@@ -9,7 +9,7 @@ import { drawChair, drawLights, drawRoomLive, drawTable, pen, roomLayer, shadow 
 import { SKILL_KANA, Shop, type Guest, type ShopEvent, type SkillId } from '../core/shop';
 import type { Art } from './amber/art';
 import { animLength, walkFrame } from './amber/manifest';
-import { entryPose, WALK_SPEED, SERVER_WALK_SPEED, serverWalkSpeed } from '../core/tavernNavigation';
+import { entryPose, WALK_SPEED } from '../core/tavernNavigation';
 import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/layout';
 import { RomajiMatcher } from '../core/romaji';
 import {
@@ -19,22 +19,8 @@ import {
 /** 席の位置（斜め上視点：2列×4席）。ty はテーブルの高さ */
 export const SEATS = TAVERN_SEATS;
 const DOOR = { x: 452, y: 202 };
-const HOME: Record<'wife' | 'daughter', { x: number; y: number }> = { wife: { x: 158, y: 152 }, daughter: { x: 158, y: 182 } };
 
-interface Server {
-  x: number; y: number; tx: number; ty: number; carry: number; moving: boolean;
-  /** 向き：絵は右向きなので、左へ進むときに反転する */
-  flip: boolean;
-  /** 動きが始まった時刻（この画面の時計）。一回再生の動きは開始からの経過で再生する */
-  walkStart: number;
-  distance: number;
-  /** 配膳に向かっている／配膳中 */
-  serving: boolean;
-  serveStart: number | null;
-  /** 通り道（席の列を横切らないよう、列の間の通路を通る） */
-  path: { x: number; y: number }[];
-  jobs: { seat: number; guest: Guest }[];
-}
+
 interface Exit { look: number; x: number; y: number; start: number; distance: number; path: { x: number; y: number }[] }
 interface Fx { anim: string; x: number; y: number; h: number; start: number }
 interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean; slot?: string; count?: number }
@@ -43,16 +29,10 @@ interface Spark { bounds?: FxBounds; x: number; y: number; vx: number; vy: numbe
 
 /** 営業画面の見た目の状態（演出用。ゲームの計算には影響しない） */
 export class ShopView {
-  servers: Record<'wife' | 'daughter', Server> = {
-    wife: { ...HOME.wife, tx: HOME.wife.x, ty: HOME.wife.y, carry: 0, moving: false, flip: false, walkStart: 0, distance: 0, serving: false, serveStart: null, path: [], jobs: [] },
-    daughter: { ...HOME.daughter, tx: HOME.daughter.x, ty: HOME.daughter.y, carry: 0, moving: false, flip: false, walkStart: 0, distance: 0, serving: false, serveStart: null, path: [], jobs: [] },
-  };
   /** 画像素材（読み込めなかったときは null で、コードで描く絵を使う） */
   art: Art | null = null;
   /** この画面の時計。一時停止中は進まない（update が呼ばれない）ので、アニメーションも止まる */
   time = 0;
-  /** 急な増減で歩きが跳ねないよう、客数に応じた目標歩速へ滑らかに近づける。 */
-  serverSpeed = SERVER_WALK_SPEED;
   /** おやじが鍋を混ぜ続ける時刻 */
   stirUntil = 0;
   /** 店を出ていく客（演出のみ） */
@@ -99,20 +79,6 @@ export class ShopView {
         break;
       case 'serve': {
         const seat = SEATS[ev.seat];
-        const who = this.pickServer(shop, ev.seat);
-        if (who) {
-          const s = this.servers[who];
-          const guest = shop.seats[ev.seat]!;
-          if (this.art) {
-            guest.awaitingDelivery = true;
-            s.jobs.push({ seat: ev.seat, guest });
-          } else {
-            this.go(s, seat.x - 18, seat.ty + 6);
-            s.carry = 1.1;
-            s.serving = true;
-            s.serveStart = null;
-          }
-        }
         if (ev.combo >= 1) {
           const fx = comboFx(ev.combo);
           this.flashPeak = fx.flash;
@@ -162,14 +128,6 @@ export class ShopView {
         break;
       }
       case 'tripStart':
-        if (ev.trip.who === 'wife' || ev.trip.who === 'daughter') {
-          const away = this.servers[ev.trip.who];
-          const other = this.servers[ev.trip.who === 'wife' ? 'daughter' : 'wife'];
-          other.jobs.push(...away.jobs.splice(0));
-          away.serving = false;
-          away.serveStart = null;
-          this.go(away, HOME[ev.trip.who].x, HOME[ev.trip.who].y);
-        }
         this.banner = { text: `${FAMILY_NAME[ev.trip.who]}「${ev.trip.act}に行ってくる！」`, t: 1.6, col: C.w };
         break;
       case 'tripEnd':
@@ -231,16 +189,6 @@ export class ShopView {
     }
   }
 
-  private pickServer(shop: Shop, seat: number): 'wife' | 'daughter' | null {
-    const away = shop.away?.who;
-    const pref: 'wife' | 'daughter' = seat % 2 ? 'wife' : 'daughter';
-    const other = pref === 'wife' ? 'daughter' : 'wife';
-    if (away === pref) return away !== other ? other : null;
-    if (away === other) return pref;
-    // 担当席は同数のときの優先順。配膳待ちが偏るときは空いている家族へ。
-    return this.servers[pref].jobs.length <= this.servers[other].jobs.length ? pref : other;
-  }
-
   targetPos(id: string): { x: number; y: number } {
     if (id.startsWith('seat:')) {
       const s = SEATS[Number(id.slice(5))];
@@ -257,21 +205,8 @@ export class ShopView {
     }
   }
 
-  /** 行き先を決める。客席の列を斜めに横切らず、列の間の通路を通って行く */
-  private go(s: Server, x: number, y: number) {
-    const AISLE = 156;
-    s.tx = x;
-    s.ty = y;
-    s.path = [];
-    if (Math.abs(s.y - AISLE) > 2 && Math.abs(x - s.x) > 1) s.path.push({ x: s.x, y: AISLE });
-    if (Math.abs(x - s.x) > 1) s.path.push({ x, y: AISLE });
-    s.path.push({ x, y });
-  }
-
   update(dt: number, shop?: Shop) {
     this.time += dt;
-    const targetSpeed = serverWalkSpeed(shop?.seats.filter(g => g !== null).length ?? 0);
-    this.serverSpeed += (targetSpeed - this.serverSpeed) * (1 - Math.exp(-dt / 0.18));
     this.missFlash = Math.max(0, this.missFlash - dt);
     this.comboBurst = shop && shop.combo < 1 ? 0 : Math.max(0, this.comboBurst - dt);
     this.comboFlash = Math.max(0, this.comboFlash - dt);
@@ -286,51 +221,6 @@ export class ShopView {
     if (this.lackTrip && (this.lackTrip.t -= dt) <= 0) this.lackTrip = null;
     if (this.gotTrip && (this.gotTrip.t -= dt) <= 0) this.gotTrip = null;
     if (this.banner && (this.banner.t -= dt) <= 0) this.banner = null;
-    const serveLen = this.art ? animLength(this.art.anim('family-wife', '配膳')) : 1.1;
-    for (const k of ['wife', 'daughter'] as const) {
-      const s = this.servers[k];
-      if (shop?.away?.who === k) continue;
-      if (this.art && !s.serving && !s.moving && s.jobs.length && Math.hypot(s.x - HOME[k].x, s.y - HOME[k].y) < 1) {
-        const seat = SEATS[s.jobs[0].seat];
-        this.go(s, seat.x - 24, seat.ty + 6);
-        s.serving = true;
-        s.serveStart = null;
-      }
-      while (s.path.length > 1 && Math.hypot(s.path[0].x - s.x, s.path[0].y - s.y) <= 1) s.path.shift();
-      const to = s.path[0] ?? { x: s.tx, y: s.ty };
-      const dx = to.x - s.x;
-      const dy = to.y - s.y;
-      const d = Math.hypot(dx, dy);
-      const wasMoving = s.moving;
-      s.moving = d > 1;
-      if (s.moving) {
-        if (!wasMoving) s.walkStart = this.time;
-        if (Math.abs(dx) > 0.5) s.flip = dx < 0;
-        const sp = Math.min(d, this.serverSpeed * dt);
-        s.x += (dx / d) * sp;
-        s.y += (dy / d) * sp;
-        s.distance += sp;
-      }
-      s.carry = Math.max(0, s.carry - dt);
-      if (s.serving) {
-        // 席に着いたら配膳を一回再生し、最後のコマで止めてから戻る
-        if (!s.moving && s.serveStart === null) {
-          s.serveStart = this.time;
-          s.flip = false;
-        }
-        if (s.serveStart !== null && this.time - s.serveStart >= 0.4 && s.jobs[0]) {
-          s.jobs[0].guest.awaitingDelivery = false;
-        }
-        if (s.serveStart !== null && this.time - s.serveStart >= serveLen + 0.15) {
-          s.serving = false;
-          s.serveStart = null;
-          s.jobs.shift();
-          this.go(s, HOME[k].x, HOME[k].y);
-        }
-      } else if (s.carry <= 0 && !s.moving && (s.tx !== HOME[k].x || s.ty !== HOME[k].y)) {
-        this.go(s, HOME[k].x, HOME[k].y);
-      }
-    }
     // 席が空いたら、その客が入り口へ歩いて出ていく
     if (shop) {
       shop.seats.forEach((g, i) => {
@@ -471,14 +361,14 @@ export class ShopView {
     if (away !== 'master') items.push({ y: 104, d: () => g.drawImage(FAM.master[Math.floor(t * 3) % 2], 64, 80 + (Math.floor(t * 2) % 2)) });
     for (const k of ['wife', 'daughter'] as const) {
       if (away === k) continue;
-      const s = this.servers[k];
+      const s = shop.crew.members[k];
       const img = s.moving ? FAM[k][Math.floor(s.distance / 8) % 2] : FAM[k][0];
       items.push({
         y: s.y,
         d: () => {
           shadow(g, s.x, s.y, 14);
           g.drawImage(img, Math.round(s.x - img.width / 2), Math.round(s.y - img.height + (s.moving ? 0 : Math.floor(t * 2) % 2)));
-          if (s.carry > 0) {
+          if (s.serving && s.jobs[0]?.guest.awaitingDelivery) {
             const px = Math.round(s.x + 3);
             const py = Math.round(s.y - img.height + 11);
             R(px - 1, py + 2, 12, 1, '#7a6a72'); R(px, py, 10, 2, C.w); R(px + 2, py - 2, 6, 2, C.gold2); R(px + 3, py - 3, 3, 1, C.gold3);
@@ -930,14 +820,14 @@ export class ShopView {
     const items: { y: number; d: () => void }[] = [];
     for (const k of ['wife', 'daughter'] as const) {
       if (away === k) continue;
-      const s = this.servers[k];
+      const s = shop.crew.members[k];
       const id = `family-${k}`;
       const kk = art.scaleFor(id, 0, L.family[k]);
       items.push({
         y: s.y,
         d: () => {
           this.shadow(sc, s.x, s.y, 14);
-          if (s.serving && s.serveStart !== null) art.drawAnim(sc, id, '配膳', t - s.serveStart, s.x, s.y, kk, false);
+          if (s.serving && s.serveStart !== null) art.drawAnim(sc, id, '配膳', shop.crew.time - s.serveStart, s.x, s.y, kk, false);
           else if (s.moving) {
             art.drawFrame(sc, `${id}-walk`, walkFrame(art.anim(`${id}-walk`, '歩行'), s.distance, L.family[k]), s.x, s.y,
               art.scaleFor(`${id}-walk`, 0, L.family[k]), s.flip);

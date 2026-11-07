@@ -6,16 +6,17 @@ import { MinigameView } from './minigameView';
 import { drawLights, drawRoomLive, roomLayer } from './room';
 import { Art } from './amber/art';
 import { CandidateInput } from '../core/candidates';
+import { PlaySession, TICK, type SessionTrip } from '../core/session';
 import { Shop } from '../core/shop';
-import { createMinigame, type Minigame } from '../core/minigames';
 import { Rng } from '../core/rng';
 import { RomajiMatcher } from '../core/romaji';
 import { SaveStore, type DayRecord } from '../core/save';
 import type { DailyBoard, RankReceipt } from '../core/ranking';
 import { RankingClient } from './rankingClient';
 import { openRankingName } from './rankingName';
+import { shareUrl } from './share';
 import { dailyConditions, defaultPrep, jstDate, prepCap, rulesFor, NORMAL_RULES, type Condition, type DayRules } from '../core/daily';
-import { MINIGAME_SECONDS, DIFFICULTIES, GAME_TITLE, INGREDIENT_ORDER, SHOP, difficultyOf, rankFor, type DifficultyId, type IngredientId } from '../core/shopConfig';
+import { DIFFICULTIES, GAME_TITLE, INGREDIENT_ORDER, difficultyOf, rankFor, type DifficultyId, type IngredientId } from '../core/shopConfig';
 import { drawVolume, drawMenu, drawMenuScreen, drawImeHint, drawClickHint } from './screens/common';
 import { demoStep, drawCheers, drawTitle } from './screens/title';
 import { drawDifficulty } from './screens/difficulty';
@@ -40,6 +41,13 @@ function localStore() {
   }
 }
 
+/** 営業をやり直すのに要るもの：乱数の種・入力の記録・仕込みの振り分け */
+export interface PlayRecord {
+  seed: number;
+  record: string;
+  prep: Record<IngredientId, number> | null;
+}
+
 /** ひがわり営業の1回分：日本時間の日付と、その日のお題 */
 export interface DailyPlay {
   date: string;
@@ -53,12 +61,16 @@ export class Game {
   settings = this.store.loadSettings();
   readonly sound = new Sound(this.settings);
   mode: Mode = 'title';
-  shop: Shop | null = null;
+  /** 営業中の1回分（1/60秒刻みで進み、入力を記録する）。営業していないときは null */
+  session: PlaySession | null = null;
+  get shop(): Shop | null { return this.session?.shop ?? null; }
+  get trip(): SessionTrip | null { return this.session?.trip ?? null; }
+  /** 画面の時計の端数（1/60秒に満たない分を次のコマへ持ち越す） */
+  private acc = 0;
   view = new ShopView();
-  trip: { game: Minigame<unknown>; phase: 'intro' | 'game' | 'outro'; t: number; earlyReturn?: boolean } | null = null;
   tripView = new MinigameView();
   paused = false;
-  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null }) | null = null;
+  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord }) | null = null;
   readonly ranking = new RankingClient();
   board: { key: string; state: 'loading' | 'ready' | 'error'; value: DailyBoard | null } | null = null;
   submission: { state: 'idle' | 'sending' | 'sent' | 'error'; receipt: RankReceipt | null; message: string } = { state: 'idle', receipt: null, message: '' };
@@ -69,7 +81,6 @@ export class Game {
   prep: { key: string; alloc: Record<IngredientId, number>; sel: number; changed: IngredientId | null; changedAt: number } | null = null;
   readonly menu: CandidateInput<MenuItem>;
   t = 0;
-  playElapsed = 0;
   last = performance.now();
   readyMarked = false;
   missFlash = 0;
@@ -194,6 +205,7 @@ export class Game {
           }] : []),
           // ひがわりは同じお題でもう一度。日付が変わっていたら、新しいお題を見せてから
           { text: 'もういちど', kana: 'もういちど', act: () => (this.daily && this.daily.date !== jstDate() ? this.openDaily() : this.daily ? this.afterDaily() : this.start()) },
+          { text: 'Xにポスト', kana: 'ぽすと', act: () => this.shareToX() },
           { text: 'たいとる', kana: 'たいとる', act: () => this.toTitle() },
         ];
       default:
@@ -219,8 +231,7 @@ export class Game {
   toTitle() {
     this.nameEntry?.close();
     this.mode = 'title';
-    this.shop = null;
-    this.trip = null;
+    this.session = null;
     this.paused = false;
     this.sound.play('title');
   }
@@ -262,18 +273,36 @@ export class Game {
     if (this.daily) void this.loadBoard(this.daily.date, this.settings.difficulty);
   }
 
+  /** 結果を X にポストする画面を、新しいタブで開く（投稿するかは遊ぶ人が決める） */
+  shareToX() {
+    if (!this.result) return;
+    const receipt = this.submission.state === 'sent' ? this.submission.receipt : null;
+    window.open(shareUrl(this.result, receipt, `${location.origin}/`), '_blank', 'noopener,noreferrer');
+  }
+
+  /** ランキングの設定（Turnstile の公開キー）。一度だけ読み、以後は使い回す */
+  private rankingConfig: Promise<{ turnstile: string | null }> | null = null;
+
   openRankingName() {
     if (!this.result?.daily || this.nameEntry || this.submission.state === 'sending' || this.submission.state === 'sent') return;
     this.menu.reset();
     this.imeHintAt = -10;
-    this.nameEntry = openRankingName({
-      initialName: this.settings.rankingName,
-      onClose: () => { this.nameEntry = null; this.menu.reset(); this.sc.canvas.focus(); },
-      onSubmit: name => { void this.submitRanking(name); },
+    // 設定を読み終わるまでの間に二重に開かないよう、先に印を付ける
+    const pending = { close: () => {} };
+    this.nameEntry = pending;
+    this.rankingConfig ??= this.ranking.config();
+    void this.rankingConfig.then((config) => {
+      if (this.nameEntry !== pending || this.mode !== 'result') return;
+      this.nameEntry = openRankingName({
+        initialName: this.settings.rankingName,
+        turnstile: config.turnstile,
+        onClose: () => { this.nameEntry = null; this.menu.reset(); this.sc.canvas.focus(); },
+        onSubmit: (name, token) => { void this.submitRanking(name, token); },
+      });
     });
   }
 
-  async submitRanking(name: string) {
+  async submitRanking(name: string, token: string | null = null) {
     const result = this.result;
     if (!result?.daily || this.submission.state === 'sending' || this.submission.state === 'sent') return;
     this.settings.rankingName = name;
@@ -284,7 +313,9 @@ export class Game {
         date: result.daily.date, difficulty: result.difficultyId, name, player: this.store.playerId(),
         score: result.score, served: result.served, maxCombo: result.maxCombo, angry: result.angry,
         accuracy: result.accuracy, kps: result.kps, conds: result.daily.conds.map(c => c.id),
-      });
+        // サーバーがこの記録どおりに営業をやり直して、成績を確かめる
+        seed: result.play.seed, record: result.play.record, prep: result.play.prep,
+      }, token);
       if (this.result !== result || this.mode !== 'result') return;
       this.submission = { state: 'sent', receipt, message: '' };
       this.menu.reset();
@@ -368,19 +399,14 @@ export class Game {
     }
     const rules = this.daily ? rulesFor(this.daily.conds, difficulty, this.daily.date) : NORMAL_RULES;
     this.seed = (this.seed * 1103515245 + 12345) >>> 0;
-    this.shop = new Shop(new Rng(this.seed), difficultyOf(difficulty), rules);
     // 開店前の仕込みの日は、振り分けたとおりの在庫で開店する
-    if (rules.prepBudget > 0) {
-      if (!this.prep) this.prep = { key: `${this.daily?.date}:${difficulty}`, alloc: defaultPrep(rules), sel: 0, changed: null, changedAt: -10 };
-      this.shop.applyPrep(this.prep.alloc);
-    }
+    if (rules.prepBudget > 0 && !this.prep) this.prep = { key: `${this.daily?.date}:${difficulty}`, alloc: defaultPrep(rules), sel: 0, changed: null, changedAt: -10 };
+    this.session = new PlaySession(this.seed, difficultyOf(difficulty), rules, rules.prepBudget > 0 ? { ...this.prep!.alloc } : null);
     this.view = new ShopView();
     this.view.art = this.art;
-    this.trip = null;
     this.paused = false;
     this.mode = 'play';
     this.result = null;
-    this.playElapsed = 0;
     // 開店まで3秒数える。その間は時間が進まず、打っても反応しない
     this.countdown = COUNTDOWN;
     this.goShown = 0;
@@ -473,17 +499,16 @@ export class Game {
     // 長押しや帰還演出中の連打で二重に帰還処理を始めない。
     if (k === 'Enter') {
       e.preventDefault();
-      if (!e.repeat) this.endTrip(true);
+      if (!e.repeat) this.session?.input('Enter');
+      this.drainEvents();
       return;
     }
-    // 営業中・調達中
-    const target = this.trip?.phase === 'game' ? this.trip.game : this.trip ? null : this.shop;
-    if (!target) return;
-    if (k === 'Backspace') { e.preventDefault(); target.input.backspace(); return; }
-    if (k === ' ') { e.preventDefault(); target.input.reset(); return; }
+    // 営業中・調達中：打ったキーは「何刻み目に押したか」と一緒に記録される
+    if (!this.session) return;
+    if (k === 'Backspace' || k === ' ') { e.preventDefault(); this.session.input(k); return; }
     if (k.length === 1 && TYPABLE.test(k.toLowerCase())) {
       e.preventDefault();
-      target.key(k.toLowerCase());
+      this.session.input(k.toLowerCase());
       this.drainEvents();
     }
   }
@@ -491,9 +516,15 @@ export class Game {
   // ---------- 進行 ----------
 
   frame(now: number) {
-    const dt = Math.max(0, Math.min(0.05, (now - this.last) / 1000));
+    const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
     this.last = now;
-    this.step(dt);
+    // 画面の更新の間隔にかかわらず、1/60秒ずつ進める（遅い端末では1コマで何刻みか進める）
+    this.acc += dt;
+    for (let n = 0; this.acc >= TICK && n < 6; n++) {
+      this.acc -= TICK;
+      this.step(TICK);
+    }
+    if (this.acc > TICK) this.acc = 0;
     this.sc.now = this.t;
     this.draw();
     if (!this.readyMarked && this.artState === 'ready' && document.fonts.status === 'loaded') {
@@ -536,51 +567,48 @@ export class Game {
       return;
     }
     this.goShown = Math.max(0, this.goShown - dt);
-    // 背景の読み込み待ちで営業時間を消費しない。
-    if (this.trip?.phase === 'intro' && this.trip.t <= 0 && this.tripView.art && !this.tripView.art.hasTrip(this.trip.game.kind)) return;
-    const shop = this.shop;
-    this.playElapsed += dt;
-    const shopDt = this.trip?.phase === 'game' ? dt * MINIGAME_SECONDS / this.trip.game.duration : dt;
-    shop.update(shopDt);
-    this.view.update(dt, shop);
+    // 背景の読み込み待ちで営業時間を消費しない（刻みも数えないので、記録の再現には影響しない）
+    const session = this.session!;
+    if (session.introDone && this.tripView.art && !this.tripView.art.hasTrip(session.trip!.game.kind)) return;
+    session.tick();
+    this.view.update(dt, session.shop);
     this.tripView.update(dt);
-    if (this.trip) this.stepTrip(dt);
     this.drainEvents();
   }
 
-  endTrip(earlyReturn = false) {
-    const trip = this.trip;
-    if (!trip || trip.phase !== 'game') return;
-    trip.earlyReturn = earlyReturn && !trip.game.finished;
-    trip.phase = 'outro';
-    trip.t = SHOP.tripIntro;
-    this.sound.tripReturn();
-  }
 
-  stepTrip(dt: number) {
-    const trip = this.trip!;
-    trip.t -= dt;
-    if (trip.phase === 'intro' && trip.t <= 0) {
-      if (this.tripView.art && !this.tripView.art.hasTrip(trip.game.kind)) return;
-      trip.phase = 'game';
-      this.sound.play(trip.game.kind);
-    } else if (trip.phase === 'game') {
-      trip.game.update(dt);
-      if (trip.game.finished) this.endTrip();
-    } else if (trip.phase === 'outro' && trip.t <= 0) {
-      const r = trip.game.result();
-      this.shop!.stats.correctKeys += r.correctKeys;
-      this.shop!.stats.missKeys += r.missKeys;
-      this.shop!.returnFromTrip(r.gains, trip.earlyReturn);
-      this.trip = null;
-      this.sound.play(PHASE_TRACK[this.shop!.phaseIndex]);
-    }
-  }
 
   drainEvents() {
-    const shop = this.shop;
-    if (!shop) return;
-    for (const ev of shop.drainEvents()) {
+    const session = this.session;
+    if (!session) return;
+    const shop = session.shop;
+    for (const item of session.drain()) {
+      if (item.src === 'session') {
+        if (item.type === 'tripGame' && session.trip) this.sound.play(session.trip.game.kind);
+        else if (item.type === 'tripReturn') this.sound.tripReturn();
+        else if (item.type === 'tripBack') this.sound.play(PHASE_TRACK[shop.phaseIndex]);
+        continue;
+      }
+      if (item.src === 'trip') {
+        const trip = session.trip;
+        if (!trip) continue;
+        const ev = item.ev;
+        this.tripView.handle(ev, trip.game);
+        const kind = trip.game.kind;
+        if (ev.type === 'key') { if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); }
+        else if (ev.type === 'word' && kind === 'hunting') this.sound.shot();
+        else if (ev.type === 'gain' && kind === 'hunting') this.sound.kill(!!ev.big);
+        else if (ev.type === 'gain') {
+          this.sound.gain(kind);
+          // 釣りの大物は、きらめく音を重ねる
+          if (kind === 'fishing' && (trip.game as unknown as { big: boolean }).big) this.sound.sparkle();
+        }
+        else if (ev.type === 'loss' && kind === 'gathering') this.sound.poison();
+        else if (ev.type === 'loss' || ev.type === 'escape') this.sound.loss();
+        else if (ev.type === 'bite') this.sound.bite();
+        continue;
+      }
+      const ev = item.ev;
       this.view.handle(ev, shop);
       switch (ev.type) {
         case 'key': if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); break;
@@ -595,7 +623,6 @@ export class Game {
         case 'banquet': this.sound.bell(); break;
         case 'refill': this.sound.select(); break;
         case 'tripStart':
-          this.trip = { game: createMinigame(ev.trip.id, new Rng(this.seed + shop.stats.trips * 7919), shop.difficulty), phase: 'intro', t: SHOP.tripIntro };
           this.tripView = new MinigameView();
           this.tripView.art = this.art;
           if (this.art) void this.art.ensureTrip(ev.trip.id).catch(() => { this.tripView.art = null; });
@@ -603,50 +630,28 @@ export class Game {
           // 最初の調達に出たら、はじめての人向けの案内は終わり
           if (!this.settings.guided) { this.settings.guided = true; this.store.saveSettings(this.settings); }
           break;
-        case 'phase': this.sound.bell(); if (!this.trip) this.sound.play(PHASE_TRACK[ev.index]); break;
+        case 'phase': this.sound.bell(); if (!session.trip) this.sound.play(PHASE_TRACK[ev.index]); break;
         case 'end': this.finish(); break;
         default: break;
-      }
-    }
-    if (this.trip?.phase === 'game') {
-      for (const ev of this.trip.game.drainEvents()) {
-        this.tripView.handle(ev, this.trip.game);
-        const kind = this.trip.game.kind;
-        if (ev.type === 'key') { if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); }
-        else if (ev.type === 'word' && kind === 'hunting') this.sound.shot();
-        else if (ev.type === 'gain' && kind === 'hunting') this.sound.kill(!!ev.big);
-        else if (ev.type === 'gain') {
-          this.sound.gain(kind);
-          // 釣りの大物は、きらめく音を重ねる
-          if (kind === 'fishing' && (this.trip.game as unknown as { big: boolean }).big) this.sound.sparkle();
-        }
-        else if (ev.type === 'loss' && kind === 'gathering') this.sound.poison();
-        else if (ev.type === 'loss' || ev.type === 'escape') this.sound.loss();
-        else if (ev.type === 'bite') this.sound.bite();
       }
     }
   }
 
   finish() {
-    const shop = this.shop!;
-    if (this.trip) {
-      // 調達中に閉店しても、持ち帰った分の打鍵は記録に残す
-      const r = this.trip.game.result();
-      shop.stats.correctKeys += r.correctKeys;
-      shop.stats.missKeys += r.missKeys;
-      this.trip = null;
-    }
-    const s = shop.stats;
-    const total = s.correctKeys + s.missKeys;
+    const session = this.session!;
+    const shop = session.shop;
+    const sum = session.summary();
     const rec: DayRecord = {
-      score: shop.score, served: s.served, maxCombo: s.maxCombo, angry: s.angry,
-      kps: this.playElapsed > 0 ? s.correctKeys / this.playElapsed : 0, accuracy: total ? s.correctKeys / total : 1, finishedAt: new Date().toISOString(),
+      score: sum.score, served: sum.served, maxCombo: sum.maxCombo, angry: sum.angry,
+      kps: sum.kps, accuracy: sum.accuracy, finishedAt: new Date().toISOString(),
     };
     const diff = shop.difficulty;
     // ひがわりの記録は日付×難易度ごと。通常営業の自己ベストとは混ぜない
     const best = this.daily ? this.store.recordDaily(rec, this.daily.date, diff.id) : this.store.record(rec, diff.id);
     const rank = rankFor(rec.score, diff);
-    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: s.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily };
+    // ランキングでは、サーバーがこの記録どおりに営業をやり直して成績を確かめる
+    const play = { seed: session.seed, record: session.record, prep: session.rules.prepBudget > 0 && this.prep ? { ...this.prep.alloc } : null };
+    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: sum.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily, play };
     this.submission = { state: 'idle', receipt: null, message: '' };
     this.mode = 'result';
     this.menu.reset();

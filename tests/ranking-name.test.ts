@@ -18,7 +18,7 @@ describe('ランキングの名前入力', () => {
     expect(input.value).toBe('おかみ');
     input.value = ' 店主 ';
     form.requestSubmit();
-    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('店主');
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('店主', null);
     expect(onClose).toHaveBeenCalledOnce();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
@@ -48,7 +48,7 @@ describe('ランキングの名前入力', () => {
     input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
     input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
     document.querySelector<HTMLButtonElement>('button[type="submit"]')!.dispatchEvent(new MouseEvent('click', { detail: 1, bubbles: true, cancelable: true }));
-    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('店主');
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('店主', null);
   });
   it('Escでキャンセルし、キーをゲームへ渡さない', () => {
     const { input, onSubmit, onClose } = open();
@@ -66,5 +66,29 @@ describe('ランキングの名前入力', () => {
     form.dispatchEvent(new Event('submit', { cancelable: true }));
     form.dispatchEvent(new Event('submit', { cancelable: true }));
     expect(onSubmit).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Turnstile の確認つきの名前入力', () => {
+  it('確認が済むまでは送らず、済んだら確認の印と一緒に送る', async () => {
+    const onSubmit = vi.fn();
+    let done: (token: string) => void = () => {};
+    const remove = vi.fn();
+    openRankingName({
+      initialName: '店主', onSubmit, onClose: vi.fn(), turnstile: 'site-key',
+      loadTurnstile: async () => ({
+        render: (_el: HTMLElement, o: Record<string, unknown>) => { done = o.callback as (t: string) => void; expect(o.sitekey).toBe('site-key'); return 'w1'; },
+        remove,
+      }),
+    });
+    await Promise.resolve(); await Promise.resolve();
+    const form = document.querySelector('form')!;
+    form.requestSubmit();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('確認が終わるまで');
+    done('token-1');
+    form.requestSubmit();
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('店主', 'token-1');
+    expect(remove).toHaveBeenCalledWith('w1');
   });
 });

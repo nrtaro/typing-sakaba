@@ -34,7 +34,17 @@ export class RankingClient {
     return this.request(`/api/daily/top?${params}`, board);
   }
 
-  submit(value: ScoreSubmission): Promise<RankReceipt> {
-    return this.request('/api/daily/score', receipt, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
+  /** ランキングの設定：Turnstile の公開キー（使わないときは null） */
+  async config(): Promise<{ turnstile: string | null }> {
+    try {
+      return await this.request<{ turnstile: string | null }>('/api/daily/config', (v) => !!v && (v.turnstile === null || typeof v.turnstile === 'string'));
+    } catch {
+      return { turnstile: null };
+    }
+  }
+
+  submit(value: ScoreSubmission, turnstile: string | null = null): Promise<RankReceipt> {
+    const body = turnstile ? { ...value, turnstile } : value;
+    return this.request('/api/daily/score', receipt, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   }
 }

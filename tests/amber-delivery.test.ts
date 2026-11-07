@@ -29,14 +29,14 @@ describe('画像版の配膳と営業の同期', () => {
       for (const key of new RomajiMatcher(dish.kana).remaining) shop.key(key);
       for (const ev of shop.drainEvents()) view.handle(ev, shop);
     }
-    expect(view.servers.wife.jobs).toHaveLength(2);
+    expect(shop.crew.members.wife.jobs).toHaveLength(2);
     expect(shop.seats[3]!.awaitingDelivery).toBe(true);
     const score = shop.score;
     for (let i = 0; i < 30; i++) { shop.update(1 / 60); view.update(1 / 60, shop); }
     expect(shop.seats[3]!.t).toBe(SHOP.eatTime);
     for (let i = 0; i < 900; i++) { shop.update(1 / 60); view.update(1 / 60, shop); }
     expect(guests.every((g) => !('awaitingDelivery' in g) || !g.awaitingDelivery)).toBe(true);
-    expect(view.servers.wife.jobs).toHaveLength(0);
+    expect(shop.crew.members.wife.jobs).toHaveLength(0);
     expect(shop.stats.served).toBe(2);
     expect(shop.score).toBeLessThanOrEqual(score); // 入店後の放置客のペナルティはあり得る
   });

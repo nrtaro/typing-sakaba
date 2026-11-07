@@ -1,4 +1,5 @@
 import { startingStock } from './startingStock';
+import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
 import { Rng } from './rng';
@@ -94,6 +95,8 @@ export class Shop {
   ended = false;
   stats: ShopStats = { served: 0, angry: 0, maxCombo: 0, correctKeys: 0, missKeys: 0, trips: 0, sales: 0, tips: 0 };
   readonly input: CandidateInput<TargetData>;
+  /** 配膳の係。料理を出すと席へ運び、置いてからお客が食べ始める */
+  readonly crew = new Crew<Guest>();
   private spawnTimer = 1;
   private entryTimer = 0;
   private nextId = 1;
@@ -327,6 +330,7 @@ export class Shop {
     this.stats.tips += tip;
     g.state = 'eat';
     g.t = SHOP.eatTime;
+    this.crew.assign(seat, g, this.away?.who);
     this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
   }
 
@@ -349,6 +353,7 @@ export class Shop {
     if (this.away) return;
     this.away = trip;
     this.awayPhase = this.phaseIndex;
+    this.crew.leave(trip.who);
     this.stats.trips++;
     this.input.reset();
     this.events.push({ type: 'tripStart', trip });
@@ -501,7 +506,9 @@ export class Shop {
         } else if (g.t <= 0) this.seats[i] = null;
       }
     });
-    this.input.prune(new Set(this.targets().map((t) => t.id)));
+    this.crew.update(dt, this.seats.filter((g) => g !== null).length, this.away?.who);
+    // 打っている途中のときだけ、消えた候補を外す（毎刻み候補を作り直さない）
+    if (this.input.active.length) this.input.prune(new Set(this.targets().map((t) => t.id)));
   }
 
   private makeGuest(): Guest {

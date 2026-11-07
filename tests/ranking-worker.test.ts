@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import type { D1Database } from '@cloudflare/workers-types';
-import { dailyConditions, jstDate } from '../src/core/daily';
+import { dailyConditions, defaultPrep, jstDate, rulesFor } from '../src/core/daily';
+import { botPlay } from './bot';
+import { checkTurnstile } from '../worker/turnstile';
 import type { ScoreSubmission } from '../src/core/ranking';
 import worker from '../worker/index';
 import { readBoard, submitScore } from '../worker/repository';
@@ -36,7 +38,24 @@ afterEach(() => { for (const db of opened.splice(0)) db.close(); });
 const player = (n: number) => `12345678-1234-4123-8123-${String(n).padStart(12, '0')}`;
 function score(n = 1, points = 1000): ScoreSubmission {
   return { date: jstDate(), difficulty: 'normal', name: `店主${n}`, player: player(n), score: points,
-    served: 30, maxCombo: 20, angry: 0, accuracy: 1, kps: 5, conds: dailyConditions(jstDate()).map(c => c.id) };
+    served: 30, maxCombo: 20, angry: 0, accuracy: 1, kps: 5, conds: dailyConditions(jstDate()).map(c => c.id),
+    seed: 1, record: '', prep: null };
+}
+/** 今日のお題で実際にボットが遊んだ記録（サーバーがやり直して確かめられる本物の記録） */
+const plays = new Map<number, ScoreSubmission>();
+function realScore(n = 1): ScoreSubmission {
+  const cached = plays.get(n);
+  if (cached) return { ...cached };
+  const date = jstDate();
+  const rules = rulesFor(dailyConditions(date), 'normal', date);
+  const prep = rules.prepBudget > 0 ? defaultPrep(rules) : null;
+  const s = botPlay(100 + n, 'normal', rules, 5, prep);
+  const m = s.summary();
+  const value: ScoreSubmission = { date, difficulty: 'normal', name: `店主${n}`, player: player(n),
+    score: m.score, served: m.served, maxCombo: m.maxCombo, angry: m.angry, accuracy: m.accuracy, kps: m.kps,
+    conds: dailyConditions(date).map(c => c.id), seed: 100 + n, record: s.record, prep };
+  plays.set(n, value);
+  return { ...value };
 }
 
 describe('D1ランキングの保存と順位', () => {
@@ -91,11 +110,12 @@ describe('WorkerのAPI', () => {
   it('記録を受け付け、上位と自分の順位を返し、生のIPを保存しない', async () => {
     const { db, sqlite } = database();
     const env = { DB: db, RANKING_IP_SALT: 'test-only-secret' };
-    const result = await worker.fetch(post(score()), env);
+    const sent = realScore();
+    const result = await worker.fetch(post(sent), env);
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ rank: 1, total: 1 });
     const board = await worker.fetch(new Request(`https://game.example/api/daily/top?date=${jstDate()}&difficulty=normal&player=${player(1)}`), env);
-    expect(await board.json()).toEqual({ top: [{ name: '店主1', score: 1000, rank: 1 }], me: { rank: 1, score: 1000 }, total: 1 });
+    expect(await board.json()).toEqual({ top: [{ name: '店主1', score: sent.score, rank: 1 }], me: { rank: 1, score: sent.score }, total: 1 });
     const hash = sqlite.prepare('SELECT ip_hash FROM scores').get()!.ip_hash;
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
     expect(hash).not.toContain('192.0.2.1');
@@ -107,11 +127,32 @@ describe('WorkerのAPI', () => {
     expect(response.status).toBe(400);
     expect((await readBoard(db, jstDate(), 'normal', null)).total).toBe(0);
   });
+  it('遊んだ記録とずれた成績は、やり直して見つけて保存しない', async () => {
+    const { db } = database();
+    const env = { DB: db, RANKING_IP_SALT: 'secret' };
+    const real = realScore();
+    for (const bad of [{ score: real.score + 10 }, { served: real.served + 1 }, { seed: real.seed + 1 }, { record: real.record.slice(0, real.record.length >> 1).replace(/\d+$/, '') }]) {
+      const response = await worker.fetch(post({ ...real, ...bad }), env);
+      expect(response.status).toBe(400);
+    }
+    expect((await readBoard(db, jstDate(), 'normal', null)).total).toBe(0);
+    // やり直しを止めているときは、数字の確認だけで受け付ける（処理時間の逃げ道）
+    expect((await worker.fetch(post({ ...real, score: real.score + 10 }), { ...env, RANKING_REPLAY: 'off' })).status).toBe(200);
+  });
+  it('Turnstile のキーがそろっているときは、確認の印がないと受け付けない', async () => {
+    const { db } = database();
+    const env = { DB: db, RANKING_IP_SALT: 'secret', TURNSTILE_SITE_KEY: 'site', TURNSTILE_SECRET: 'secret' };
+    expect((await worker.fetch(post(realScore()), env)).status).toBe(403);
+    const config = await worker.fetch(new Request('https://game.example/api/daily/config'), env);
+    expect(await config.json()).toEqual({ turnstile: 'site' });
+    const off = await worker.fetch(new Request('https://game.example/api/daily/config'), { DB: db, TURNSTILE_SITE_KEY: 'site' });
+    expect(await off.json()).toEqual({ turnstile: null });
+  });
   it('回数を超えると429を返す', async () => {
     const { db } = database();
     const env = { DB: db, RANKING_IP_SALT: 'secret' };
-    for (let i = 0; i < 10; i++) expect((await worker.fetch(post(score()), env)).status).toBe(200);
-    expect((await worker.fetch(post(score()), env)).status).toBe(429);
+    for (let i = 0; i < 10; i++) expect((await worker.fetch(post(realScore()), env)).status).toBe(200);
+    expect((await worker.fetch(post(realScore()), env)).status).toBe(429);
   });
   it('他のサイトからの送信を拒否する', async () => {
     const { db } = database();
@@ -119,7 +160,7 @@ describe('WorkerのAPI', () => {
   });
   it('本文が大きすぎると拒否する', async () => {
     const { db } = database();
-    expect((await worker.fetch(post({ extra: 'x'.repeat(9000) }), { DB: db, RANKING_IP_SALT: 'secret' })).status).toBe(413);
+    expect((await worker.fetch(post({ extra: 'x'.repeat(70000) }), { DB: db, RANKING_IP_SALT: 'secret' })).status).toBe(413);
   });
   it('DBや秘密値の準備前は503でゲームに戻れる', async () => {
     expect((await worker.fetch(post(score()), {})).status).toBe(503);
@@ -136,5 +177,16 @@ describe('WorkerのAPI', () => {
   it('API以外は静的アセットに渡す', async () => {
     const response = await worker.fetch(new Request('https://game.example/'), { ASSETS: { fetch: async () => new Response('static-game') } });
     expect(await response.text()).toBe('static-game');
+  });
+});
+
+describe('Turnstile の確認', () => {
+  const ok = (body: unknown) => (async () => new Response(JSON.stringify(body))) as unknown as typeof fetch;
+  it('Cloudflare が成功と答えたときだけ通す', async () => {
+    expect(await checkTurnstile('s', 'token', '192.0.2.1', ok({ success: true, action: 'ranking' }))).toBe(true);
+    expect(await checkTurnstile('s', 'token', null, ok({ success: false }))).toBe(false);
+    expect(await checkTurnstile('s', 'token', null, ok({ success: true, action: 'login' }))).toBe(false);
+    expect(await checkTurnstile('s', '', null, ok({ success: true }))).toBe(false);
+    expect(await checkTurnstile('s', 'token', null, (async () => { throw new TypeError('offline'); }) as unknown as typeof fetch)).toBe(false);
   });
 });

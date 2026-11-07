@@ -5,8 +5,8 @@ import { procurementReward, rewardKeys } from '../src/core/procurementRewards';
 import { defaultRomaji } from '../src/core/romaji';
 import { Rng } from '../src/core/rng';
 import { difficultyOf, TRIPS } from '../src/core/shopConfig';
-import { Shop } from '../src/core/shop';
-import { Game } from '../src/ui/game';
+import { PlaySession } from '../src/core/session';
+import { NORMAL_RULES } from '../src/core/daily';
 
 const easy = difficultyOf('easy');
 
@@ -20,22 +20,14 @@ describe('やさしいの調達', () => {
   });
 
   it.each(['easy', 'normal', 'hard'] as const)('%s：調達中の店の時計と調達時間が正しい速度で進む', id => {
-    const shop = new Shop(new Rng(1), difficultyOf(id));
+    const session = new PlaySession(1, difficultyOf(id), NORMAL_RULES);
     const mini = createMinigame('gathering', new Rng(2), difficultyOf(id));
-    shop.away = TRIPS.find(t => t.id === 'gathering')!;
-    const game = Object.assign(Object.create(Game.prototype), {
-      mode: 'play', paused: false, shop, countdown: 0, goShown: 0, t: 0, missFlash: 0, volumeShown: 0, playElapsed: 0,
-      settings: { guided: true }, view: { update: vi.fn() }, tripView: { art: null, update: vi.fn() },
-      trip: { game: mini, phase: 'game', t: 0 }, sound: new Proxy({}, { get: () => vi.fn() }),
-    }) as Game;
-    game.step(1);
-    expect(shop.clock).toBeCloseTo(id === 'easy' ? 2 / 3 : 1);
+    session.shop.away = TRIPS.find(t => t.id === 'gathering')!;
+    session.trip = { game: mini, phase: 'game', t: 0 };
+    for (let i = 0; i < 60; i++) session.tick();
+    expect(session.shop.clock).toBeCloseTo(id === 'easy' ? 2 / 3 : 1);
     expect(mini.timeLeft).toBeCloseTo((id === 'easy' ? 15 : 10) - 1);
-    expect(game['playElapsed']).toBe(1);
-    game.paused = true;
-    game.step(5);
-    expect(game['playElapsed']).toBe(1);
-    expect(shop.clock).toBeCloseTo(id === 'easy' ? 2 / 3 : 1);
+    expect(session.elapsed).toBeCloseTo(1);
   });
 
   it('短いテキストでも以前より素材が多い', () => {
@@ -68,14 +60,10 @@ describe('やさしいの調達', () => {
   });
 
   it('店の時計が遅い分を含む実プレイ時間から、打鍵／秒を算出する', () => {
-    const shop = new Shop(new Rng(1), easy);
-    shop.stats.correctKeys = 420;
-    const game = Object.assign(Object.create(Game.prototype), {
-      shop, trip: null, playElapsed: 210, store: { record: () => false }, menu: { reset: vi.fn() },
-      sound: new Proxy({}, { get: () => vi.fn() }), t: 210,
-    }) as Game;
-    game['finish']();
-    expect(game.result?.kps).toBe(2);
+    const session = new PlaySession(1, easy, NORMAL_RULES);
+    session.shop.stats.correctKeys = 420;
+    session.ticks = 210 * 60;
+    expect(session.summary().kps).toBeCloseTo(2);
   });
 
   it('狩り・採取・仕入れは、やさしいで長すぎる言葉を出さない', () => {

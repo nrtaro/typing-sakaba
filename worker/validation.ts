@@ -1,6 +1,6 @@
 import { BANQUET_MULT, HIDEN_MULT, dailyConditions, jstDate, rulesFor } from '../src/core/daily';
-import { normalizeRankingName, PLAYER_ID, type ScoreSubmission } from '../src/core/ranking';
-import { DISHES, SHOP, type DifficultyId } from '../src/core/shopConfig';
+import { normalizeRankingName, PLAYER_ID, RECORD_FORMAT, RECORD_MAX, type ScoreSubmission } from '../src/core/ranking';
+import { DISHES, INGREDIENT_ORDER, SHOP, type DifficultyId, type IngredientId } from '../src/core/shopConfig';
 
 const SCORE_LIMIT: Record<DifficultyId, number> = { easy: 60000, normal: 100000, hard: 120000 };
 const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
@@ -19,6 +19,21 @@ function submissionDate(date: string, now: Date) {
   if (date === today) return true;
   const midnight = new Date(`${today}T00:00:00+09:00`).getTime();
   return now.getTime() - midnight < 5 * 60_000 && date === jstDate(new Date(now.getTime() - 86400_000));
+}
+
+/** 仕込みの振り分け：null か、6種類すべてが0〜99の整数。それ以外は undefined */
+function readPrep(v: unknown): Record<IngredientId, number> | null | undefined {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const o = v as Record<string, unknown>;
+  if (Object.keys(o).length !== INGREDIENT_ORDER.length) return undefined;
+  const out = {} as Record<IngredientId, number>;
+  for (const id of INGREDIENT_ORDER) {
+    const n = o[id];
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 99) return undefined;
+    out[id] = n;
+  }
+  return out;
 }
 
 type Validation = { ok: true; value: ScoreSubmission } | { ok: false; error: string };
@@ -58,9 +73,14 @@ export function validateSubmission(input: unknown, now = new Date()): Validation
   const maxSales = perDish * (v.served + hiden * (HIDEN_MULT - 1) + banquets * (BANQUET_MULT - 1)
     + Math.min(hiden, banquets) * (HIDEN_MULT - 1) * (BANQUET_MULT - 1));
   if (v.score > maxSales) return invalid('売上と料理の数を確かめられませんでした');
+  // やり直しに要るもの（中身が合っているかは、やり直して確かめる）
+  if (!numberIn(v.seed, 0xffffffff)) return invalid('遊んだ記録を読み取れませんでした');
+  if (typeof v.record !== 'string' || v.record.length > RECORD_MAX || !RECORD_FORMAT.test(v.record)) return invalid('遊んだ記録を読み取れませんでした');
+  const prep = readPrep(v.prep);
+  if (prep === undefined) return invalid('仕込みの振り分けを読み取れませんでした');
   return { ok: true, value: {
     date: v.date, difficulty: v.difficulty, name, player: v.player.toLowerCase(),
     score: v.score, served: v.served, maxCombo: v.maxCombo, angry: v.angry,
-    accuracy: v.accuracy, kps: v.kps, conds: expected,
+    accuracy: v.accuracy, kps: v.kps, conds: expected, seed: v.seed, record: v.record, prep,
   } };
 }

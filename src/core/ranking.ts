@@ -1,5 +1,5 @@
 import type { ConditionId } from './daily';
-import type { DifficultyId } from './shopConfig';
+import type { DifficultyId, IngredientId } from './shopConfig';
 
 export interface ScoreSubmission {
   date: string;
@@ -13,7 +13,15 @@ export interface ScoreSubmission {
   accuracy: number;
   kps: number;
   conds: ConditionId[];
+  /** 営業をやり直すのに要るもの：乱数の種・入力の記録（1/60秒刻み）・仕込みの振り分け */
+  seed: number;
+  record: string;
+  prep: Record<IngredientId, number> | null;
 }
+
+/** 入力の記録の長さの上限（とても速い人が3分打ち続けても届かない長さ） */
+export const RECORD_MAX = 30000;
+export const RECORD_FORMAT = /^(?:\d{1,6}[a-z\-BSE])*$/;
 
 export interface RankedScore { rank: number; name: string; score: number }
 export interface RankReceipt { rank: number; total: number }

@@ -1,10 +1,17 @@
 import { normalizeRankingName } from '../core/ranking';
+import { loadTurnstile, type TurnstileApi } from './turnstile';
 
 interface NameOptions {
   initialName: string;
-  onSubmit(name: string): void;
+  /** Turnstile の公開キー。あるときは、確認が済むまで送信しない */
+  turnstile?: string | null;
+  onSubmit(name: string, token: string | null): void;
   onClose(): void;
+  /** 動作確認用：Turnstile の読み込みを差し替える */
+  loadTurnstile?: () => Promise<TurnstileApi>;
 }
+
+const WAIT = '確認が終わるまで、少しお待ちください。';
 
 /** 名前入力だけはHTMLにし、ブラウザの日本語入力をそのまま使う。 */
 export function openRankingName(options: NameOptions, doc: Document = document) {
@@ -43,7 +50,26 @@ export function openRankingName(options: NameOptions, doc: Document = document) 
   cancel.textContent = 'やめる（Esc）';
   for (const button of [submit, cancel]) button.style.cssText = 'font:inherit;font-size:14px;padding:10px 8px;border:2px solid #b9883f;border-radius:4px;background:#ebc47e;color:#3a2414;cursor:pointer';
   actions.append(submit, cancel);
-  form.append(label, note, error, actions);
+  // Turnstile：人が送っていることを確かめる欄（多くの場合は自動で済む）
+  let token: string | null = null;
+  let widget: string | null = null;
+  let api: TurnstileApi | null = null;
+  const check = doc.createElement('div');
+  check.style.cssText = 'min-height:0;margin:4px 0 8px';
+  if (options.turnstile) {
+    const siteKey = options.turnstile;
+    (options.loadTurnstile ?? (() => loadTurnstile(doc)))().then((t) => {
+      if (closed) return;
+      api = t;
+      widget = t.render(check, {
+        sitekey: siteKey, action: 'ranking', theme: 'dark', language: 'ja',
+        callback: (v: string) => { token = v; if (error.textContent === WAIT) error.textContent = ''; },
+        'expired-callback': () => { token = null; },
+        'error-callback': () => { token = null; error.textContent = '確認を読み込めませんでした。少し待ってからもう一度お試しください。'; },
+      });
+    }).catch(() => { if (!closed) error.textContent = '確認を読み込めませんでした。通信の状態を確かめてください。'; });
+  }
+  form.append(label, note, check, error, actions);
   wrap.append(form);
   let closed = false;
   let composing = false;
@@ -52,6 +78,7 @@ export function openRankingName(options: NameOptions, doc: Document = document) 
   const close = () => {
     if (closed) return;
     closed = true;
+    if (api && widget) api.remove(widget);
     wrap.remove();
     previous?.focus();
     options.onClose();
@@ -81,8 +108,12 @@ export function openRankingName(options: NameOptions, doc: Document = document) 
       input.focus();
       return;
     }
+    if (options.turnstile && !token) {
+      error.textContent = WAIT;
+      return;
+    }
     close();
-    options.onSubmit(name);
+    options.onSubmit(name, token);
   });
   cancel.addEventListener('click', close);
   doc.body.append(wrap);
