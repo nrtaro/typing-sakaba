@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import type { D1Database } from '@cloudflare/workers-types';
 import { dailyConditions, defaultPrep, jstDate, rulesFor } from '../src/core/daily';
 import { botPlay } from './bot';
 import { checkTurnstile } from '../worker/turnstile';
+import { auditRow, type ScoreRow } from '../worker/audit';
 import type { ScoreSubmission } from '../src/core/ranking';
 import worker from '../worker/index';
 import { readBoard, submitScore } from '../worker/repository';
@@ -14,7 +15,10 @@ const opened: DatabaseSync[] = [];
 function database() {
   const sqlite = new DatabaseSync(':memory:');
   opened.push(sqlite);
-  sqlite.exec(readFileSync(new URL('../migrations/0001_daily_ranking.sql', import.meta.url), 'utf8'));
+  // 本番と同じく、マイグレーションを番号の順にすべて当てる
+  for (const file of readdirSync(new URL('../migrations/', import.meta.url)).filter((f) => f.endsWith('.sql')).sort()) {
+    sqlite.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
+  }
   class Statement {
     constructor(readonly sql: string, readonly args: (string | number | null)[] = []) {}
     bind(...args: (string | number | null)[]) { return new Statement(this.sql, args); }
@@ -188,5 +192,34 @@ describe('Turnstile の確認', () => {
     expect(await checkTurnstile('s', 'token', null, ok({ success: true, action: 'login' }))).toBe(false);
     expect(await checkTurnstile('s', '', null, ok({ success: true }))).toBe(false);
     expect(await checkTurnstile('s', 'token', null, (async () => { throw new TypeError('offline'); }) as unknown as typeof fetch)).toBe(false);
+  });
+});
+
+describe('記録を残して、あとから手元で確かめる', () => {
+  const post = (body: unknown) => new Request('https://game.example/api/daily/score', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '192.0.2.9' }, body: JSON.stringify(body),
+  });
+  const rows = (sqlite: DatabaseSync) => sqlite.prepare('SELECT * FROM scores ORDER BY id').all() as unknown as ScoreRow[];
+
+  it('遊んだ記録を自己ベストと一緒に残し、本物は「一致」、書き換えた成績は「一致しない」', async () => {
+    const { db, sqlite } = database();
+    // 無料プランの設定（やり直しなし）で受け付けたものを、あとから確かめる
+    const env = { DB: db, RANKING_IP_SALT: 'secret', RANKING_REPLAY: 'off' };
+    const real = realScore(1);
+    expect((await worker.fetch(post(real), env)).status).toBe(200);
+    expect((await worker.fetch(post({ ...realScore(2), score: realScore(2).score + 30 }), env)).status).toBe(200);
+    const [a, b] = rows(sqlite);
+    expect(a).toMatchObject({ seed: real.seed, record: real.record, prep: real.prep ? JSON.stringify(real.prep) : null });
+    expect(auditRow(a).status).toBe('ok');
+    expect(auditRow(b)).toMatchObject({ status: 'mismatch', reason: '遊んだ記録と成績が一致しませんでした' });
+  });
+
+  it('段階6より前の記録は「記録なし」。低い記録では、残した記録を書き換えない', async () => {
+    const { db, sqlite } = database();
+    await submitScore(db, { ...score(1, 500), seed: 9, record: '5a' }, 'ip', 1000);
+    await submitScore(db, { ...score(1, 300), seed: 8, record: '7b' }, 'ip', 1001);
+    expect(rows(sqlite)[0]).toMatchObject({ score: 500, seed: 9, record: '5a' });
+    sqlite.exec('UPDATE scores SET seed = NULL, record = NULL');
+    expect(auditRow(rows(sqlite)[0]).status).toBe('noRecord');
   });
 });

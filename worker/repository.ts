@@ -40,16 +40,19 @@ export async function submitScore(db: D1Database, s: ScoreSubmission, ipHash: st
       WHERE (SELECT COUNT(*) FROM score_requests WHERE player = ? AND created_at > ?) < 10
         AND (SELECT COUNT(*) FROM score_requests WHERE ip_hash = ? AND created_at > ?) < 10`)
       .bind(requestId, s.player, ipHash, now, s.player, cutoff, ipHash, cutoff),
+    // 遊んだ記録も自己ベストと一緒に残す（あとから手元でやり直して確かめるため）
     db.prepare(`INSERT INTO scores
-      (date, difficulty, name, score, served, max_combo, angry, accuracy, kps, player, ip_hash, created_at)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      (date, difficulty, name, score, served, max_combo, angry, accuracy, kps, player, ip_hash, created_at, seed, record, prep)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE EXISTS (SELECT 1 FROM score_requests WHERE request_id = ?)
       ON CONFLICT (date, difficulty, player) DO UPDATE SET
         name = excluded.name, score = excluded.score, served = excluded.served,
         max_combo = excluded.max_combo, angry = excluded.angry, accuracy = excluded.accuracy,
-        kps = excluded.kps, ip_hash = excluded.ip_hash, created_at = excluded.created_at
+        kps = excluded.kps, ip_hash = excluded.ip_hash, created_at = excluded.created_at,
+        seed = excluded.seed, record = excluded.record, prep = excluded.prep
       WHERE excluded.score > scores.score`)
-      .bind(s.date, s.difficulty, s.name, s.score, s.served, s.maxCombo, s.angry, s.accuracy, s.kps, s.player, ipHash, now, requestId),
+      .bind(s.date, s.difficulty, s.name, s.score, s.served, s.maxCombo, s.angry, s.accuracy, s.kps, s.player, ipHash, now,
+        s.seed, s.record, s.prep ? JSON.stringify(s.prep) : null, requestId),
     myRank(db, s.date, s.difficulty, s.player), totalPlayers(db, s.date, s.difficulty),
   ]);
   if (results[1].meta.changes !== 1) throw new RateLimitError();

@@ -12,7 +12,8 @@
     "db:local": "wrangler d1 migrations apply typing-sakaba --local",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "sim": "vitest run tests/day.sim.test.ts --silent=false"
+    "sim": "vitest run tests/day.sim.test.ts --silent=false",
+    "audit": "esbuild scripts/audit-scores.ts --bundle --platform=node --format=esm --outfile=.wrangler/tmp/audit-scores.mjs --log-level=warning && node .wrangler/tmp/audit-scores.mjs"
   },
   "repository": {
     "type": "git",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261106.1",
     "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
     "jsdom": "^31.0.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
