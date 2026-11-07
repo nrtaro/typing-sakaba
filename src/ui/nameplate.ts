@@ -30,7 +30,10 @@ export function drawNameplate(sc: Screen, x: number, y: number, w: number, h: nu
     sc.PR(x, y, 1, h, edge);
     sc.PR(x + w - 1, y, 1, h, edge);
     // ☆3〜4はゆっくり光の筋が流れる
-    if (plate.star >= 3 && plate.star <= 4) sc.PR(x + ((t * 30) % (w + 10)) - 10, y + 1, 4, h - 2, '#ffffff', 0.25);
+    if (plate.star >= 3 && plate.star <= 4) {
+      const sx = x + 1 + ((t * 30) % (w - 6));
+      sc.PR(sx, y + 1, 4, h - 2, '#ffffff', 0.25);
+    }
     textCol = p.text;
   }
   const pad = 3;
