@@ -29,6 +29,8 @@ export function setupTutorial(s: PlaySession): TutorialState {
   const shop = s.shop;
   shop.holdTime = true;
   shop.noTrips = true;
+  // 釣りだけを教える（ほかの調達は、時間切れや失敗の仕組みが違うため）
+  shop.onlyTrip = 'fishing';
   const stock: Record<IngredientId, number> = { fish: 0, meat: 6, veg: 6, mush: 4, ale: 3, spice: 3 };
   Object.assign(shop.stock, stock);
   shop.seats.fill(null);
@@ -44,7 +46,11 @@ export function tutorialEvent(state: TutorialState, s: PlaySession, item: Sessio
     const ev = item.ev;
     if (ev.type === 'serve' && state.step === 'serve1' && ev.seat === FIRST_SEAT) next(state, 'lack');
     else if (ev.type === 'serve' && state.step === 'serve2' && ev.seat === SECOND_SEAT) next(state, 'done');
-    else if (ev.type === 'tripStart' && state.step === 'lack') next(state, 'trip');
+    else if (ev.type === 'tripStart' && state.step === 'lack') {
+      // 練習の釣り：時間が減らず、魚も逃げない
+      if (s.trip) s.trip.game.practice = true;
+      next(state, 'trip');
+    }
     // 練習なので、持ち帰りが少なくても焼き魚が作れるだけの魚は置いておく
     else if (ev.type === 'tripEnd') shop.stock.fish = Math.max(shop.stock.fish, 2);
   } else if (item.src === 'trip') {
@@ -77,9 +83,9 @@ export function tutorialText(state: TutorialState): { title: string; lines: stri
     case 'lack':
       return { title: '② 素材が足りない', lines: ['焼き魚には魚が2つ要るけど、', '魚がありません（×の印）。', '下の「つり」と打って、', '女将に釣ってきてもらおう。'] };
     case 'trip':
-      return state.gained || state.t > 10
-        ? { title: '③ 店に戻る', lines: ['魚が取れたら、Enter で', 'いつでも店に戻れます。', 'さあ、Enter で戻ろう！'] }
-        : { title: '③ 調達（つり）', lines: ['浮きが沈んだら、出てきた言葉を', '打って合わせる。かかったら、', '次の言葉を打って巻き上げよう。', 'Enter でいつでも店に戻れます。'] };
+      return state.gained
+        ? { title: '③ 店に戻る', lines: ['魚が取れました！', '調達はいつでも Enter で', '切り上げて、店に戻れます。', 'さあ、Enter で戻ろう！'] }
+        : { title: '③ 調達（つり）', lines: ['練習なので時間は止まっていて、', '魚は逃げません。ゆっくりどうぞ。', '浮きが沈んだら、出た言葉を打って', '合わせ、次の言葉で巻き上げよう。', '本番では時間内に戻ってきます。'] };
     case 'serve2':
       return { title: '④ もう一度、料理を出す', lines: ['持ち帰った魚で、', '「焼き魚」を出そう。'] };
     default:

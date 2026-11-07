@@ -33,6 +33,8 @@ export abstract class Minigame<T = unknown> {
   missKeys = 0;
   readonly input: CandidateInput<T>;
   protected events: MinigameEvent[] = [];
+  /** れんしゅう：調達の時間が減らず、失敗もしない（説明を読みながら、ゆっくり試せるように） */
+  practice = false;
 
   constructor(protected readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1]) {
     this.duration = difficulty.id === 'easy' ? EASY_MINIGAME_SECONDS : MINIGAME_SECONDS;
@@ -51,7 +53,7 @@ export abstract class Minigame<T = unknown> {
 
   update(dt: number) {
     if (this.finished) return;
-    this.timeLeft = Math.max(0, this.timeLeft - dt);
+    if (!this.practice) this.timeLeft = Math.max(0, this.timeLeft - dt);
     this.step(dt);
     this.input.prune(new Set(this.targets().map((t) => t.id)));
   }
@@ -175,7 +177,8 @@ export class FishingGame extends Minigame<null> {
   protected step(dt: number) {
     if (this.timeLeft <= 0) this.overtime += dt;
     if (this.phase === 'hook') {
-      this.hookLeft -= dt;
+      // れんしゅうでは、かかった魚は打つまで待ってくれる
+      if (!this.practice) this.hookLeft -= dt;
       if (this.hookLeft <= 0) {
         // あわせ損ねた：魚に逃げられる（同じ大きさの魚がまた来る）
         this.events.push({ type: 'escape', id: 'hook' });
@@ -207,7 +210,7 @@ export class FishingGame extends Minigame<null> {
   }
 
   protected onMiss() {
-    if (this.phase !== 'reel') return;
+    if (this.phase !== 'reel' || this.practice) return;
     this.tension++;
     if (this.tension >= FISHING.breakAt) {
       // 糸が切れた：次の魚へ

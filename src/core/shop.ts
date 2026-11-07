@@ -110,6 +110,8 @@ export class Shop {
   holdTime = false;
   /** れんしゅう：調達の言葉を出さない（教えている手順の順番を守るため） */
   noTrips = false;
+  /** れんしゅう：この調達の言葉だけを出す（null はすべて） */
+  onlyTrip: TripId | null = null;
   /** 品切れ札・ひでんのを使った回数 */
   used: Record<SkillId, number> = { shinagire: 0, hiden: 0 };
   /** ひでんの：次に出す1皿が売上2倍 */
@@ -200,7 +202,7 @@ export class Shop {
     this.seats.forEach((g, i) => {
       if (g && g.state === 'wait') out.push({ id: `seat:${i}`, kana: g.dish.kana, data: { kind: 'order', seat: i } });
     });
-    if (!this.away && !this.noTrips) for (const t of TRIPS) out.push({ id: `trip:${t.id}`, kana: t.kana, data: { kind: 'trip', trip: t } });
+    if (!this.away && !this.noTrips) for (const t of TRIPS) if (!this.onlyTrip || t.id === this.onlyTrip) out.push({ id: `trip:${t.id}`, kana: t.kana, data: { kind: 'trip', trip: t } });
     for (const skill of ['shinagire', 'hiden'] as const) {
       if (this.canUseSkill(skill)) out.push({ id: `skill:${skill}`, kana: SKILL_KANA[skill], data: { kind: 'skill', skill } });
     }

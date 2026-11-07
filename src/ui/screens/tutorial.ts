@@ -37,7 +37,7 @@ export function drawTutorial(g: Game) {
   const trip = g.trip;
   if (trip && trip.phase !== 'intro') {
     // 調達の画面：上の帯の下、右側に
-    sc.shifted(0, e.y0, () => hintPanel(g, e.x1 - 196, 34, 190, title, lines, t.gained || t.t > 10));
+    sc.shifted(0, e.y0, () => hintPanel(g, e.x1 - 196, 34, 190, title, lines, t.gained));
     return;
   }
   if (trip) return;

@@ -65,4 +65,30 @@ describe('れんしゅう', () => {
     run(s, state, 20);
     expect(s.shop.seats[FIRST_SEAT]).toBeNull();
   });
+
+  it('練習の釣りは時間が減らず、かかった魚は逃げず、打ち間違えても糸が切れない', () => {
+    const s = new PlaySession(4, difficultyOf('easy'), NORMAL_RULES);
+    const state = setupTutorial(s);
+    type(s, state, 'えーる');
+    run(s, state, 1);
+    // つりだけを教える
+    expect(s.shop.targets().filter((t) => t.data.kind === 'trip').map((t) => t.id)).toEqual(['trip:fishing']);
+    type(s, state, 'つり');
+    const game = s.trip!.game as import('../src/core/minigames').FishingGame;
+    expect(game.practice).toBe(true);
+    run(s, state, 2);
+    const timeLeft = game.timeLeft;
+    // 魚がかかるまで待ち、そのあと1分放っておいても逃げない
+    run(s, state, 5);
+    expect(game.phase).toBe('hook');
+    run(s, state, 60);
+    expect(game.phase).toBe('hook');
+    expect(game.timeLeft).toBe(timeLeft);
+    expect(s.trip).not.toBeNull();
+    // 合わせてから、わざと何度も間違えても糸は切れない
+    type(s, state, game.word!.kana);
+    expect(game.phase).toBe('reel');
+    for (let i = 0; i < 10; i++) s.input('q');
+    expect(game.phase).toBe('reel');
+  });
 });

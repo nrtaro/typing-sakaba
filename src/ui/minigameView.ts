@@ -322,7 +322,7 @@ export class MinigameView {
     const closing = left <= 10 && left > 0;
     if (closing) sc.TB(`閉店まで ${Math.ceil(left)}秒`, 312, 6, 10 + (Math.ceil(left) - left > 0.6 ? 2 : 0), C.red3, 'left', C.ink);
     else sc.T(`店 ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 312, 9, 8, C.cream, 'left', 0.7);
-    if (game.difficulty.id === 'easy') sc.TB('店の時計がゆっくり進む', 8, 31, 8, C.gold3, 'left');
+    if (game.difficulty.id === 'easy' && !game.practice) sc.TB('店の時計がゆっくり進む', 8, 31, 8, C.gold3, 'left');
     // 調達中もお客は待たない日：店で待っている人数と、一番待たせている人の残り
     if (shop.rules.awayWaitRate > 0) {
       const waiting = shop.seats.filter((g) => g && g.state === 'wait');
