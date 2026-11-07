@@ -18,6 +18,10 @@ import {
 
 /** 席の位置（斜め上視点：2列×4席）。ty はテーブルの高さ */
 export const SEATS = TAVERN_SEATS;
+/** 待ち時間がこの割合を切った注文を強調する */
+export const URGENT = 0.22;
+/** 閉店前の緊張を高める秒数 */
+export const FINAL_SECONDS = 10;
 const DOOR = { x: 452, y: 202 };
 
 
@@ -433,7 +437,15 @@ export class ShopView {
     });
     sc.PR(bx + (shop.clock / DAY_LENGTH) * bw - 0.5, 16, 1.5, 9, C.w);
     const left = shop.timeLeft;
-    sc.TB(`残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 184, 6, 12, left < 20 ? C.red3 : C.w, 'left');
+    // 残り10秒：1秒ごとに時計が大きく弾み、画面の上下の縁が赤く脈打つ
+    const last = left <= FINAL_SECONDS && left > 0;
+    const beat = last ? 1 - (Math.ceil(left) - left) : 0;
+    const size = last ? 12 * (1 + 0.35 * Math.max(0, beat - 0.6) / 0.4) : 12;
+    sc.TB(`残り ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 184, 6 - (size - 12) / 2, size, left < 20 ? C.red3 : C.w, 'left');
+    if (last) {
+      const glow = 0.4 + 0.45 * beat;
+      sc.fade(e.x0, 26, e.w, 26, '#ff3a2a', glow, 0, 'y');
+    }
     sc.T('売上', 262, 9, 9, C.cream, 'left', 0.85);
     const sales = `${shop.score.toLocaleString()}円`;
     sc.TB(sales, 288, 5, sc.fitSize(sales, 14, 82), C.gold, 'left');
@@ -616,6 +628,13 @@ export class ShopView {
     const p = gst.wait / gst.maxWait;
     sc.PR(x + 4, y + bh - 3, bw - 8, 2, C.ink, a);
     sc.PR(x + 4, y + bh - 3, (bw - 8) * p, 2, p > 0.5 ? C.green : p > 0.25 ? C.gold : C.red, a);
+    // 時間切れが近い注文：札が赤く点滅し、上に「いそいで！」（おかわりの2品目は怒らないので出さない）
+    const urgent = p < URGENT && !gst.refill;
+    if (urgent) {
+      const blink = 0.5 + 0.5 * Math.sin(this.time * 12);
+      sc.glow(x, y, bw, bh, '#ff4a3a', (dim ? 0.25 : 0.45) + 0.45 * blink);
+      if (!first) sc.TB('いそいで！', x + 2, y - 10, 8, blink > 0.5 ? '#ffd0c8' : '#ff6a5a', 'left', C.ink, dim ? 0.6 : 1);
+    }
     if (first) sc.TB('▼先に出す', cx, y - 10, 8, C.gold3, 'center');
     if (gst.banquet) {
       // 宴会の札：金の縁と「予約の宴会」の帯
@@ -628,7 +647,7 @@ export class ShopView {
       sc.panel(x + 1, y + bh - 1, sc.W('しなぎれで断れる', 6) + 6, 9, '#3a1418', '#c06060');
       sc.T('しなぎれで断れる', x + 4, y + bh + 0.5, 6, '#ffb0a0', 'left');
     }
-    if (gst.extra) this.drawExtraTag(sc, gst.extra, x + bw, first || (big && shop.combo >= 2) ? y - 22 : y - 9, dim);
+    if (gst.extra) this.drawExtraTag(sc, gst.extra, x + bw, first || urgent || (big && shop.combo >= 2) ? y - 22 : y - 9, dim);
     if (gst.refill && !typing && !first) sc.TB('おかわり', x + 2, y - 9, 8, C.gold3, 'left', C.ink);
     // 打っている札の上にコンボを付ける（目線を動かさずに見えるように）
     if (big && shop.combo >= 2) {

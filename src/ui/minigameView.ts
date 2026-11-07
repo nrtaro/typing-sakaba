@@ -11,7 +11,7 @@ import { RomajiMatcher } from '../core/romaji';
 import { INGREDIENT_NAME, TRIPS } from '../core/shopConfig';
 import type { Shop } from '../core/shop';
 import type { Art } from './amber/art';
-import { deerLabelBox } from './huntLayout';
+import { deerLabelBox, spreadLabels } from './huntLayout';
 import { animLength, frameAt } from './amber/manifest';
 import { AMBER, ICON_INDEX } from './amber/layout';
 
@@ -318,7 +318,10 @@ export class MinigameView {
     }
     // お店の残り時間は右端に小さく（お客の待ち時間は止まっているので、急がせる表示にしない）
     const left = shop.timeLeft;
-    sc.T(`店 ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 312, 9, 8, C.cream, 'left', 0.7);
+    // 閉店まで10秒を切ったら、店の時計を赤く大きくして知らせる
+    const closing = left <= 10 && left > 0;
+    if (closing) sc.TB(`閉店まで ${Math.ceil(left)}秒`, 312, 6, 10 + (Math.ceil(left) - left > 0.6 ? 2 : 0), C.red3, 'left', C.ink);
+    else sc.T(`店 ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`, 312, 9, 8, C.cream, 'left', 0.7);
     if (game.difficulty.id === 'easy') sc.TB('店の時計がゆっくり進む', 8, 31, 8, C.gold3, 'left');
     // 調達中もお客は待たない日：店で待っている人数と、一番待たせている人の残り
     if (shop.rules.awayWaitRate > 0) {
@@ -484,8 +487,9 @@ export class MinigameView {
   private drawHuntingUi(sc: Screen, game: HuntingGame) {
     const active = game.input.active;
     // 他の獲物との重なりで上へ積み上げない。小物は頭上、大物は頭の横へ追従する。
-    const preys = [...game.prey].sort((a, b) => a.x - b.x);
-    for (const p of preys) {
+    // 大物の札を先に、小物は左から順に置き、重なる札はずらす（大物の札は動かさない）
+    const preys = [...game.prey].sort((a, b) => (a.kind === 'deer' ? 0 : 1) - (b.kind === 'deer' ? 0 : 1) || a.x - b.x);
+    const plans = preys.map((p) => {
       const pos = preyPos(p);
       const live = active.find((l) => l.target.id === p.id);
       const dim = game.input.typed.length > 0 && !live;
@@ -494,11 +498,17 @@ export class MinigameView {
       const h = 32;
       const w = Math.max(60, sc.W(m.typed + m.remaining, 10) + 14, sc.W(label, 12) + 14);
       const spriteH = p.kind === 'deer' ? 48 : 24;
-      const deer = p.kind === 'deer';
       // 大物の頭上は中段の小物の走路。ふだんは頭の左横に置き、画面の左端に近づいたら
       // 反対側へ飛ばさずに、少しずつ頭の上へ移していく（札が急に跳ねて大物が戻ったように見えないように）
-      const box = deer ? deerLabelBox(pos, w, h, spriteH)
+      const box = p.kind === 'deer' ? deerLabelBox(pos, w, h, spriteH)
         : { x: Math.max(4, Math.min(LW - w - 4, pos.x - w / 2)), y: pos.y - spriteH - h - 8, w, h };
+      return { p, pos, live, dim, m, label, h, w, spriteH, box };
+    });
+    const boxes = spreadLabels(plans.map((x) => x.box), 4, LW - 4);
+    plans.forEach((plan, i) => {
+      const { p, pos, live, dim, m, label, h, w, spriteH } = plan;
+      const box = boxes[i];
+      const deer = p.kind === 'deer';
       const cx = box.x + w / 2;
       // 弱める札も透かさない（明るい砂地の上でも文字が読めるように）。枠と文字の色だけ落とす
       const edge = live ? C.gold : dim ? '#6a5040' : deer ? C.gold2 : C.cream2;
@@ -516,7 +526,7 @@ export class MinigameView {
       sc.roma(m.typed, m.remaining, cx, box.y + 18, 10, live ? 'active' : dim ? 'dim' : 'idle');
       for (let i = 0; i < p.maxHp; i++) sc.PR(cx - p.maxHp * 4 + i * 8, box.y - 5, 6, 3, i < p.hp ? C.pink : C.ink);
       if (p.kind === 'deer') this.tag(sc, p.hp === 1 ? `大物 肉×${procurementReward('hunting', (p.rewardKeys ?? 0) + rewardKeys(p.word.kana), true, game.difficulty.id)}` : '大物', box.x - 4, box.y - 8, C.gold3, C.ink);
-    }
+    });
   }
 
   // ---------- さいしゅ ----------

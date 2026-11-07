@@ -1,7 +1,7 @@
 import { C } from './palette';
 import { Screen, LW } from './screen';
 import { Sound, VOLUME_NAMES } from './audio';
-import { ShopView } from './shopView';
+import { FINAL_SECONDS, ShopView } from './shopView';
 import { MinigameView } from './minigameView';
 import { drawLights, drawRoomLive, roomLayer } from './room';
 import { Art } from './amber/art';
@@ -24,7 +24,7 @@ import { drawModeSelect } from './screens/modeSelect';
 import { drawDaily } from './screens/daily';
 import { drawPrep, PREP_WORDS } from './screens/prep';
 import { helpPlay, drawHelp, openTripHelp, drawTripHelp, drawModeHelp } from './screens/help';
-import { resultStep, drawResult } from './screens/result';
+import { resultStep, drawResult, drawResultMenu } from './screens/result';
 import { guideFor, drawCountdown, drawTripIntro, drawTripOutro } from './screens/play';
 import { PHASE_TRACK, RESULT_READY, COUNTDOWN, RESULT_LOCK, MenuItem } from './screens/shared';
 
@@ -271,6 +271,20 @@ export class Game {
   returnToDaily() {
     this.mode = 'daily';
     if (this.daily) void this.loadBoard(this.daily.date, this.settings.difficulty);
+  }
+
+  /** 閉店前の秒読みで最後に鳴らした秒（同じ秒で二度鳴らさない） */
+  private lastCall = 0;
+
+  /** 閉店まで10秒：1秒ごとに秒読みの音、BGM を速め、知らせを出す */
+  private finalCall(left: number) {
+    if (left > FINAL_SECONDS || left <= 0) { this.lastCall = 0; return; }
+    this.sound.setRate(1.25);
+    const sec = Math.ceil(left);
+    if (sec === this.lastCall) return;
+    this.lastCall = sec;
+    this.sound.final(sec);
+    if (sec === FINAL_SECONDS) this.view.banner = { text: 'ラストスパート！ 閉店まで10秒', t: 1.8, col: C.gold3 };
   }
 
   /** 結果を X にポストする画面を、新しいタブで開く（投稿するかは遊ぶ人が決める） */
@@ -571,6 +585,7 @@ export class Game {
     const session = this.session!;
     if (session.introDone && this.tripView.art && !this.tripView.art.hasTrip(session.trip!.game.kind)) return;
     session.tick();
+    this.finalCall(session.shop.timeLeft);
     this.view.update(dt, session.shop);
     this.tripView.update(dt);
     this.drainEvents();
@@ -726,7 +741,8 @@ export class Game {
     else if (this.mode === 'daily') drawDaily(this);
     else if (this.mode === 'prep') drawPrep(this);
     else drawResult(this);
-    if (this.mode !== 'result' || this.t - this.resultAt > RESULT_READY - 0.3) drawMenu(this, this.mode === 'help' ? 210 : this.mode === 'result' ? 200 : this.mode === 'difficulty' ? 170 : 172);
+    if (this.mode === 'result') { if (this.t - this.resultAt > RESULT_READY - 0.3) drawResultMenu(this); }
+    else drawMenu(this, this.mode === 'help' ? 210 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);
     drawClickHint(this);
     drawImeHint(this);

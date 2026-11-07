@@ -102,6 +102,8 @@ export class Sound {
   private step = 0;
   /** 次の拍を鳴らす時刻（音の時計）。先読みして予約し、タイマーの遅れで拍がずれないようにする */
   private nextTime = 0;
+  /** BGM の速さの倍率（閉店前に速める。曲を変えると 1 に戻る） */
+  private rate = 1;
   /** 全体の音量と、音割れを防ぐリミッター */
   private master: GainNode | null = null;
   /** ノイズ用の音（1秒分を一度だけ作り、毎回切り出して使う） */
@@ -420,6 +422,20 @@ export class Sound {
     }
   }
 
+  /** BGM の速さを変える（1 が元の速さ） */
+  setRate(rate: number) {
+    this.rate = rate;
+  }
+
+  /** 閉店前の秒読み：残り秒数が少ないほど高く、最後の3秒は2音にする */
+  final(n: number) {
+    if (!this.ok) return;
+    const t = this.now;
+    const s = 26 + (10 - n);
+    this.tone(this.semi(s), t, 0.09, 'square', 0.045, this.sfx!);
+    if (n <= 3) this.tone(this.semi(s + 12), t + 0.1, 0.09, 'square', 0.035, this.sfx!);
+  }
+
   /** 売上を数える間のカチカチ音 */
   tick() {
     if (!this.ok) return;
@@ -469,8 +485,8 @@ export class Sound {
     if (!this.ac) return;
     const song = SONGS[track];
     this.step = 0;
+    this.rate = 1;
     this.nextTime = this.ac.currentTime + 0.06;
-    const beat = 60 / song.tempo / 2;
     // 25ミリ秒ごとに、少し先（0.15秒）までの拍を音の時計で予約する。
     // 画面の処理で一瞬止まっても、拍の時刻はずれない
     this.timer = window.setInterval(() => {
@@ -478,6 +494,7 @@ export class Sound {
       if (!ac || !this.music || ac.state !== 'running') return;
       // 裏に回るなどで大きく遅れたら、まとめて鳴らさずに今から仕切り直す
       if (this.nextTime < ac.currentTime - 0.1) this.nextTime = ac.currentTime + 0.05;
+      const beat = 60 / song.tempo / 2 / this.rate;
       while (this.nextTime < ac.currentTime + 0.15) {
         this.beatAt(song, this.step++, this.nextTime, beat);
         this.nextTime += beat;

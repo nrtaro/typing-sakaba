@@ -4,6 +4,7 @@ import { LW } from '../screen';
 import { dateLabel } from '../../core/daily';
 import type { Game } from '../game';
 import { chipWidth, drawCondChip } from './conditions';
+import { button } from './common';
 
 /** 結果画面の演出が終わって、選べるようになるまでの時間 */
 export function resultStep(g: Game) {
@@ -108,4 +109,23 @@ export function drawResult(g: Game) {
       g.art.drawAnim(sc, `family-${id}`, '待機', g.t, x, 268 + (1 - p) * 30, g.art.scaleFor(`family-${id}`, 0, hgt), false, p);
     }
   }
+}
+
+/**
+ * 結果画面の札：家族の絵（左右の下の角）に重ならないよう、真ん中に2段で並べる。
+ * 上の段は Enter で選ぶ大きな札（名前を入れる／もういちど）、下の段はほかの札を小さく並べる。
+ */
+export function drawResultMenu(g: Game) {
+  const items = g.menuItems();
+  if (!items.length) return;
+  const [main, ...rest] = items;
+  const mw = 186;
+  button(g, main, LW / 2 - mw / 2, 194, mw, 37, 'primary', 'Enter');
+  const w = 104;
+  const gap = 8;
+  const total = rest.length * w + (rest.length - 1) * gap;
+  rest.forEach((it, k) => {
+    const last = k === rest.length - 1;
+    button(g, it, LW / 2 - total / 2 + k * (w + gap), 237, w, 27, 'plain', last ? 'Esc' : undefined);
+  });
 }
