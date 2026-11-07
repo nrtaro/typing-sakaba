@@ -131,10 +131,10 @@ export function drawResult(g: Game) {
     const y = r.unlocked?.length ? 112 : 72;
     const w = 138;
     const can = (r.coins ?? 0) >= PULL_PRICE;
-    sc.panel(x, y, w, can ? 26 : 16, 'rgba(36,40,30,0.95)', can ? C.gold3 : '#8a6232', p);
+    sc.panel(x, y, w, can ? 22 : 13, 'rgba(36,40,30,0.95)', can ? C.gold3 : '#8a6232', p);
     const line = `本日の売上 ＋${r.credited.toLocaleString()}円 → 貯金箱`;
-    sc.T(line, x + 6, y + 3.5, sc.fitSize(line, 7.5, w - 12, 5.5), '#f2efe2', 'left', p);
-    if (can) sc.T('ふくびきが引けます（タイトルの「ふくびき」）', x + 6, y + 14.5, sc.fitSize('ふくびきが引けます（タイトルの「ふくびき」）', 6.5, w - 12, 5), C.gold3, 'left', p);
+    sc.T(line, x + 6, y + 2.5, sc.fitSize(line, 7.5, w - 12, 5.5), '#f2efe2', 'left', p);
+    if (can) sc.T('ふくびきが引けます（タイトルの「ふくびき」）', x + 6, y + 12, sc.fitSize('ふくびきが引けます（タイトルの「ふくびき」）', 6.5, w - 12, 5), C.gold3, 'left', p);
   }
   // 家族が見送る
   if (g.art) {

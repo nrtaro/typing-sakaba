@@ -11,7 +11,7 @@ export function titleOf(d: Decoration | undefined): string | null {
 const RAINBOW = ['#ff6b6b', '#ffb84a', '#ffe66b', '#7ce08a', '#6bc8ff', '#b48aff'];
 
 /**
- * 名前の後ろにプレート、名前の横に二つ名を小さく描く。どちらも幅 w に収める。
+ * 名前の後ろにプレート、名前の上に二つ名を小さく描く。どちらも幅 w に収める。
  * t は光り方の動き（秒）。飾りがなければ名前だけを今までどおり描く。
  */
 export function drawNameplate(sc: Screen, x: number, y: number, w: number, h: number, name: string, d: Decoration | undefined, size: number, t = 0) {
@@ -41,12 +41,10 @@ export function drawNameplate(sc: Screen, x: number, y: number, w: number, h: nu
     sc.T(name, x + pad, ty, sc.fitSize(name, size, inner, 5), textCol);
     return;
   }
-  // 名前は幅の半分まで、残りに二つ名を小さく
-  const nameSize = sc.fitSize(name, size, inner * 0.5, 5);
-  const nameW = Math.min(sc.W(name, nameSize), inner * 0.5);
-  sc.T(name, x + pad, ty, nameSize, textCol);
-  const rest = inner - nameW - 3;
-  const small = Math.max(4, size * 0.72);
-  const titleSize = sc.fitSize(title, small, rest, 4);
-  sc.T(title, x + w - pad, y + (h - titleSize) / 2, titleSize, p ? textCol : '#d9c2a0', 'right');
+  // 二つ名を上に小さく、名前をその下に（狭い欄でも重ならない）
+  const titleSize = sc.fitSize(title, Math.max(4, size * 0.6), inner, 4);
+  const nameSize = sc.fitSize(name, size * 0.85, inner, 5);
+  const top = y + Math.max(0.5, (h - titleSize - nameSize - 0.5) / 2);
+  sc.T(title, x + pad, top, titleSize, p ? textCol : '#d9c2a0');
+  sc.T(name, x + pad, top + titleSize + 0.5, nameSize, textCol);
 }

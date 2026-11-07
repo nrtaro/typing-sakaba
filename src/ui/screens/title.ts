@@ -107,20 +107,20 @@ export function drawTitle(g: Game) {
     drawKeyboard(g, 30, 212);
     sc.T('打って選ぶ', 56, 213.5, 8, C.cream, 'left', 0.95);
     const [start, help, ranking, records, fukubiki, sound] = g.menuItems();
-    button(g, start, 22, 224, 108, 38, 'primary', 'Enter');
-    button(g, help, 136, 228, 74, 30, 'plain');
-    button(g, ranking, 216, 228, 74, 30, 'plain');
-    button(g, records, 296, 228, 52, 30, 'plain');
-    button(g, fukubiki, 354, 228, 62, 30, 'plain');
-    button(g, sound, 422, 228, 52, 30, 'plain');
+    button(g, start, 14, 224, 122, 38, 'primary', 'Enter');
+    button(g, help, 142, 228, 70, 30, 'plain');
+    button(g, ranking, 218, 228, 70, 30, 'plain');
+    button(g, records, 294, 228, 52, 30, 'plain');
+    button(g, fukubiki, 352, 228, 62, 30, 'plain');
+    button(g, sound, 420, 228, 52, 30, 'plain');
     if (g.unreadRecords()) {
-      sc.panel(308, 219, 28, 10, '#7a2a3a', C.gold3);
-      sc.T('NEW', 322, 220.5, 6.5, C.gold3, 'center');
+      sc.panel(306, 219, 28, 10, '#7a2a3a', C.gold3);
+      sc.T('NEW', 320, 220.5, 6.5, C.gold3, 'center');
     }
     // 段階6：ふくびきが引けるときの印
     if (g.canPullNow()) {
-      sc.panel(366, 219, 38, 10, '#2a5a3a', C.gold3);
-      sc.T('引ける！', 385, 220.5, 6.5, C.gold3, 'center');
+      sc.panel(364, 219, 38, 10, '#2a5a3a', C.gold3);
+      sc.T('引ける！', 383, 220.5, 6.5, C.gold3, 'center');
     }
   });
 }

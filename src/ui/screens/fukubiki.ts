@@ -35,10 +35,10 @@ export function drawFukubiki(g: Game) {
     sc.panel(x, 40, w, 166, 'rgba(36,23,14,0.95)', '#8a6232');
     sc.T('貯金箱', x + 10, 47, 8, C.cream2);
     sc.TB(`${c.coins.toLocaleString()}円`, x + 10, 57, 13, C.gold3, 'left', C.ink);
-    sc.T('おまけ札', x + 150, 47, 8, C.cream2);
-    sc.TB(`${c.tickets}枚`, x + 150, 57, 13, '#a9f0e4', 'left', C.ink);
+    sc.T('おまけ札', x + 118, 47, 8, C.cream2);
+    sc.TB(`${c.tickets}枚`, x + 118, 57, 13, '#a9f0e4', 'left', C.ink);
     const price = c.freeUsed ? `1回 ${PULL_PRICE.toLocaleString()}円` : '最初の1回は無料！';
-    sc.T(price, x + w - 10, 47, 8, c.freeUsed ? C.cream : '#ffb8d0', 'right');
+    sc.T(price, x + w - 10, 60, 8, c.freeUsed ? C.cream : '#ffb8d0', 'right');
     sc.PR(x + 8, 75, w - 16, 0.8, '#6b4422');
     if (f.exchange) drawExchange(g, x, w);
     else if (f.last && f.anim >= FUKUBIKI_ANIM) drawCards(g, x, w);
@@ -118,9 +118,7 @@ function drawCards(g: Game, x: number, w: number) {
     if (it.kind === 'sticker') drawSticker(sc, g.stickerArt, it, cx + cw / 2 - 20, mid, 40, g.t, true);
     else if (it.kind === 'plate') drawNameplate(sc, cx + 8, mid + 12, cw - 16, 16, g.settings.rankingName || '店主', { titleFront: null, titleLink: null, titleBack: null, plate: it.id }, 9, g.t);
     else sc.TB(it.name, cx + cw / 2, mid + 12, sc.fitSize(it.name, 14, cw - 12, 8), '#f2efe2', 'center', C.ink);
-    if (it.kind !== 'front' && it.kind !== 'back' && it.kind !== 'plate') {
-      sc.T(it.name, cx + cw / 2, cy + 76, sc.fitSize(it.name, 8, cw - 10, 6), '#f2efe2', 'center');
-    } else if (it.kind === 'plate') sc.T(it.name, cx + cw / 2, cy + 76, 8, '#f2efe2', 'center');
+    if (it.kind === 'sticker' || it.kind === 'plate') sc.T(it.name, cx + cw / 2, cy + 76, sc.fitSize(it.name, 8, cw - 10, 6), '#f2efe2', 'center');
     const tag = got.isNew ? 'NEW!' : `かぶり → おまけ札 +${got.tickets}`;
     sc.TB(tag, cx + cw / 2, cy + 92, got.isNew ? 10 : 8, got.isNew ? '#ff8a7a' : '#a9f0e4', 'center', C.ink);
   });
