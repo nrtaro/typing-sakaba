@@ -805,7 +805,7 @@ export const ACHIEVEMENT_TEXT: AchievementText[] = [
   {
     "no": 23,
     "title": "もう一皿だけ",
-    "condition": "採取で成果を持ち帰り、料理を10皿以上出した営業が累計3回。料理編では、この条件を満たした営業を1回ずつ数える。",
+    "condition": "採取で成果を持ち帰り、料理を10皿以上出した営業が累計3回。",
     "scene": null,
     "lines": [
       {

@@ -5,8 +5,13 @@ import { ACHIEVEMENTS, GROUP_NAME, currentStreak, longestStreak, type Records } 
 import { jstDate } from '../../core/daily';
 import type { Game } from '../game';
 import { button, drawSignboard } from './common';
+import { PORTRAIT } from '../sprites';
+import type { FamilyId } from '../../core/shopConfig';
 
 const SPEAKER_COLOR: Record<string, Color> = { おやじ: '#ffb08a', 女将: '#9fe0d0', 看板娘: '#ffb8d0' };
+const SPEAKER_ID: Record<string, FamilyId> = { おやじ: 'master', 女将: 'wife', 看板娘: 'daughter' };
+/** 台詞の左に置く顔の欄の幅 */
+const FACE_W = 22;
 /** 一覧に一度に見せる行数 */
 export const LIST_ROWS = 8;
 
@@ -30,7 +35,7 @@ export function dialogueRows(sc: Pick<Screen, 'W'>, index: number, width: number
   const rows: { who: string | null; text: string; scene?: boolean }[] = [];
   if (a.scene) for (const t of wrapText(sc, a.scene, 8, width)) rows.push({ who: null, text: t, scene: true });
   for (const l of a.lines) {
-    wrapText(sc, `「${l.text}」`, 9, width - 46).forEach((t, k) => rows.push({ who: k === 0 ? l.who : '', text: t }));
+    wrapText(sc, `「${l.text}」`, 9, width - FACE_W).forEach((t, k) => rows.push({ who: k === 0 ? l.who : '', text: t }));
   }
   return rows;
 }
@@ -134,10 +139,10 @@ export function drawReader(g: Game, index: number, scroll: number) {
     const rows = dialogueRows(sc, index, w - 24);
     const visible = READER_ROWS;
     rows.slice(scroll, scroll + visible).forEach((row, k) => {
-      const ry = y + 34 + k * 13;
+      const ry = y + 35 + k * 14;
       if (row.scene) { sc.T(row.text, x + 14, ry, 8, '#d9c2a0', 'left', 0.9); return; }
-      if (row.who) sc.T(row.who, x + 12, ry + 0.5, 8, SPEAKER_COLOR[row.who] ?? C.cream);
-      sc.T(row.text, x + 58, ry, 9, '#f2efe2');
+      if (row.who) drawFace(g, row.who, x + 12, ry - 2);
+      sc.T(row.text, x + 12 + FACE_W, ry, 9, '#f2efe2');
     });
     if (scroll > 0) sc.T('▲', x + w - 16, y + 30, 7, C.gold3);
     if (scroll + visible < rows.length) sc.T('▼ 続き', x + w - 14, y + h - 30, 7, C.gold3, 'right');
@@ -145,5 +150,15 @@ export function drawReader(g: Game, index: number, scroll: number) {
   });
 }
 
+/** 話者の顔（イラスト。絵がまだ読めていなければ小さなドット絵） */
+function drawFace(g: Game, who: string, x: number, y: number) {
+  const sc = g.sc;
+  const id = SPEAKER_ID[who];
+  if (!id) return;
+  sc.panel(x, y, 16, 13.5, '#1a0f08', SPEAKER_COLOR[who] ?? C.cream);
+  if (g.art) g.art.drawHead(sc, `family-${id}`, 0, x + 2.5, y + 1.2, 11);
+  else sc.spr(PORTRAIT[id], x + 1, y + 1, 1);
+}
+
 /** 会話の画面に一度に見せる行数 */
-export const READER_ROWS = 12;
+export const READER_ROWS = 10;
