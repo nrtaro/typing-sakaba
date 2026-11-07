@@ -48,3 +48,16 @@ describe('ランキング通信', () => {
     await expect(client.top('2026-11-07', 'normal', 'player')).rejects.toThrow('つながりません');
   });
 });
+
+describe('ランキング通信の飾り（段階6）', () => {
+  it('上位の飾りを受け取り、知らない飾りは捨てる', async () => {
+    const board = { top: [
+      { rank: 1, name: 'A', score: 9, decoration: { titleFront: 'f-nonbiri', titleLink: 'na', titleBack: 'b-minarai', plate: 'p-zzz' } },
+      { rank: 2, name: 'B', score: 8 },
+    ], me: null, total: 2 };
+    const client = new RankingClient(async () => new Response(JSON.stringify(board)));
+    const got = await client.top('2026-11-07', 'normal', 'p');
+    expect(got.top[0].decoration).toEqual({ titleFront: 'f-nonbiri', titleLink: 'na', titleBack: 'b-minarai', plate: null });
+    expect(got.top[1].decoration).toBeUndefined();
+  });
+});

@@ -1,5 +1,5 @@
 import { BANQUET_MULT, HIDEN_MULT, dailyConditions, jstDate, rulesFor } from '../src/core/daily';
-import { normalizeRankingName, PLAYER_ID, RECORD_FORMAT, RECORD_MAX, type ScoreSubmission } from '../src/core/ranking';
+import { normalizeRankingName, PLAYER_ID, readDecoration, RECORD_FORMAT, RECORD_MAX, type ScoreSubmission } from '../src/core/ranking';
 import { DISHES, INGREDIENT_ORDER, SHOP, type DifficultyId, type IngredientId } from '../src/core/shopConfig';
 
 const SCORE_LIMIT: Record<DifficultyId, number> = { easy: 60000, normal: 100000, hard: 120000 };
@@ -82,5 +82,6 @@ export function validateSubmission(input: unknown, now = new Date()): Validation
     date: v.date, difficulty: v.difficulty, name, player: v.player.toLowerCase(),
     score: v.score, served: v.served, maxCombo: v.maxCombo, angry: v.angry,
     accuracy: v.accuracy, kps: v.kps, conds: expected, seed: v.seed, record: v.record, prep,
+    decoration: readDecoration(v.decoration),
   } };
 }

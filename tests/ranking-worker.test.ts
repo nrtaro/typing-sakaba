@@ -241,3 +241,21 @@ describe('3つの難易度の順位表をまとめて読む', () => {
     expect((await worker.fetch(new Request(`https://game.example/api/daily/boards?date=${jstDate()}`), {})).status).toBe(503);
   });
 });
+
+describe('ランキングの飾り（段階6）', () => {
+  const deco = { titleFront: 'f-nonbiri', titleLink: 'no', titleBack: 'b-minarai', plate: 'p-kinari' };
+  it('自己ベストと一緒に飾りを残し、上位で返す。下がった再送信では変えない', async () => {
+    const { db } = database();
+    await submitScore(db, { ...score(1, 1000), decoration: deco }, 'ip', 1000);
+    expect((await readBoard(db, jstDate(), 'normal', null)).top[0]).toEqual({ rank: 1, name: '店主1', score: 1000, decoration: deco });
+    await submitScore(db, { ...score(1, 500), decoration: { ...deco, plate: 'p-sorairo' } }, 'ip', 1001);
+    expect((await readBoard(db, jstDate(), 'normal', null)).top[0].decoration).toEqual(deco);
+    await submitScore(db, { ...score(1, 1500), decoration: { ...deco, plate: 'p-sorairo' } }, 'ip', 1002);
+    expect((await readBoard(db, jstDate(), 'normal', null)).top[0].decoration?.plate).toBe('p-sorairo');
+  });
+  it('飾りのない行は decoration を付けない', async () => {
+    const { db } = database();
+    await submitScore(db, score(2, 800), 'ip', 1000);
+    expect((await readBoard(db, jstDate(), 'normal', null)).top[0]).toEqual({ rank: 1, name: '店主2', score: 800 });
+  });
+});

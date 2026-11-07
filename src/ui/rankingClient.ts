@@ -1,4 +1,4 @@
-import type { DailyBoard, RankReceipt, ScoreSubmission } from '../core/ranking';
+import { decorationOrNone, readDecoration, type DailyBoard, type RankReceipt, type ScoreSubmission } from '../core/ranking';
 import type { DifficultyId } from '../core/shopConfig';
 
 const OFFLINE = '今はランキングにつながりません。しばらくしてからお試しください';
@@ -9,6 +9,14 @@ function board(v: DailyBoard) {
   return v && Array.isArray(v.top) && v.top.length <= 5 && nonnegative(v.total) && Number.isInteger(v.total) &&
     v.top.every(s => s && positiveInt(s.rank) && typeof s.name === 'string' && nonnegative(s.score)) &&
     (v.me === null || (v.me && positiveInt(v.me.rank) && nonnegative(v.me.score)));
+}
+
+/** 上位の飾りは一覧にあるものだけ残す（すべて空なら付けない） */
+function cleanBoard(v: DailyBoard): DailyBoard {
+  return { ...v, top: v.top.map(({ decoration, ...s }) => {
+    const d = decoration === undefined ? undefined : decorationOrNone(readDecoration(decoration));
+    return d ? { ...s, decoration: d } : s;
+  }) };
 }
 
 export class RankingClient {
@@ -31,13 +39,14 @@ export class RankingClient {
 
   top(date: string, difficulty: DifficultyId, player: string): Promise<DailyBoard> {
     const params = new URLSearchParams({ date, difficulty, player });
-    return this.request(`/api/daily/top?${params}`, board);
+    return this.request(`/api/daily/top?${params}`, board).then(cleanBoard);
   }
 
   /** 3つの難易度の順位表をまとめて読む */
   boards(date: string, player: string): Promise<Record<DifficultyId, DailyBoard>> {
     const params = new URLSearchParams({ date, player });
-    return this.request(`/api/daily/boards?${params}`, (v: Record<string, DailyBoard>) => !!v && (['easy', 'normal', 'hard'] as const).every((id) => board(v[id])));
+    return this.request(`/api/daily/boards?${params}`, (v: Record<string, DailyBoard>) => !!v && (['easy', 'normal', 'hard'] as const).every((id) => board(v[id])))
+      .then((v) => ({ easy: cleanBoard(v.easy), normal: cleanBoard(v.normal), hard: cleanBoard(v.hard) }));
   }
 
   /** ランキングの設定：Turnstile の公開キー（使わないときは null） */

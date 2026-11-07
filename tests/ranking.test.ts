@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dailyConditions } from '../src/core/daily';
-import { normalizeRankingName } from '../src/core/ranking';
+import { normalizeRankingName, readDecoration } from '../src/core/ranking';
 import { SaveStore, type KeyValueStore } from '../src/core/save';
 import { validateSubmission } from '../worker/validation';
 
@@ -118,5 +118,27 @@ describe('やり直しに要る項目', () => {
     expect(ok.ok && ok.value.prep).toEqual(prep);
     const none = validateSubmission(score({ prep: null }), now);
     expect(none.ok && none.value.prep).toBeNull();
+  });
+});
+
+// 段階6：二つ名とプレート
+describe('ランキングの飾り', () => {
+  const ok = { titleFront: 'f-nonbiri', titleLink: 'na', titleBack: 'b-minarai', plate: 'p-kinari' };
+  it('一覧にある飾りはそのまま、知らないものは捨てる', () => {
+    expect(readDecoration(ok)).toEqual(ok);
+    expect(readDecoration({ ...ok, titleFront: 'f-zzz' })).toEqual({ titleFront: null, titleLink: null, titleBack: null, plate: 'p-kinari' });
+    expect(readDecoration({ ...ok, titleFront: 'b-minarai' }).titleFront).toBeNull();
+    expect(readDecoration({ ...ok, titleLink: 'zz' }).titleBack).toBeNull();
+    expect(readDecoration({ ...ok, plate: 'f-nonbiri' }).plate).toBeNull();
+    expect(readDecoration(undefined)).toEqual({ titleFront: null, titleLink: null, titleBack: null, plate: null });
+    expect(readDecoration('x')).toEqual({ titleFront: null, titleLink: null, titleBack: null, plate: null });
+  });
+  it('飾りのない古い送信も、知らない飾りの送信も受け付ける', () => {
+    const old = validateSubmission(score(), now);
+    expect(old.ok && old.value.decoration).toEqual({ titleFront: null, titleLink: null, titleBack: null, plate: null });
+    const bad = validateSubmission(score({ decoration: { titleFront: 'f-zzz', plate: 'p-zzz' } }), now);
+    expect(bad.ok).toBe(true);
+    const good = validateSubmission(score({ decoration: ok }), now);
+    expect(good.ok && good.value.decoration).toEqual(ok);
   });
 });
