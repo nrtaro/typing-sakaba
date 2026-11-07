@@ -23,6 +23,8 @@ import { drawDifficulty } from './screens/difficulty';
 import { drawModeSelect } from './screens/modeSelect';
 import { drawDaily } from './screens/daily';
 import { drawRanking } from './screens/ranking';
+import { drawTutorial } from './screens/tutorial';
+import { setupTutorial, tutorialEvent, tutorialStep, type TutorialState } from './tutorial';
 import { drawPrep, PREP_WORDS } from './screens/prep';
 import { helpPlay, drawHelp, openTripHelp, drawTripHelp, drawModeHelp } from './screens/help';
 import { resultStep, drawResult, drawResultMenu } from './screens/result';
@@ -78,6 +80,8 @@ export class Game {
   nameEntry: ReturnType<typeof openRankingName> | null = null;
   /** 今日の3つの難易度の順位表（タイトル画面とランキングの画面で使う） */
   boards: { date: string; state: 'loading' | 'ready' | 'error'; value: Record<DifficultyId, DailyBoard> | null; at: number } | null = null;
+  /** れんしゅう中の手順（れんしゅうでないときは null） */
+  tutorial: TutorialState | null = null;
   /** ランキングの画面を閉じたときに戻る画面 */
   rankingFrom: Mode = 'title';
   /** ひがわり営業で遊んでいるときの、日付とお題（通常営業では null） */
@@ -153,6 +157,13 @@ export class Game {
   // ---------- メニュー（打って選ぶ） ----------
 
   menuItems(): MenuItem[] {
+    if (this.mode === 'play' && this.tutorial?.step === 'done') {
+      return [
+        { text: 'はじめる', kana: 'はじめる', act: () => { this.leavePlay(); this.mode = 'modeSelect'; } },
+        { text: 'もういちど', kana: 'もういちど', act: () => this.startTutorial() },
+        { text: 'たいとる', kana: 'たいとる', act: () => this.toTitle() },
+      ];
+    }
     if (this.mode === 'play' && this.paused) {
       return [
         { text: 'さいかい', kana: 'さいかい', act: () => { this.paused = false; } },
@@ -184,6 +195,7 @@ export class Game {
         return [
           { text: '通常営業', kana: 'つうじょう', act: () => this.pickMode('normal') },
           { text: 'ひがわり営業', kana: 'ひがわり', act: () => this.pickMode('daily') },
+          { text: 'れんしゅう', kana: 'れんしゅう', act: () => this.startTutorial() },
           { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
         ];
       case 'difficulty':
@@ -239,11 +251,35 @@ export class Game {
   }
 
   toTitle() {
-    this.nameEntry?.close();
+    this.leavePlay();
     this.mode = 'title';
+  }
+
+  /** 営業・れんしゅうを片付けて、メニューの画面へ戻る準備をする */
+  leavePlay() {
+    this.nameEntry?.close();
     this.session = null;
+    this.tutorial = null;
     this.paused = false;
     this.sound.play('title');
+  }
+
+  /** れんしゅう：時計を止めた店で、料理を出す・調達に出る・戻るを一度ずつ */
+  startTutorial() {
+    this.nameEntry?.close();
+    this.daily = null;
+    this.seed = (this.seed * 1103515245 + 12345) >>> 0;
+    this.session = new PlaySession(this.seed, difficultyOf('easy'), NORMAL_RULES);
+    this.tutorial = setupTutorial(this.session);
+    this.view = new ShopView();
+    this.view.art = this.art;
+    this.paused = false;
+    this.mode = 'play';
+    this.result = null;
+    this.countdown = 0;
+    this.goShown = 0;
+    this.menu.reset();
+    this.sound.play('morning');
   }
 
   /** 通常営業かひがわり営業かを選んで、難易度の画面へ */
@@ -281,6 +317,16 @@ export class Game {
   returnToDaily() {
     this.mode = 'daily';
     if (this.daily) void this.loadBoard(this.daily.date, this.settings.difficulty);
+  }
+
+  /** れんしゅうを終えた：覚えておき、終わりのメニューを出す */
+  private finishTutorial() {
+    if (!this.settings.tutorialDone) {
+      this.settings.tutorialDone = true;
+      this.store.saveSettings(this.settings);
+    }
+    this.menu.reset();
+    this.sound.sparkle();
   }
 
   /** 閉店前の秒読みで最後に鳴らした秒（同じ秒で二度鳴らさない） */
@@ -441,6 +487,7 @@ export class Game {
 
   start(difficulty: DifficultyId = this.settings.difficulty) {
     this.nameEntry?.close();
+    this.tutorial = null;
     this.submission = { state: 'idle', receipt: null, message: '' };
     this.saveDifficulty(difficulty);
     // ひがわりは、お題の画面で見せた日付のお題で開店する（お客の来かたは毎回ちがう）
@@ -490,11 +537,12 @@ export class Game {
     const k = e.key;
     if (k === 'Escape' && this.mode === 'play') {
       e.preventDefault();
+      if (this.tutorial?.step === 'done') { this.sound.select(); this.toTitle(); return; }
       if (this.paused) this.paused = false;
       else this.autoPause();
       return;
     }
-    const inMenu = this.mode !== 'play' || this.paused;
+    const inMenu = this.mode !== 'play' || this.paused || this.tutorial?.step === 'done';
     // 結果の演出中：打ち続けたまま来ても飛ばされないよう、最初の少しはキーを受け付けない。
     // そのあとはキーで演出を飛ばして最後の状態にする
     if (this.mode === 'result' && this.t - this.resultAt < RESULT_READY) {
@@ -607,7 +655,7 @@ export class Game {
     // タイトル画面では、今日のランキングの1位を見せるために順位表を読んでおく
     if (this.mode === 'title' && this.artState !== 'loading') void this.loadBoards(jstDate());
     if (this.mode === 'result') resultStep(this);
-    if (this.mode === 'play' && this.shop) this.view.guide = this.settings.guided ? null : guideFor(this, this.shop);
+    if (this.mode === 'play' && this.shop) this.view.guide = this.settings.guided || this.tutorial ? null : guideFor(this, this.shop);
     if (this.mode !== 'play' || !this.shop || this.paused) return;
     if (this.countdown > 0) {
       const before = Math.ceil(this.countdown);
@@ -627,6 +675,7 @@ export class Game {
     if (session.introDone && this.tripView.art && !this.tripView.art.hasTrip(session.trip!.game.kind)) return;
     session.tick();
     this.finalCall(session.shop.timeLeft);
+    if (this.tutorial) tutorialStep(this.tutorial, session, dt);
     this.view.update(dt, session.shop);
     this.tripView.update(dt);
     this.drainEvents();
@@ -639,6 +688,11 @@ export class Game {
     if (!session) return;
     const shop = session.shop;
     for (const item of session.drain()) {
+      if (this.tutorial) {
+        const before = this.tutorial.step;
+        tutorialEvent(this.tutorial, session, item);
+        if (before !== 'done' && this.tutorial.step === 'done') this.finishTutorial();
+      }
       if (item.src === 'session') {
         if (item.type === 'tripGame' && session.trip) this.sound.play(session.trip.game.kind);
         else if (item.type === 'tripReturn') this.sound.tripReturn();
@@ -748,8 +802,10 @@ export class Game {
         if (this.trip?.phase === 'intro') drawTripIntro(this);
         drawCountdown(this);
       }
+      drawTutorial(this);
+      if (this.tutorial?.step === 'done' && !this.paused) drawMenuScreen(this, '練習はおしまい！', '本番は3分間。時間が進み、お客が次々に来ます');
       if (this.paused) drawMenuScreen(this, '一時停止中', '');
-      if (this.paused) drawClickHint(this);
+      if (this.paused || this.tutorial?.step === 'done') drawClickHint(this);
       drawImeHint(this);
       drawVolume(this);
       return;

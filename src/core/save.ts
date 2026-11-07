@@ -20,11 +20,13 @@ export interface Settings {
   guided: boolean;
   /** 前回選んだ営業（Enter で選ぶときに使う） */
   playMode: 'normal' | 'daily';
+  /** れんしゅうを最後まで終えたか */
+  tutorialDone: boolean;
   /** ランキングで前回使った名前 */
   rankingName: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '' };
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '', tutorialDone: false };
 
 export interface DayRecord {
   score: number;

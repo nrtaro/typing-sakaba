@@ -106,6 +106,10 @@ export class Shop {
   private awayPhase = 0;
   /** 前にこぼしてからのミスの数 */
   missSinceSpill = 0;
+  /** れんしゅう：営業の時計を止める（お客は増えず、待ち時間も減らない。配膳や食事は進む） */
+  holdTime = false;
+  /** れんしゅう：調達の言葉を出さない（教えている手順の順番を守るため） */
+  noTrips = false;
   /** 品切れ札・ひでんのを使った回数 */
   used: Record<SkillId, number> = { shinagire: 0, hiden: 0 };
   /** ひでんの：次に出す1皿が売上2倍 */
@@ -196,7 +200,7 @@ export class Shop {
     this.seats.forEach((g, i) => {
       if (g && g.state === 'wait') out.push({ id: `seat:${i}`, kana: g.dish.kana, data: { kind: 'order', seat: i } });
     });
-    if (!this.away) for (const t of TRIPS) out.push({ id: `trip:${t.id}`, kana: t.kana, data: { kind: 'trip', trip: t } });
+    if (!this.away && !this.noTrips) for (const t of TRIPS) out.push({ id: `trip:${t.id}`, kana: t.kana, data: { kind: 'trip', trip: t } });
     for (const skill of ['shinagire', 'hiden'] as const) {
       if (this.canUseSkill(skill)) out.push({ id: `skill:${skill}`, kana: SKILL_KANA[skill], data: { kind: 'skill', skill } });
     }
@@ -403,6 +407,18 @@ export class Shop {
 
   update(dt: number) {
     if (this.ended) return;
+    // れんしゅう：時計を止めたまま、配膳・食事・調達の帰りだけを進める
+    if (this.holdTime) {
+      this.seats.forEach((g, i) => {
+        if (!g) return;
+        g.lack = Math.max(0, g.lack - dt);
+        if (g.state === 'walk') { g.t -= dt; if (g.t <= 0) g.state = 'wait'; }
+        else if (g.state === 'eat' && !g.awaitingDelivery && (g.t -= dt) <= 0) this.seats[i] = null;
+      });
+      this.crew.update(dt, this.seats.filter((g) => g !== null).length, this.away?.who);
+      if (this.input.active.length) this.input.prune(new Set(this.targets().map((t) => t.id)));
+      return;
+    }
     this.clock += dt;
     const ph = this.phaseIndex;
     if (ph !== this.lastPhase) {

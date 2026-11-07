@@ -85,5 +85,15 @@ export function drawModeSelect(g: Game) {
   sc.shifted(0, (e.y1 - 270) / 2, () => {
     const items = g.menuItems();
     button(g, items[items.length - 1], 26, 228, 120, 30, 'plain', 'Esc', '◀');
+    const practice = items.find((it) => it.kana === 'れんしゅう');
+    if (practice) {
+      const first = !g.settings.tutorialDone;
+      if (first && !g.menu.typed) g.sc.glow(300, 226, 158, 34, C.gold3, 0.4 + 0.3 * Math.sin(g.t * 3));
+      button(g, practice, 300, 226, 158, 34, first ? 'primary' : 'plain', undefined, '▶');
+      if (first) {
+        g.sc.panel(306, 218, 92, 11, '#a7c99d', '#4c6b43');
+        g.sc.T('はじめての人はここから', 310, 219.5, 7, '#203321');
+      }
+    }
   });
 }
