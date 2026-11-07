@@ -5,6 +5,8 @@ import { ACHIEVEMENTS, GROUP_NAME, currentStreak, longestStreak, type Records } 
 import { jstDate } from '../../core/daily';
 import type { Game } from '../game';
 import { button, drawSignboard } from './common';
+import { drawStickerBook } from './stickerBook';
+import { drawDecor } from './decor';
 import { PORTRAIT } from '../sprites';
 import type { FamilyId } from '../../core/shopConfig';
 
@@ -57,7 +59,13 @@ export function drawRecords(g: Game) {
   const today = jstDate();
   sc.shifted(0, e.y0 / 2, () => {
     drawSignboard(g, 150, 4, 180, 30);
-    sc.TB('記録・実績', LW / 2, 10, 15, '#ffd98a', 'center', '#3a1408');
+    sc.TB(TAB_TITLE[view.tab], LW / 2, 10, 15, '#ffd98a', 'center', '#3a1408');
+    if (view.tab === 'stickers') {
+      drawStickerBook(g);
+      sc.T('←→でシリーズを切り替える　Tabでタブを切り替える', LW / 2, 210, 7, C.cream2, 'center');
+      return;
+    }
+    if (view.tab === 'decor') { drawDecor(g); return; }
     // 左：遊んだ記録
     const px = 10;
     sc.panel(px, 40, 140, 166, 'rgba(34,50,42,0.96)', '#6b4422');
@@ -108,17 +116,27 @@ export function drawRecords(g: Game) {
       sc.PR(lx + 8, 198, w * Math.min(1, p.now / p.goal), 3, C.gold2);
     }
     if (opened) sc.T('Enter で会話を読む', lx + lw - 8, 197, 7, '#a9f0e4', 'right');
-    const hint = '↑↓でえらぶ　Enterで会話を読む';
+    const hint = '↑↓でえらぶ　Enterで会話を読む　Tabでタブを切り替える';
     sc.T(hint, LW / 2, 210, 7, C.cream2, 'center');
   });
   sc.PR(e.x0, 224, e.w, e.y1 - 224, '#2a1a10');
   sc.PR(e.x0, 224, e.w, 2, '#a8743f');
   sc.shifted(0, (e.y1 - 270) / 2, () => {
     const items = g.menuItems();
-    button(g, items[0], 26, 232, 130, 30, 'plain', 'Esc', '◀');
+    button(g, items[0], 26, 232, 110, 30, 'plain', 'Esc', '◀');
+    // タブ：今のタブに金の線
+    const tabs: [number, typeof view.tab][] = [[1, 'achievements'], [2, 'stickers'], [3, 'decor']];
+    for (const [i, tab] of tabs) {
+      const x = 160 + (i - 1) * 102;
+      if (!items[i]) continue;
+      button(g, items[i], x, 232, 94, 30, 'plain');
+      if (view.tab === tab) sc.PR(x + 6, 264, 82, 2, C.gold3);
+    }
   });
   if (view.reading !== null) drawReader(g, view.reading, view.scroll);
 }
+
+const TAB_TITLE = { achievements: '記録・実績', stickers: 'シール帳', decor: '飾り' } as const;
 
 /** 会話を読む画面：話者ごとに色を分け、長い会話は↑↓で送る */
 export function drawReader(g: Game, index: number, scroll: number) {

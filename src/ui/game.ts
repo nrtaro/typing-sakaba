@@ -1,4 +1,6 @@
-import { itemById, owns } from '../core/collection';
+import { ITEMS, LINKS, SERIES, PULL_PRICE, canPull, exchange, itemById, owns, pull, setEquip, type CollectionState, type Equip, type Kind, type PullResult } from '../core/collection';
+import { StickerArt, sheetUrl, stickerUrl } from './stickerArt';
+import { drawFukubiki, FUKUBIKI_ANIM } from './screens/fukubiki';
 import { readDecoration, type Decoration } from '../core/ranking';
 import { C } from './palette';
 import { Screen, LW } from './screen';
@@ -10,7 +12,7 @@ import { Art } from './amber/art';
 import { CandidateInput } from '../core/candidates';
 import { PlaySession, TICK, type SessionTrip } from '../core/session';
 import { Shop } from '../core/shop';
-import { Rng } from '../core/rng';
+import { Rng, randomSeed } from '../core/rng';
 import { RomajiMatcher } from '../core/romaji';
 import { SaveStore, type DayRecord } from '../core/save';
 import type { DailyBoard, RankReceipt } from '../core/ranking';
@@ -35,7 +37,11 @@ import { resultStep, drawResult, drawResultMenu } from './screens/result';
 import { guideFor, drawCountdown, drawTripIntro, drawTripOutro } from './screens/play';
 import { PHASE_TRACK, RESULT_READY, COUNTDOWN, RESULT_LOCK, MenuItem } from './screens/shared';
 
-export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records';
+export type RecordsTab = 'achievements' | 'stickers' | 'decor';
+/** 飾りの欄：前の言葉・つなぎ・後ろの言葉・プレート・打鍵音 */
+export const DECOR_KEYS = ['front', 'link', 'back', 'plate', 'sound'] as const;
+const DECOR_ROWS: (Kind | 'link')[] = ['front', 'link', 'back', 'plate', 'sound'];
+export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki';
 export type PlayMode = 'normal' | 'daily';
 
 const TYPABLE = /^[a-z\-]$/;
@@ -77,10 +83,15 @@ export class Game {
   view = new ShopView();
   tripView = new MinigameView();
   paused = false;
-  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord; unlocked: string[] }) | null = null;
+  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord; unlocked: string[]; credited?: number; coins?: number }) | null = null;
   /** 記録・実績の画面で見ている記録と、選んでいる実績・読んでいる会話 */
   records: Records | null = null;
-  recordsView: { sel: number; reading: number | null; scroll: number } | null = null;
+  recordsView: { tab: RecordsTab; sel: number; reading: number | null; scroll: number; series: number; decorRow: number } | null = null;
+  /** 段階6：コレクション（画面を開いたときと変えたときに読み直す） */
+  collection: CollectionState | null = null;
+  readonly stickerArt = new StickerArt();
+  /** ふくびきの画面：演出の経過秒・最後の結果・案内・交換の一覧 */
+  fukubiki: { anim: number; last: PullResult | null; message: string; exchange: { sel: number } | null } | null = null;
   /** この営業の一意なIDと、開店時に確定した JST の日付（記録・実績に使う） */
   playId = '';
   openDate = '';
@@ -189,6 +200,7 @@ export class Game {
           { text: 'あそびかた', kana: 'あそびかた', act: () => { this.mode = 'help'; this.helpPage = 0; } },
           { text: 'らんきんぐ', kana: 'らんきんぐ', act: () => this.openRanking() },
           { text: 'きろく', kana: 'きろく', act: () => this.openRecords() },
+          { text: 'ふくびき', kana: 'ふくびき', act: () => this.openFukubiki() },
           { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
         ];
       case 'help':
@@ -228,7 +240,19 @@ export class Game {
           { text: 'もどる', kana: 'もどる', act: () => this.returnToDaily() },
         ];
       case 'records':
-        return [{ text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } }];
+        return [
+          { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
+          { text: 'じっせき', kana: 'じっせき', act: () => this.setRecordsTab('achievements') },
+          { text: 'シール', kana: 'しーる', act: () => this.setRecordsTab('stickers') },
+          { text: 'かざり', kana: 'かざり', act: () => this.setRecordsTab('decor') },
+        ];
+      case 'fukubiki':
+        if (this.fukubiki?.exchange) return [{ text: 'もどる', kana: 'もどる', act: () => { this.fukubiki!.exchange = null; } }];
+        return [
+          { text: 'ひく', kana: 'ひく', act: () => this.pullOnce() },
+          { text: 'こうかん', kana: 'こうかん', act: () => { this.fukubiki!.exchange = { sel: 0 }; this.fukubiki!.message = ''; } },
+          { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
+        ];
       case 'ranking':
         return [{ text: 'もどる', kana: 'もどる', act: () => this.closeRanking() }];
       case 'result':
@@ -410,19 +434,166 @@ export class Game {
     return this.unreadCache;
   }
 
+  /** 段階6：ふくびきが引けるか（タイトルの印。毎コマ保存を読まないよう、少し間を置いて確かめる） */
+  private pullAt = -10;
+  private pullCache = false;
+  canPullNow() {
+    if (this.t - this.pullAt > 2) {
+      this.pullAt = this.t;
+      try { this.pullCache = canPull(this.store.loadCollection()); } catch { this.pullCache = false; }
+    }
+    return this.pullCache;
+  }
+
   /** 記録・実績の画面を開く（まだ読んでいない会話があれば、そこを選んでおく） */
   openRecords() {
     this.records = this.store.loadRecords();
     const r = this.records;
     const unread = ACHIEVEMENTS.findIndex((a) => r.unlocked[a.id] && !r.read.includes(a.id));
-    this.recordsView = { sel: Math.max(0, unread), reading: null, scroll: 0 };
+    this.recordsView = { tab: 'achievements', sel: Math.max(0, unread), reading: null, scroll: 0, series: 0, decorRow: 0 };
+    this.refreshCollection();
     this.mode = 'records';
     this.menu.reset();
+  }
+
+  /** 段階6：コレクションを読み直す */
+  refreshCollection() {
+    try { this.collection = this.store.loadCollection(); } catch { this.collection = null; }
+    try { this.records = this.store.loadRecords(); } catch { /* 前の値のまま */ }
+  }
+
+  setRecordsTab(tab: RecordsTab) {
+    const v = this.recordsView;
+    if (!v) return;
+    v.tab = tab;
+    v.reading = null;
+    if (tab === 'stickers') this.loadStickerArt();
+    this.sound.select();
+  }
+
+  /** シールと台紙の絵を読む（開いたときだけ。読めなければ仮の描き方） */
+  loadStickerArt() {
+    this.stickerArt.load([
+      ...ITEMS.filter((i) => i.kind === 'sticker').map((i) => stickerUrl(i.id)),
+      ...SERIES.flatMap((x) => [sheetUrl(x.id, false), sheetUrl(x.id, true)]),
+    ]);
+  }
+
+  /** 飾りの欄ごとの選べるもの（null は「なし」） */
+  decorOptions(row: number): (string | null)[] {
+    if (row === 1) return LINKS.map((l) => l.id);
+    const kind = DECOR_ROWS[row];
+    const c = this.collection ?? this.store.loadCollection();
+    const u = this.records?.unlocked ?? {};
+    return [null, ...ITEMS.filter((i) => i.kind === kind && owns(c, u, i.id)).map((i) => i.id)];
+  }
+
+  /** 飾りを付け替えて保存する（持っていないものは付かない） */
+  setDecor(patch: Partial<Equip>) {
+    const u = this.records?.unlocked ?? this.store.loadRecords().unlocked;
+    this.collection = this.store.updateCollection((c) => setEquip(c, u, patch));
+    if ('sound' in patch) {
+      this.applyKeyVoice();
+      this.sound.key(1);
+    }
+  }
+
+  // ---------- ふくびき ----------
+
+  openFukubiki() {
+    this.fukubiki = { anim: FUKUBIKI_ANIM, last: null, message: '', exchange: null };
+    this.refreshCollection();
+    this.loadStickerArt();
+    this.mode = 'fukubiki';
+    this.menu.reset();
+  }
+
+  /** 1回引く。演出中や貯金箱が足りないときは引かない */
+  pullOnce() {
+    const f = this.fukubiki;
+    if (!f || f.anim < FUKUBIKI_ANIM) return;
+    let result: PullResult | null = null;
+    const c = this.store.updateCollection((s) => {
+      result = pull(s, new Rng(randomSeed() ^ (Date.now() & 0xffffff)));
+      return result ? result.state : s;
+    });
+    this.collection = c;
+    if (!result) {
+      f.message = `貯金箱のお金が足りません（あと${(PULL_PRICE - c.coins).toLocaleString()}円）`;
+      this.sound.miss();
+      this.missFlash = 0.25;
+      return;
+    }
+    f.last = result;
+    f.anim = 0;
+    f.message = '';
+    this.sound.select();
+  }
+
+  /** ふくびき画面のキー：演出中は飛ばすだけ、交換の一覧では↑↓・Enter・Esc */
+  fukubikiKey(k: string) {
+    const f = this.fukubiki;
+    if (!f) return;
+    if (f.anim < FUKUBIKI_ANIM) { f.anim = FUKUBIKI_ANIM; return; }
+    const ex = f.exchange;
+    if (!ex) return;
+    const list = this.exchangeList();
+    const n = Math.max(1, list.length);
+    if (k === 'Escape') { f.exchange = null; this.sound.select(); return; }
+    if (k === 'ArrowUp') ex.sel = (ex.sel + n - 1) % n;
+    else if (k === 'ArrowDown') ex.sel = (ex.sel + 1) % n;
+    else if (k === 'ArrowLeft') ex.sel = Math.max(0, ex.sel - 8);
+    else if (k === 'ArrowRight') ex.sel = Math.min(n - 1, ex.sel + 8);
+    else if (k === 'Enter') { if (list[ex.sel]) this.exchangeItem(list[ex.sel].id); return; }
+    this.sound.key(1);
+  }
+
+  /** 交換できる飾り（まだ持っていないふくびきの飾り）。☆の高い順 */
+  exchangeList() {
+    const c = this.collection ?? this.store.loadCollection();
+    return ITEMS.filter((i) => i.source === 'gacha' && !c.owned[i.id]).sort((a, b) => b.star - a.star);
+  }
+
+  exchangeItem(id: string) {
+    const f = this.fukubiki;
+    if (!f) return;
+    let error = '';
+    this.collection = this.store.updateCollection((s) => {
+      const r = exchange(s, id);
+      if ('error' in r) { error = r.error; return s; }
+      return r.state;
+    });
+    if (error) { f.message = error; this.sound.miss(); this.missFlash = 0.25; return; }
+    f.message = `「${itemById(id)?.name}」と交換しました`;
+    if (f.exchange) f.exchange.sel = Math.min(f.exchange.sel, Math.max(0, this.exchangeList().length - 1));
+    this.sound.select();
   }
 
   /** 記録・実績の画面のキー操作 */
   recordsKey(k: string) {
     const v = this.recordsView!;
+    if (k === 'Tab' && v.reading === null) {
+      const order: RecordsTab[] = ['achievements', 'stickers', 'decor'];
+      this.setRecordsTab(order[(order.indexOf(v.tab) + 1) % order.length]);
+      return;
+    }
+    if (v.tab === 'stickers') {
+      if (k === 'ArrowLeft' || k === 'ArrowRight') { v.series = (v.series + (k === 'ArrowRight' ? 1 : SERIES.length - 1)) % SERIES.length; this.sound.key(1); }
+      return;
+    }
+    if (v.tab === 'decor') {
+      if (k === 'ArrowUp' || k === 'ArrowDown') { v.decorRow = (v.decorRow + (k === 'ArrowDown' ? 1 : DECOR_ROWS.length - 1)) % DECOR_ROWS.length; this.sound.key(1); return; }
+      if (k === 'ArrowLeft' || k === 'ArrowRight') {
+        const opts = this.decorOptions(v.decorRow);
+        const key = DECOR_KEYS[v.decorRow];
+        const cur = (this.collection ?? this.store.loadCollection()).equip[key];
+        const i = opts.indexOf(cur);
+        const next = opts[(Math.max(0, i) + (k === 'ArrowRight' ? 1 : opts.length - 1)) % opts.length];
+        this.setDecor({ [key]: next } as Partial<Equip>);
+        if (key !== 'sound') this.sound.key(1);
+      }
+      return;
+    }
     const r = this.records!;
     const opened = (i: number) => !!r.unlocked[ACHIEVEMENTS[i].id];
     if (v.reading === null) {
@@ -673,7 +844,13 @@ export class Game {
       return;
     }
     // 記録・実績：↑↓でえらぶ、Enter で会話を開く／閉じる、会話の中は↑↓で送り、←→でほかの会話へ
-    if (this.mode === 'records' && this.recordsView && (k.startsWith('Arrow') || k === 'Enter' || (k === 'Escape' && this.recordsView.reading !== null))) {
+    // ふくびき：演出中はキーで飛ばす。交換の一覧は↑↓・Enter・Esc
+    if (this.mode === 'fukubiki' && this.fukubiki && (this.fukubiki.anim < FUKUBIKI_ANIM || (this.fukubiki.exchange && (k.startsWith('Arrow') || k === 'Enter' || k === 'Escape')))) {
+      e.preventDefault();
+      this.fukubikiKey(k);
+      return;
+    }
+    if (this.mode === 'records' && this.recordsView && (k.startsWith('Arrow') || k === 'Enter' || k === 'Tab' || (k === 'Escape' && this.recordsView.reading !== null))) {
       e.preventDefault();
       this.recordsKey(k);
       return;
@@ -776,6 +953,7 @@ export class Game {
 
   /** 動作確認からも呼べる1コマの進行 */
   step(dt: number) {
+    if (this.fukubiki && this.fukubiki.anim < 10) this.fukubiki.anim += dt;
     this.t += dt;
     this.missFlash = Math.max(0, this.missFlash - dt);
     this.volumeShown = Math.max(0, this.volumeShown - dt);
@@ -891,8 +1069,10 @@ export class Game {
     const play = { seed: session.seed, record: session.record, prep: session.rules.prepBudget > 0 && this.prep ? { ...this.prep.alloc } : null };
     // 記録・実績：閉店結果が確定したこのときに、1営業分を一度だけ反映する（同じ営業IDは二度数えない）
     let unlocked: string[] = [];
-    try { unlocked = this.store.recordPlay(this.playFacts(session)).unlocked; } catch { unlocked = []; }
-    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: sum.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily, play, unlocked };
+    let credited = 0;
+    let coins = 0;
+    try { ({ unlocked, credited, coins } = this.store.recordPlay(this.playFacts(session))); } catch { unlocked = []; }
+    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: sum.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily, play, unlocked, credited, coins };
     this.submission = { state: 'idle', receipt: null, message: '' };
     this.mode = 'result';
     this.menu.reset();
@@ -903,7 +1083,7 @@ export class Game {
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
   get overTavern() {
-    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records';
+    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'fukubiki';
   }
 
   // ---------- 描画 ----------
@@ -976,6 +1156,7 @@ export class Game {
     else if (this.mode === 'prep') drawPrep(this);
     else if (this.mode === 'ranking') drawRanking(this);
     else if (this.mode === 'records') drawRecords(this);
+    else if (this.mode === 'fukubiki') drawFukubiki(this);
     else drawResult(this);
     if (this.mode === 'result') { if (this.t - this.resultAt > RESULT_READY - 0.3) drawResultMenu(this); }
     else drawMenu(this, this.mode === 'help' ? 210 : this.mode === 'difficulty' ? 170 : 172);

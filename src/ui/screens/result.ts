@@ -1,4 +1,5 @@
 // 画面：result
+import { PULL_PRICE } from '../../core/collection';
 import { C } from '../palette';
 import { LW } from '../screen';
 import { dateLabel } from '../../core/daily';
@@ -122,6 +123,18 @@ export function drawResult(g: Game) {
       sc.T(name, x + 6, y + 15, sc.fitSize(name, 8, w - 12, 6), '#f2efe2', 'left', p);
     }
     sc.T('タイトルの「きろく」で会話が読めます', x + 6, y + 27, sc.fitSize('タイトルの「きろく」で会話が読めます', 6.5, w - 12, 5), C.cream2, 'left', p);
+  }
+  // 段階6：売上を貯金箱へ（実績のお知らせがあればその下）
+  if (r.credited !== undefined && age > 2.6) {
+    const p = ease((age - 2.6) / 0.3);
+    const x = 334;
+    const y = r.unlocked?.length ? 112 : 72;
+    const w = 138;
+    const can = (r.coins ?? 0) >= PULL_PRICE;
+    sc.panel(x, y, w, can ? 26 : 16, 'rgba(36,40,30,0.95)', can ? C.gold3 : '#8a6232', p);
+    const line = `本日の売上 ＋${r.credited.toLocaleString()}円 → 貯金箱`;
+    sc.T(line, x + 6, y + 3.5, sc.fitSize(line, 7.5, w - 12, 5.5), '#f2efe2', 'left', p);
+    if (can) sc.T('ふくびきが引けます（タイトルの「ふくびき」）', x + 6, y + 14.5, sc.fitSize('ふくびきが引けます（タイトルの「ふくびき」）', 6.5, w - 12, 5), C.gold3, 'left', p);
   }
   // 家族が見送る
   if (g.art) {
