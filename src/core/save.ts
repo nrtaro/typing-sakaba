@@ -1,5 +1,6 @@
 // ブラウザへの保存：設定・自己ベスト・直近の結果（3分の一周なので途中経過は保存しない）
 
+import { readCollection, type CollectionState } from './collection';
 import { PLAYER_ID } from './ranking';
 
 import { applyPlay, markRead, readRecords, type PlayFacts, type Records } from './achievements';
@@ -40,7 +41,7 @@ export interface DayRecord {
   finishedAt: string;
 }
 
-const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily', player: 'lastorder2.player', records: 'lastorder2.records.v1' };
+const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily', player: 'lastorder2.player', records: 'lastorder2.records.v1', collection: 'lastorder2.collection.v1' };
 
 /** ひがわり営業の記録は、直近の何日分を残すか */
 export const DAILY_KEEP_DAYS = 30;
@@ -63,7 +64,7 @@ export class SaveStore {
   /** slot を指定すると別の保存枠を使う（動作確認用） */
   constructor(private store: KeyValueStore | null, slot = '') {
     const sfx = slot ? `.${slot.replace(/[^a-z0-9_-]/gi, '')}` : '';
-    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx, player: KEYS.player + sfx, records: KEYS.records + sfx };
+    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx, player: KEYS.player + sfx, records: KEYS.records + sfx, collection: KEYS.collection + sfx };
   }
 
   /** 記録・実績（段階5）。保存がない・壊れているときは、空の記録から始める */
@@ -75,11 +76,31 @@ export class SaveStore {
    * 1回の営業を記録に反映する。反映の直前に保存を読み直すので、別のタブで遊んだ分や解放を消さない。
    * 書き込みに失敗しても、営業と結果画面はそのまま使える。
    */
-  recordPlay(f: PlayFacts, now = new Date()): { records: Records; unlocked: string[] } {
+  recordPlay(f: PlayFacts, now = new Date()): { records: Records; unlocked: string[]; coins: number; credited: number } {
     const before = this.loadRecords();
     const result = applyPlay(before, f, now);
     if (result.records !== before) this.write(this.keys.records, result.records);
-    return result;
+    // 段階6：売上を貯金箱へ。記録と同じ営業IDで一度だけ足す
+    let credited = 0;
+    const c = this.updateCollection((s) => {
+      if (s.credited.includes(f.id)) return s;
+      credited = Math.max(0, Math.floor(f.score));
+      return { ...s, coins: s.coins + credited, credited: [...s.credited, f.id].slice(-200) };
+    });
+    return { ...result, coins: c.coins, credited };
+  }
+
+  /** コレクション（段階6）。保存がない・壊れているときは空から始める */
+  loadCollection(): CollectionState {
+    return readCollection(this.read<unknown>(this.keys.collection));
+  }
+
+  /** 保存の直前に読み直して変更する（別のタブの分を消さない）。書き込めなくても結果を返す */
+  updateCollection(fn: (s: CollectionState) => CollectionState): CollectionState {
+    const before = this.loadCollection();
+    const after = fn(before);
+    if (after !== before) this.write(this.keys.collection, after);
+    return after;
   }
 
   /** 会話を開いたことを残す */
