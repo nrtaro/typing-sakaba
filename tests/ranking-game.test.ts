@@ -17,7 +17,7 @@ function result() {
     finishedAt: '2026-11-07T03:00:00Z', best: true, rank: 'A', title: '店主', trips: 1,
     difficulty: 'ふつう', difficultyId: 'normal' as const,
     daily: { date: '2026-11-07', conds: dailyConditions('2026-11-07') },
-    play: { seed: 1, record: '0a', prep: null } };
+    play: { seed: 1, record: '0a', prep: null }, unlocked: [] };
 }
 function game(client: RankingClient): Game {
   const store = new SaveStore(localStorage, 'test');

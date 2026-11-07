@@ -21,7 +21,11 @@ export interface MinigameResult {
   gains: Partial<Record<IngredientId, number>>;
   correctKeys: number;
   missKeys: number;
+  /** 記録・実績用：捕獲が確定した大物の魚と鉄角ジカの数、競りの最長連勝 */
+  feats: MinigameFeats;
 }
+
+export interface MinigameFeats { bigFish: number; deer: number; streak: number }
 
 /** 4つの調達ミニゲームの共通部分。時間・入力・成果・演出用のイベント */
 export abstract class Minigame<T = unknown> {
@@ -35,6 +39,8 @@ export abstract class Minigame<T = unknown> {
   protected events: MinigameEvent[] = [];
   /** れんしゅう：調達の時間が減らず、失敗もしない（説明を読みながら、ゆっくり試せるように） */
   practice = false;
+  /** 記録・実績用の確定した出来事（演出や素材の数から推定しない） */
+  feats: MinigameFeats = { bigFish: 0, deer: 0, streak: 0 };
 
   constructor(protected readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1]) {
     this.duration = difficulty.id === 'easy' ? EASY_MINIGAME_SECONDS : MINIGAME_SECONDS;
@@ -87,7 +93,7 @@ export abstract class Minigame<T = unknown> {
   }
 
   result(): MinigameResult {
-    return { gains: { ...this.gains }, correctKeys: this.correctKeys, missKeys: this.missKeys };
+    return { gains: { ...this.gains }, correctKeys: this.correctKeys, missKeys: this.missKeys, feats: { ...this.feats } };
   }
 }
 
@@ -246,6 +252,7 @@ export class FishingGame extends Minigame<null> {
       return;
     }
     this.add('fish', procurementReward('fishing', this.catchKeys, this.big, this.difficulty.id), 0, 0);
+    if (this.big) this.feats.bigFish++;
     this.fishIndex++;
     // 次の合図は直ちに入力可能。水しぶきの演出と入力受付を分離する。
     this.word = this.rng.pick(HOOK_WORDS);
@@ -384,6 +391,7 @@ export class HuntingGame extends Minigame<Prey> {
     p.flash = 0.25;
     if (p.hp <= 0) {
       this.add('meat', procurementReward('hunting', p.rewardKeys, p.kind === 'deer', this.difficulty.id), p.x, p.lane, p.kind === 'deer');
+      if (p.kind === 'deer') this.feats.deer++;
       this.prey = this.prey.filter((q) => q !== p);
     } else {
       p.word = pickWord(this.rng, wordsForDifficulty(HUNTING_WORDS, this.difficulty), this.usedFirst(p), p.word);
@@ -530,6 +538,8 @@ export interface Lot {
 }
 
 export class TradingGame extends Minigame<null> {
+  /** 今続いている落札の数（負けると0に戻る） */
+  private winStreak = 0;
   readonly kind = 'trading' as const;
   lot: Lot;
   /** 次に競りに出る品物（打っている間も見せる） */
@@ -584,6 +594,7 @@ export class TradingGame extends Minigame<null> {
       // ライバルに先を越された
       lot.outcome = 'lost';
       this.losses++;
+      this.winStreak = 0;
       this.pause = TRADING.pause;
       this.events.push({ type: 'escape', id: 'lot' });
     }
@@ -597,6 +608,9 @@ export class TradingGame extends Minigame<null> {
     const lot = this.lot;
     lot.outcome = 'won';
     this.wins++;
+    // 競りの連勝：負けを挟んだ勝ちはつなげない
+    this.winStreak++;
+    this.feats.streak = Math.max(this.feats.streak, this.winStreak);
     this.add(lot.item, procurementReward('trading', rewardKeys(lot.word.kana), false, this.difficulty.id) + (lot.missed ? 0 : TRADING.bonus), 0, 0);
     // 落札したら間を置かずに次の品物を出し、すぐ打ち始められるようにする
     this.lots++;

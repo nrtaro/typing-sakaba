@@ -10,6 +10,8 @@ import {
 } from './shopConfig';
 
 export const LOOK_COUNT = 7;
+/** 記録・実績：閉店前の何秒を「最後」とみなすか */
+export const LATE_SECONDS = 20;
 
 export interface Guest {
   id: number;
@@ -73,6 +75,10 @@ export type ShopEvent =
 
 export interface ShopStats {
   served: number;
+  /** 残り20秒以内（ちょうどを含む）に出した皿の数 */
+  lateServes: number;
+  /** 予約の宴会の注文を出した数 */
+  banquetServed: number;
   angry: number;
   maxCombo: number;
   correctKeys: number;
@@ -93,7 +99,7 @@ export class Shop {
   queue: Guest[] = [];
   away: Trip | null = null;
   ended = false;
-  stats: ShopStats = { served: 0, angry: 0, maxCombo: 0, correctKeys: 0, missKeys: 0, trips: 0, sales: 0, tips: 0 };
+  stats: ShopStats = { served: 0, lateServes: 0, banquetServed: 0, angry: 0, maxCombo: 0, correctKeys: 0, missKeys: 0, trips: 0, sales: 0, tips: 0 };
   readonly input: CandidateInput<TargetData>;
   /** 配膳の係。料理を出すと席へ運び、置いてからお客が食べ始める */
   readonly crew = new Crew<Guest>();
@@ -332,6 +338,8 @@ export class Shop {
     const gain = Math.round((g.dish.price + tip) * this.multiplier * (hiden ? HIDEN_MULT : 1) * (g.banquet ? BANQUET_MULT : 1));
     this.score += gain;
     this.stats.served++;
+    if (this.timeLeft <= LATE_SECONDS) this.stats.lateServes++;
+    if (g.banquet) this.stats.banquetServed++;
     this.stats.sales += g.dish.price;
     this.stats.tips += tip;
     g.state = 'eat';

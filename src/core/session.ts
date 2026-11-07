@@ -3,9 +3,9 @@
 // 画面・音は扱わない（出来事を events で渡す）。
 
 import { Shop, type ShopEvent } from './shop';
-import { createMinigame, type Minigame } from './minigames';
+import { createMinigame, type Minigame, type MinigameFeats } from './minigames';
 import { Rng } from './rng';
-import { DAY_LENGTH, INGREDIENT_ORDER, MINIGAME_SECONDS, SHOP, type Difficulty, type IngredientId } from './shopConfig';
+import { DAY_LENGTH, INGREDIENT_ORDER, MINIGAME_SECONDS, SHOP, type Difficulty, type IngredientId, type TripId } from './shopConfig';
 import type { DayRules } from './daily';
 
 /** 1刻みの長さ（秒） */
@@ -35,6 +35,10 @@ export class PlaySession {
   /** 進めた刻みの数（営業時間の合計＝ticks×TICK） */
   ticks = 0;
   finished = false;
+  /** 記録・実績用：店に帰ってきた調達（成果があったか、早帰りか） */
+  returns: { kind: TripId; gained: boolean; early: boolean }[] = [];
+  /** 記録・実績用：この営業で確定した大物の魚・鉄角ジカの数と、競りの最長連勝 */
+  feats: MinigameFeats = { bigFish: 0, deer: 0, streak: 0 };
   private events: SessionEvent[] = [];
   private log: string[] = [];
   private lastLogged = 0;
@@ -123,6 +127,10 @@ export class PlaySession {
       const r = trip.game.result();
       this.shop.stats.correctKeys += r.correctKeys;
       this.shop.stats.missKeys += r.missKeys;
+      // 成果は調達で実際に取れた分で判定する（最低保証や倉庫・到着の都合は含めない）
+      const gained = Object.values(r.gains).some((n) => (n ?? 0) > 0);
+      this.returns.push({ kind: trip.game.kind, gained, early: !!trip.earlyReturn });
+      this.addFeats(r.feats);
       this.shop.returnFromTrip(r.gains, trip.earlyReturn);
       this.trip = null;
       this.events.push({ src: 'session', type: 'tripBack' });
@@ -149,8 +157,16 @@ export class PlaySession {
       const r = this.trip.game.result();
       this.shop.stats.correctKeys += r.correctKeys;
       this.shop.stats.missKeys += r.missKeys;
+      // 帰りが間に合わなかった調達：持ち帰りには数えないが、捕獲は確定している
+      this.addFeats(r.feats);
       this.trip = null;
     }
+  }
+
+  private addFeats(f: MinigameFeats) {
+    this.feats.bigFish += f.bigFish;
+    this.feats.deer += f.deer;
+    this.feats.streak = Math.max(this.feats.streak, f.streak);
   }
 
   /** 成績（画面の結果と、サーバーで確かめる値は同じ計算） */

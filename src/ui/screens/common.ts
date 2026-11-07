@@ -23,7 +23,7 @@ export function drawMenu(g: Game, y: number) {
   const sc = g.sc;
   const items = g.menuItems();
   if (g.mode === 'title') return;
-  if (g.mode === 'difficulty' || g.mode === 'modeSelect' || g.mode === 'daily' || g.mode === 'prep' || g.mode === 'ranking') return;
+  if (g.mode === 'difficulty' || g.mode === 'modeSelect' || g.mode === 'daily' || g.mode === 'prep' || g.mode === 'ranking' || g.mode === 'records') return;
   if (g.mode === 'help') {
     button(g, items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
     if (g.helpPage === 0) {

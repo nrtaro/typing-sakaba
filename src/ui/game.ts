@@ -23,6 +23,8 @@ import { drawDifficulty } from './screens/difficulty';
 import { drawModeSelect } from './screens/modeSelect';
 import { drawDaily } from './screens/daily';
 import { drawRanking } from './screens/ranking';
+import { drawRecords, dialogueRows, READER_ROWS } from './screens/records';
+import { ACHIEVEMENTS, type PlayFacts, type Records } from '../core/achievements';
 import { drawTutorial } from './screens/tutorial';
 import { setupTutorial, tutorialEvent, tutorialStep, type TutorialState } from './tutorial';
 import { drawPrep, PREP_WORDS } from './screens/prep';
@@ -31,7 +33,7 @@ import { resultStep, drawResult, drawResultMenu } from './screens/result';
 import { guideFor, drawCountdown, drawTripIntro, drawTripOutro } from './screens/play';
 import { PHASE_TRACK, RESULT_READY, COUNTDOWN, RESULT_LOCK, MenuItem } from './screens/shared';
 
-export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking';
+export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records';
 export type PlayMode = 'normal' | 'daily';
 
 const TYPABLE = /^[a-z\-]$/;
@@ -73,7 +75,13 @@ export class Game {
   view = new ShopView();
   tripView = new MinigameView();
   paused = false;
-  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord }) | null = null;
+  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord; unlocked: string[] }) | null = null;
+  /** 記録・実績の画面で見ている記録と、選んでいる実績・読んでいる会話 */
+  records: Records | null = null;
+  recordsView: { sel: number; reading: number | null; scroll: number } | null = null;
+  /** この営業の一意なIDと、開店時に確定した JST の日付（記録・実績に使う） */
+  playId = '';
+  openDate = '';
   readonly ranking = new RankingClient();
   board: { key: string; state: 'loading' | 'ready' | 'error'; value: DailyBoard | null } | null = null;
   submission: { state: 'idle' | 'sending' | 'sent' | 'error'; receipt: RankReceipt | null; message: string } = { state: 'idle', receipt: null, message: '' };
@@ -115,7 +123,7 @@ export class Game {
   helpPage = 0;
   /** 結果画面の演出の開始時刻と、鳴らした音の記録 */
   resultAt = 0;
-  resultFx = { tick: 0, stamped: false, sparkled: false };
+  resultFx = { tick: 0, stamped: false, sparkled: false, unlocked: false };
   /** 開店までの残り秒数（0 なら営業中） */
   countdown = 0;
   /** 「開店！」を見せている残り時間 */
@@ -177,6 +185,7 @@ export class Game {
           { text: 'はじめる', kana: 'はじめる', act: () => { this.mode = 'modeSelect'; } },
           { text: 'あそびかた', kana: 'あそびかた', act: () => { this.mode = 'help'; this.helpPage = 0; } },
           { text: 'らんきんぐ', kana: 'らんきんぐ', act: () => this.openRanking() },
+          { text: 'きろく', kana: 'きろく', act: () => this.openRecords() },
           { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
         ];
       case 'help':
@@ -215,6 +224,8 @@ export class Game {
           { text: 'おまかせ', kana: 'おまかせ', act: () => this.prepReset() },
           { text: 'もどる', kana: 'もどる', act: () => this.returnToDaily() },
         ];
+      case 'records':
+        return [{ text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } }];
       case 'ranking':
         return [{ text: 'もどる', kana: 'もどる', act: () => this.closeRanking() }];
       case 'result':
@@ -341,6 +352,86 @@ export class Game {
     this.lastCall = sec;
     this.sound.final(sec);
     if (sec === FINAL_SECONDS) this.view.banner = { text: 'ラストスパート！ 閉店まで10秒', t: 1.8, col: C.gold3 };
+  }
+
+  /** この営業で確定した事実（記録・実績用） */
+  playFacts(session: PlaySession): PlayFacts {
+    const s = session.shop.stats;
+    return {
+      id: this.playId || crypto.randomUUID(),
+      mode: this.daily ? 'daily' : 'normal',
+      difficulty: session.shop.difficulty.id,
+      date: this.openDate || this.daily?.date || jstDate(),
+      score: session.shop.score, served: s.served, maxCombo: s.maxCombo, angry: s.angry, tripsStarted: s.trips,
+      conds: this.daily ? this.daily.conds.map((c) => c.id) : [],
+      bigFish: session.feats.bigFish, deer: session.feats.deer, streak: session.feats.streak,
+      late: s.lateServes, banquet: s.banquetServed, returns: session.returns.map((t) => ({ ...t })),
+    };
+  }
+
+  /** まだ読んでいない会話があるか（タイトルの「きろく」に印を付ける）。毎コマ保存を読まないよう、少し間を置いて確かめる */
+  private unreadAt = -10;
+  private unreadCache = false;
+  unreadRecords() {
+    if (this.t - this.unreadAt > 2) {
+      this.unreadAt = this.t;
+      try {
+        const r = this.store.loadRecords();
+        this.unreadCache = ACHIEVEMENTS.some((a) => r.unlocked[a.id] && !r.read.includes(a.id));
+      } catch { this.unreadCache = false; }
+    }
+    return this.unreadCache;
+  }
+
+  /** 記録・実績の画面を開く（まだ読んでいない会話があれば、そこを選んでおく） */
+  openRecords() {
+    this.records = this.store.loadRecords();
+    const r = this.records;
+    const unread = ACHIEVEMENTS.findIndex((a) => r.unlocked[a.id] && !r.read.includes(a.id));
+    this.recordsView = { sel: Math.max(0, unread), reading: null, scroll: 0 };
+    this.mode = 'records';
+    this.menu.reset();
+  }
+
+  /** 記録・実績の画面のキー操作 */
+  recordsKey(k: string) {
+    const v = this.recordsView!;
+    const r = this.records!;
+    const opened = (i: number) => !!r.unlocked[ACHIEVEMENTS[i].id];
+    if (v.reading === null) {
+      if (k === 'ArrowUp') v.sel = (v.sel + ACHIEVEMENTS.length - 1) % ACHIEVEMENTS.length;
+      else if (k === 'ArrowDown') v.sel = (v.sel + 1) % ACHIEVEMENTS.length;
+      else if (k === 'ArrowLeft') v.sel = Math.max(0, v.sel - 8);
+      else if (k === 'ArrowRight') v.sel = Math.min(ACHIEVEMENTS.length - 1, v.sel + 8);
+      else if (k === 'Enter') {
+        if (!opened(v.sel)) { this.sound.miss(); this.missFlash = 0.25; return; }
+        this.openDialogue(v.sel);
+        return;
+      }
+      this.sound.key(1);
+      return;
+    }
+    if (k === 'Enter' || k === 'Escape') { v.reading = null; this.sound.select(); return; }
+    if (k === 'ArrowUp' || k === 'ArrowDown') {
+      const rows = dialogueRows(this.sc, v.reading, 388).length;
+      v.scroll = Math.max(0, Math.min(Math.max(0, rows - READER_ROWS), v.scroll + (k === 'ArrowDown' ? 1 : -1)));
+      this.sound.key(1);
+      return;
+    }
+    // ←→：解放済みのほかの会話へ
+    const dir = k === 'ArrowRight' ? 1 : -1;
+    for (let i = v.reading + dir; i >= 0 && i < ACHIEVEMENTS.length; i += dir) {
+      if (opened(i)) { v.sel = i; this.openDialogue(i); return; }
+    }
+    this.sound.miss();
+  }
+
+  private openDialogue(i: number) {
+    const v = this.recordsView!;
+    v.reading = i;
+    v.scroll = 0;
+    try { this.records = this.store.markRecordRead(ACHIEVEMENTS[i].id); } catch { /* 保存できなくても読める */ }
+    this.sound.select();
   }
 
   /** ランキングの画面を開く（開くたびに読み直す） */
@@ -501,6 +592,9 @@ export class Game {
     // 開店前の仕込みの日は、振り分けたとおりの在庫で開店する
     if (rules.prepBudget > 0 && !this.prep) this.prep = { key: `${this.daily?.date}:${difficulty}`, alloc: defaultPrep(rules), sel: 0, changed: null, changedAt: -10 };
     this.session = new PlaySession(this.seed, difficultyOf(difficulty), rules, rules.prepBudget > 0 ? { ...this.prep!.alloc } : null);
+    // 記録・実績：この営業のIDと営業日（0時を越えて閉店しても、開店した日で数える）
+    this.playId = crypto.randomUUID();
+    this.openDate = this.daily?.date ?? jstDate();
     this.view = new ShopView();
     this.view.art = this.art;
     this.paused = false;
@@ -548,6 +642,12 @@ export class Game {
     if (this.mode === 'result' && this.t - this.resultAt < RESULT_READY) {
       e.preventDefault();
       if (this.t - this.resultAt > RESULT_LOCK) this.resultAt = this.t - RESULT_READY;
+      return;
+    }
+    // 記録・実績：↑↓でえらぶ、Enter で会話を開く／閉じる、会話の中は↑↓で送り、←→でほかの会話へ
+    if (this.mode === 'records' && this.recordsView && (k.startsWith('Arrow') || k === 'Enter' || (k === 'Escape' && this.recordsView.reading !== null))) {
+      e.preventDefault();
+      this.recordsKey(k);
       return;
     }
     if (k === 'Escape' && this.mode !== 'title') {
@@ -761,18 +861,21 @@ export class Game {
     const rank = rankFor(rec.score, diff);
     // ランキングでは、サーバーがこの記録どおりに営業をやり直して成績を確かめる
     const play = { seed: session.seed, record: session.record, prep: session.rules.prepBudget > 0 && this.prep ? { ...this.prep.alloc } : null };
-    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: sum.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily, play };
+    // 記録・実績：閉店結果が確定したこのときに、1営業分を一度だけ反映する（同じ営業IDは二度数えない）
+    let unlocked: string[] = [];
+    try { unlocked = this.store.recordPlay(this.playFacts(session)).unlocked; } catch { unlocked = []; }
+    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: sum.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily, play, unlocked };
     this.submission = { state: 'idle', receipt: null, message: '' };
     this.mode = 'result';
     this.menu.reset();
     this.resultAt = this.t;
-    this.resultFx = { tick: 0, stamped: false, sparkled: false };
+    this.resultFx = { tick: 0, stamped: false, sparkled: false, unlocked: false };
     this.sound.play('result');
   }
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
   get overTavern() {
-    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking';
+    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records';
   }
 
   // ---------- 描画 ----------
@@ -844,6 +947,7 @@ export class Game {
     else if (this.mode === 'daily') drawDaily(this);
     else if (this.mode === 'prep') drawPrep(this);
     else if (this.mode === 'ranking') drawRanking(this);
+    else if (this.mode === 'records') drawRecords(this);
     else drawResult(this);
     if (this.mode === 'result') { if (this.t - this.resultAt > RESULT_READY - 0.3) drawResultMenu(this); }
     else drawMenu(this, this.mode === 'help' ? 210 : this.mode === 'difficulty' ? 170 : 172);

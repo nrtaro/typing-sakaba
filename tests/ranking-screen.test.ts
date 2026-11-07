@@ -34,7 +34,7 @@ describe('今日のランキングの画面', () => {
     const { g } = game();
     g.mode = 'result';
     g.result = { score: 1, served: 1, maxCombo: 1, angry: 0, kps: 1, accuracy: 1, finishedAt: '', best: false, rank: 'C', title: '', trips: 0,
-      difficulty: 'ふつう', difficultyId: 'normal', daily: { date: '2026-11-08', conds: dailyConditions('2026-11-08') }, play: { seed: 1, record: '', prep: null } };
+      difficulty: 'ふつう', difficultyId: 'normal', daily: { date: '2026-11-08', conds: dailyConditions('2026-11-08') }, play: { seed: 1, record: '', prep: null }, unlocked: [] };
     expect(g.menuItems().map((i) => i.kana)).not.toContain('らんきんぐ');
     g.submission = { state: 'sent', receipt: { rank: 1, total: 1 }, message: '' };
     g.menuItems().find((i) => i.kana === 'らんきんぐ')!.act();

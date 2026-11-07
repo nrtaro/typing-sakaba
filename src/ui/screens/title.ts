@@ -105,11 +105,16 @@ export function drawTitle(g: Game) {
     // メニューは打って選ぶ：キーボードの絵と短い一言
     drawKeyboard(g, 30, 212);
     sc.T('打って選ぶ', 56, 213.5, 8, C.cream, 'left', 0.95);
-    const [start, help, ranking, sound] = g.menuItems();
-    button(g, start, 30, 224, 160, 38, 'primary', 'Enter');
-    button(g, help, 196, 228, 98, 30, 'plain');
-    button(g, ranking, 300, 228, 98, 30, 'plain');
-    button(g, sound, 404, 228, 66, 30, 'plain');
+    const [start, help, ranking, records, sound] = g.menuItems();
+    button(g, start, 30, 224, 120, 38, 'primary', 'Enter');
+    button(g, help, 156, 228, 88, 30, 'plain');
+    button(g, ranking, 250, 228, 88, 30, 'plain');
+    button(g, records, 344, 228, 60, 30, 'plain');
+    button(g, sound, 410, 228, 60, 30, 'plain');
+    if (g.unreadRecords()) {
+      sc.panel(372, 219, 28, 10, '#7a2a3a', C.gold3);
+      sc.T('NEW', 386, 220.5, 6.5, C.gold3, 'center');
+    }
   });
 }
 

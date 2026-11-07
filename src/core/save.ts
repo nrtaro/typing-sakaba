@@ -2,6 +2,8 @@
 
 import { PLAYER_ID } from './ranking';
 
+import { applyPlay, markRead, readRecords, type PlayFacts, type Records } from './achievements';
+
 export interface KeyValueStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -38,7 +40,7 @@ export interface DayRecord {
   finishedAt: string;
 }
 
-const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily', player: 'lastorder2.player' };
+const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily', player: 'lastorder2.player', records: 'lastorder2.records.v1' };
 
 /** ひがわり営業の記録は、直近の何日分を残すか */
 export const DAILY_KEEP_DAYS = 30;
@@ -61,7 +63,30 @@ export class SaveStore {
   /** slot を指定すると別の保存枠を使う（動作確認用） */
   constructor(private store: KeyValueStore | null, slot = '') {
     const sfx = slot ? `.${slot.replace(/[^a-z0-9_-]/gi, '')}` : '';
-    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx, player: KEYS.player + sfx };
+    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx, player: KEYS.player + sfx, records: KEYS.records + sfx };
+  }
+
+  /** 記録・実績（段階5）。保存がない・壊れているときは、空の記録から始める */
+  loadRecords(): Records {
+    return readRecords(this.read<unknown>(this.keys.records));
+  }
+
+  /**
+   * 1回の営業を記録に反映する。反映の直前に保存を読み直すので、別のタブで遊んだ分や解放を消さない。
+   * 書き込みに失敗しても、営業と結果画面はそのまま使える。
+   */
+  recordPlay(f: PlayFacts, now = new Date()): { records: Records; unlocked: string[] } {
+    const before = this.loadRecords();
+    const result = applyPlay(before, f, now);
+    if (result.records !== before) this.write(this.keys.records, result.records);
+    return result;
+  }
+
+  /** 会話を開いたことを残す */
+  markRecordRead(id: string): Records {
+    const r = markRead(this.loadRecords(), id);
+    this.write(this.keys.records, r);
+    return r;
   }
 
   /** 保存できないブラウザでも、この起動中は同じ端末IDを使う。 */

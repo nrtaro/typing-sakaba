@@ -5,6 +5,7 @@ import { dateLabel } from '../../core/daily';
 import type { Game } from '../game';
 import { chipWidth, drawCondChip } from './conditions';
 import { button } from './common';
+import { ACHIEVEMENTS } from '../../core/achievements';
 
 /** 結果画面の演出が終わって、選べるようになるまでの時間 */
 export function resultStep(g: Game) {
@@ -23,6 +24,10 @@ export function resultStep(g: Game) {
   if (r.best && !g.resultFx.sparkled && age > 2.4) {
     g.resultFx.sparkled = true;
     g.sound.sparkle();
+  }
+  if (r.unlocked?.length && !g.resultFx.unlocked && age > 2.7) {
+    g.resultFx.unlocked = true;
+    g.sound.chord(4);
   }
 }
 
@@ -101,6 +106,22 @@ export function drawResult(g: Game) {
       : sent.state === 'error' ? `${sent.message}（端末の記録は保存済み）`
       : '名前を付けて、今日のランキングへ';
     sc.T(text, LW / 2, 185, sc.fitSize(text, 9, LW - 24), sent.state === 'error' ? '#ffb6a4' : C.gold3, 'center');
+  }
+  // 新しく開いた実績（判子の右）
+  if (r.unlocked?.length && age > 2.6) {
+    const p = ease((age - 2.6) / 0.3);
+    const first = ACHIEVEMENTS.find((a) => a.id === r.unlocked[0]);
+    const x = 334;
+    const y = 72;
+    const w = 138;
+    sc.radialGlow(x + w / 2, y + 18, 60, '#ffd27a', 0.25 * p);
+    sc.panel(x, y, w, 38, 'rgba(58,31,24,0.95)', C.gold3, p);
+    sc.TB(`実績が開いた！${r.unlocked.length > 1 ? `（${r.unlocked.length}件）` : ''}`, x + 6, y + 3, 9, C.gold3, 'left', C.ink, p);
+    if (first) {
+      const name = `「${first.title}」${r.unlocked.length > 1 ? 'ほか' : ''}`;
+      sc.T(name, x + 6, y + 15, sc.fitSize(name, 8, w - 12, 6), '#f2efe2', 'left', p);
+    }
+    sc.T('タイトルの「きろく」で会話が読めます', x + 6, y + 27, sc.fitSize('タイトルの「きろく」で会話が読めます', 6.5, w - 12, 5), C.cream2, 'left', p);
   }
   // 家族が見送る
   if (g.art) {
