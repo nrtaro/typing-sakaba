@@ -9,6 +9,11 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
+  // Workers の無料プランは1回の処理の計算時間が約10ms。遊んだ記録のやり直し（約40〜70ms）は
+  // 入りきらないため止めておく（有料プランにしたら、この行を消すか "on" にする）。
+  "vars": {
+    "RANKING_REPLAY": "off"
+  },
   "d1_databases": [
     {
       "binding": "DB",
