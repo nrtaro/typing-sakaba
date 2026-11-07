@@ -1,7 +1,7 @@
 // バランス確認：一定の速さで打つボットに3分の営業を通しで遊ばせる
 import { describe, expect, it } from 'vitest';
 import { Shop } from '../src/core/shop';
-import { NORMAL_RULES, type DayRules } from '../src/core/daily';
+import { NORMAL_RULES, defaultPrep, type DayRules } from '../src/core/daily';
 import { createMinigame, GatheringGame, type Minigame } from '../src/core/minigames';
 import { Rng } from '../src/core/rng';
 import { RomajiMatcher } from '../src/core/romaji';
@@ -17,6 +17,8 @@ function nextKey(input: { active: { target: { id: string }; matcher: RomajiMatch
 export function playDay(seed: number, kps: number, missRate = 0.04, diffId: DifficultyId = 'normal', rules: DayRules = NORMAL_RULES) {
   const diff = difficultyOf(diffId);
   const shop = new Shop(new Rng(seed), diff, rules);
+  // 開店前の仕込みの日は「おまかせ」で振り分ける
+  if (rules.prepBudget > 0) shop.applyPrep(defaultPrep(rules));
   const rng = new Rng(seed + 99);
   let trip: { game: Minigame<unknown>; phase: 'intro' | 'game' | 'outro'; t: number } | null = null;
   let firstTrip: TripId | null = null;

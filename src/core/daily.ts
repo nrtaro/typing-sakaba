@@ -2,7 +2,7 @@
 // お題は日付だけで決まり、どの難易度でも同じ。難易度によって条件の強さが変わる。
 // お客の来かたは通常と同じく毎回ちがう（同じ日でも遊ぶたびに別の営業になる）。
 
-import { TRIPS, type DifficultyId, type TripId } from './shopConfig';
+import { INGREDIENT_ORDER, SHOP, TRIPS, type DifficultyId, type IngredientId, type TripId } from './shopConfig';
 
 /** お題が営業に与える変更。Shop はこれを見てふるまいを変える */
 export interface DayRules {
@@ -34,12 +34,14 @@ export interface DayRules {
   spoilAfter: number | null;
   /** 予約の宴会：来店する時刻（営業開始からの秒）と料理 */
   banquets: { at: number; dish: string }[];
+  /** 開店前の仕込み：開店前に自分で振り分ける素材の数（0 は仕込みなし） */
+  prepBudget: number;
 }
 
 export const NORMAL_RULES: DayRules = {
   comboMissAllowance: null, angryPenaltyMult: 1, storageCap: null, awayWaitRate: 0,
   luckyTrips: null, luckyMult: 1, unluckyMult: 1, spillEvery: null, refillChance: 0,
-  shinagire: 0, hiden: 0, deliveryDelay: 0, spoilAfter: null, banquets: [],
+  shinagire: 0, hiden: 0, deliveryDelay: 0, spoilAfter: null, banquets: [], prepBudget: 0,
 };
 
 /** ひでんの・予約の宴会の売上の倍率 */
@@ -49,7 +51,7 @@ export const BANQUET_MULT = 2;
 export const BANQUET_WAIT_MULT = 2;
 export const BANQUET_PENALTY_MULT = 3;
 
-export type ConditionId = 'noMiss' | 'smallStore' | 'busyAway' | 'luckyTrip' | 'spill' | 'refill' | 'shinagire' | 'hiden' | 'delivery' | 'spoil' | 'banquet';
+export type ConditionId = 'noMiss' | 'smallStore' | 'busyAway' | 'luckyTrip' | 'spill' | 'refill' | 'shinagire' | 'hiden' | 'delivery' | 'spoil' | 'banquet' | 'prep';
 
 export interface Condition {
   id: ConditionId;
@@ -73,6 +75,7 @@ export const LUCKY_MULT = 1.5;
 const SHINAGIRE: Record<DifficultyId, number> = { easy: 5, normal: 3, hard: 2 };
 const HIDEN: Record<DifficultyId, number> = { easy: 4, normal: 3, hard: 2 };
 const DELIVERY_DELAY: Record<DifficultyId, number> = { easy: 10, normal: 20, hard: 30 };
+const PREP_BUDGET: Record<DifficultyId, number> = { easy: 36, normal: 30, hard: 26 };
 const SPOIL_AFTER: Record<DifficultyId, number> = { easy: 90, normal: 75, hard: 60 };
 /** 宴会の時刻（営業開始からの秒）。朝0〜50・昼50〜110・夜110〜180 */
 const BANQUET_TIMES: Record<DifficultyId, number[]> = { easy: [120], normal: [90, 150], hard: [60, 110, 160] };
@@ -179,6 +182,15 @@ export const CONDITIONS: Record<ConditionId, Condition> = {
     lines: (d) => [`手に入れた素材は${SPOIL_AFTER[d]}秒で傷む`, '古いものから使われる。ためこみすぎに注意'],
     apply: (r, d) => { r.spoilAfter = SPOIL_AFTER[d]; },
   },
+  prep: {
+    id: 'prep',
+    // 宴会や時間帯の当たり（どちらも大）と同じ日に出せるよう、小にする
+    kind: 'minor',
+    name: '開店前の仕込み',
+    title: () => '開店前の仕込み',
+    lines: (d) => [`開店前に、素材${PREP_BUDGET[d]}個を自分で振り分ける`, 'その日のお題に合わせて仕込もう'],
+    apply: (r, d) => { r.prepBudget = PREP_BUDGET[d]; },
+  },
   banquet: {
     id: 'banquet',
     kind: 'major',
@@ -277,4 +289,26 @@ export function rulesFor(conds: Condition[], d: DifficultyId, date = ''): DayRul
   const r = { ...NORMAL_RULES };
   for (const c of conds) c.apply(r, d, date);
   return r;
+}
+
+/** 仕込みで1種類の素材に入れられる数（狭い倉庫の日はその上限まで） */
+export function prepCap(rules: DayRules) {
+  return Math.min(rules.storageCap ?? PREP_MAX, PREP_MAX);
+}
+export const PREP_MAX = 12;
+
+/** 仕込みの「おまかせ」：いつもの開店時の在庫の割合で振り分ける */
+export function defaultPrep(rules: DayRules): Record<IngredientId, number> {
+  const cap = prepCap(rules);
+  const base = SHOP.startStock;
+  const total = INGREDIENT_ORDER.reduce((a, id) => a + base[id], 0);
+  const out = Object.fromEntries(INGREDIENT_ORDER.map((id) => [id, Math.min(cap, Math.floor((base[id] * rules.prepBudget) / total))])) as Record<IngredientId, number>;
+  // 端数は、いつもの在庫が多い順に1つずつ足す
+  let left = rules.prepBudget - INGREDIENT_ORDER.reduce((a, id) => a + out[id], 0);
+  const order = [...INGREDIENT_ORDER].sort((a, b) => base[b] - base[a]);
+  for (let k = 0; left > 0 && k < 100; k++) {
+    const id = order[k % order.length];
+    if (out[id] < cap) { out[id]++; left--; }
+  }
+  return out;
 }

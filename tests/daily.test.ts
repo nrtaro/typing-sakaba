@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONDITIONS, NORMAL_RULES, dailyConditions, dateLabel, isBanned, jstDate, luckySchedule, rulesFor } from '../src/core/daily';
+import { CONDITIONS, NORMAL_RULES, dailyConditions, dateLabel, defaultPrep, isBanned, jstDate, luckySchedule, prepCap, rulesFor } from '../src/core/daily';
 import { Shop } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
 import { defaultRomaji } from '../src/core/romaji';
@@ -45,8 +45,8 @@ describe('ひがわり：お題の決まり方', () => {
       expect(isBanned(a.id, b.id)).toBe(false);
       seen.add(`${a.id}+${b.id}`);
     }
-    // 大6つ×小5つ＝30通りすべてが、いずれかの日に出る
-    expect(seen.size).toBe(30);
+    // 大6つ×小6つ＝36通りすべてが、いずれかの日に出る
+    expect(seen.size).toBe(36);
   });
 
   it('難易度で強さが変わる', () => {
@@ -371,6 +371,37 @@ describe('ひがわり：予約の宴会', () => {
     shop.seats[6] = wait('feast', 0.01, { banquet: true });
     shop.update(0.05);
     expect(shop.score).toBe(1000 - SHOP.angryPenalty * 3);
+  });
+});
+
+describe('ひがわり：開店前の仕込み', () => {
+  it('おまかせは、難易度ごとの数をちょうど使い切り、上限を超えない', () => {
+    for (const d of DIFFICULTIES) {
+      for (const extra of [[], [CONDITIONS.smallStore]]) {
+        const rules = rulesFor([CONDITIONS.prep, ...extra], d.id);
+        const alloc = defaultPrep(rules);
+        const sum = Object.values(alloc).reduce((a, b) => a + b, 0);
+        expect(sum).toBe(rules.prepBudget);
+        expect(Math.max(...Object.values(alloc))).toBeLessThanOrEqual(prepCap(rules));
+      }
+    }
+    expect(DIFFICULTIES.map((d) => rulesFor([CONDITIONS.prep], d.id).prepBudget)).toEqual([36, 30, 26]);
+  });
+
+  it('振り分けたとおりの在庫で開店する（傷む日は開店時から数える）', () => {
+    const rules = rulesFor([CONDITIONS.prep, CONDITIONS.spoil], 'normal');
+    const shop = new Shop(new Rng(1), difficultyOf('normal'), rules);
+    shop.applyPrep({ fish: 12, meat: 8, veg: 4, mush: 2, ale: 4, spice: 0 });
+    expect(shop.stock).toEqual({ fish: 12, meat: 8, veg: 4, mush: 2, ale: 4, spice: 0 });
+    expect(shop.spoilsIn('fish')).toBe(75);
+    expect(shop.spoilsIn('spice')).toBeNull();
+  });
+
+  it('宴会や時間帯の当たり（大）と同じ日に出せるよう、小のお題になっている', () => {
+    expect(CONDITIONS.prep.kind).toBe('minor');
+    const days = Array.from({ length: 1500 }, (_, i) => dailyConditions(day(i)).map((c) => c.id).sort().join('+'));
+    expect(days).toContain('banquet+prep');
+    expect(days).toContain('luckyTrip+prep');
   });
 });
 

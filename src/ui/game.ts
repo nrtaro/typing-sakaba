@@ -11,19 +11,20 @@ import { createMinigame, type Minigame } from '../core/minigames';
 import { Rng } from '../core/rng';
 import { RomajiMatcher } from '../core/romaji';
 import { SaveStore, type DayRecord } from '../core/save';
-import { dailyConditions, jstDate, rulesFor, NORMAL_RULES, type Condition } from '../core/daily';
-import { MINIGAME_SECONDS, DIFFICULTIES, GAME_TITLE, SHOP, difficultyOf, rankFor, type DifficultyId } from '../core/shopConfig';
+import { dailyConditions, defaultPrep, jstDate, prepCap, rulesFor, NORMAL_RULES, type Condition, type DayRules } from '../core/daily';
+import { MINIGAME_SECONDS, DIFFICULTIES, GAME_TITLE, INGREDIENT_ORDER, SHOP, difficultyOf, rankFor, type DifficultyId, type IngredientId } from '../core/shopConfig';
 import { drawVolume, drawMenu, drawMenuScreen, drawImeHint, drawClickHint } from './screens/common';
 import { demoStep, drawCheers, drawTitle } from './screens/title';
 import { drawDifficulty } from './screens/difficulty';
 import { drawModeSelect } from './screens/modeSelect';
 import { drawDaily } from './screens/daily';
+import { drawPrep, PREP_WORDS } from './screens/prep';
 import { helpPlay, drawHelp, openTripHelp, drawTripHelp, drawModeHelp } from './screens/help';
 import { resultStep, drawResult } from './screens/result';
 import { guideFor, drawCountdown, drawTripIntro, drawTripOutro } from './screens/play';
 import { PHASE_TRACK, RESULT_READY, COUNTDOWN, RESULT_LOCK, MenuItem } from './screens/shared';
 
-export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'play' | 'result';
+export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result';
 export type PlayMode = 'normal' | 'daily';
 
 const TYPABLE = /^[a-z\-]$/;
@@ -57,6 +58,8 @@ export class Game {
   result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; daily: DailyPlay | null }) | null = null;
   /** ひがわり営業で遊んでいるときの、日付とお題（通常営業では null） */
   daily: DailyPlay | null = null;
+  /** 開店前の仕込み：振り分け（同じ日・同じ難易度なら、もういちどのときも前の振り分けから） */
+  prep: { key: string; alloc: Record<IngredientId, number>; sel: number; changed: IngredientId | null; changedAt: number } | null = null;
   readonly menu: CandidateInput<MenuItem>;
   t = 0;
   playElapsed = 0;
@@ -166,13 +169,20 @@ export class Game {
         ];
       case 'daily':
         return [
-          { text: 'はじめる', kana: 'はじめる', act: () => this.start() },
+          { text: 'はじめる', kana: 'はじめる', act: () => this.afterDaily() },
           { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'difficulty'; } },
+        ];
+      case 'prep':
+        return [
+          { text: 'はじめる', kana: 'はじめる', act: () => this.start() },
+          ...INGREDIENT_ORDER.map((id) => ({ text: PREP_WORDS[id], kana: PREP_WORDS[id], act: () => this.prepAdd(id, 1) })),
+          { text: 'おまかせ', kana: 'おまかせ', act: () => this.prepReset() },
+          { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'daily'; } },
         ];
       case 'result':
         return [
           // ひがわりは同じお題でもう一度。日付が変わっていたら、新しいお題を見せてから
-          { text: 'もういちど', kana: 'もういちど', act: () => (this.daily && this.daily.date !== jstDate() ? this.openDaily() : this.start()) },
+          { text: 'もういちど', kana: 'もういちど', act: () => (this.daily && this.daily.date !== jstDate() ? this.openDaily() : this.daily ? this.afterDaily() : this.start()) },
           { text: 'たいとる', kana: 'たいとる', act: () => this.toTitle() },
         ];
       default:
@@ -220,6 +230,52 @@ export class Game {
     this.mode = 'daily';
   }
 
+  /** 今日のお題のあと：仕込みの日は仕込みの画面へ、それ以外はすぐ開店 */
+  afterDaily() {
+    if (this.prepRules().prepBudget > 0) this.openPrep();
+    else this.start();
+  }
+
+  /** 今のお題のルール（ひがわりでなければ通常） */
+  prepRules(): DayRules {
+    return this.daily ? rulesFor(this.daily.conds, this.settings.difficulty, this.daily.date) : NORMAL_RULES;
+  }
+
+  openPrep() {
+    const key = `${this.daily?.date}:${this.settings.difficulty}`;
+    if (!this.prep || this.prep.key !== key) this.prep = { key, alloc: defaultPrep(this.prepRules()), sel: 0, changed: null, changedAt: -10 };
+    this.mode = 'prep';
+  }
+
+  /** 仕込みの残り（振り分けていない数） */
+  prepLeft() {
+    if (!this.prep) return 0;
+    return this.prepRules().prepBudget - INGREDIENT_ORDER.reduce((a, id) => a + this.prep!.alloc[id], 0);
+  }
+
+  /** 仕込み：1つ増やす・減らす。できないときはミスの音 */
+  prepAdd(id: IngredientId, d: number) {
+    const p = this.prep;
+    if (!p) return;
+    p.sel = INGREDIENT_ORDER.indexOf(id);
+    const n = p.alloc[id] + d;
+    if (n < 0 || n > prepCap(this.prepRules()) || (d > 0 && this.prepLeft() <= 0)) {
+      this.sound.miss();
+      this.missFlash = 0.25;
+      return;
+    }
+    p.alloc[id] = n;
+    p.changed = id;
+    p.changedAt = this.t;
+    this.sound.key(1);
+  }
+
+  prepReset() {
+    if (!this.prep) return;
+    this.prep.alloc = defaultPrep(this.prepRules());
+    this.prep.changed = null;
+  }
+
   private saveDifficulty(difficulty: DifficultyId) {
     if (difficulty !== this.settings.difficulty) {
       this.settings.difficulty = difficulty;
@@ -247,6 +303,11 @@ export class Game {
     const rules = this.daily ? rulesFor(this.daily.conds, difficulty, this.daily.date) : NORMAL_RULES;
     this.seed = (this.seed * 1103515245 + 12345) >>> 0;
     this.shop = new Shop(new Rng(this.seed), difficultyOf(difficulty), rules);
+    // 開店前の仕込みの日は、振り分けたとおりの在庫で開店する
+    if (rules.prepBudget > 0) {
+      if (!this.prep) this.prep = { key: `${this.daily?.date}:${difficulty}`, alloc: defaultPrep(rules), sel: 0, changed: null, changedAt: -10 };
+      this.shop.applyPrep(this.prep.alloc);
+    }
     this.view = new ShopView();
     this.view.art = this.art;
     this.trip = null;
@@ -303,11 +364,23 @@ export class Game {
       else if (this.mode === 'help' && this.helpPage !== 0) this.helpPage = 0;
       else if (this.mode === 'difficulty') this.mode = 'modeSelect';
       else if (this.mode === 'daily') this.mode = 'difficulty';
+      else if (this.mode === 'prep') this.mode = 'daily';
       else this.mode = 'title';
       this.menu.reset();
       return;
     }
     if (inMenu) {
+      // 仕込み：↑↓でえらぶ、←→で増減、何も打っていないときの Backspace で−1
+      if (this.mode === 'prep' && this.prep && (k.startsWith('Arrow') || (k === 'Backspace' && !this.menu.typed))) {
+        e.preventDefault();
+        const p = this.prep;
+        const id = INGREDIENT_ORDER[p.sel];
+        if (k === 'ArrowUp') { p.sel = (p.sel + INGREDIENT_ORDER.length - 1) % INGREDIENT_ORDER.length; this.sound.key(1); }
+        else if (k === 'ArrowDown') { p.sel = (p.sel + 1) % INGREDIENT_ORDER.length; this.sound.key(1); }
+        else if (k === 'ArrowRight') this.prepAdd(id, 1);
+        else this.prepAdd(id, -1);
+        return;
+      }
       if (k === 'Enter') {
         e.preventDefault();
         const first = this.enterItem();
@@ -516,7 +589,7 @@ export class Game {
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
   get overTavern() {
-    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily';
+    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep';
   }
 
   // ---------- 描画 ----------
@@ -578,6 +651,7 @@ export class Game {
     else if (this.mode === 'modeSelect') drawModeSelect(this);
     else if (this.mode === 'difficulty') drawDifficulty(this);
     else if (this.mode === 'daily') drawDaily(this);
+    else if (this.mode === 'prep') drawPrep(this);
     else drawResult(this);
     if (this.mode !== 'result' || this.t - this.resultAt > RESULT_READY - 0.3) drawMenu(this, this.mode === 'help' ? 210 : this.mode === 'result' ? 200 : this.mode === 'difficulty' ? 170 : 172);
     if (this.missFlash > 0) sc.PR(sc.ext.x0, sc.ext.y1 - 3, sc.ext.w, 3, C.red, this.missFlash * 3);

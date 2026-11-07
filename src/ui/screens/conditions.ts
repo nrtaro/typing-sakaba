@@ -9,7 +9,8 @@ import type { DifficultyId } from '../../core/shopConfig';
  * お題の絵（16×16 の升目で描く）。
  * ノーミス＝丸の付いたキー、狭い倉庫＝ぎっしりの棚、調達中も待たない＝砂時計、
  * 時間帯の当たり＝太陽と月と星、こぼす＝傾いた器としずく、おかわり＝重ねた皿と「＋」、
- * 品切れ札＝赤い×の木札、ひでんの＝金の星の付いた壺、届くまで＝木箱と時計、傷む＝しおれた葉、宴会＝大皿と酒
+ * 品切れ札＝赤い×の木札、ひでんの＝金の星の付いた壺、届くまで＝木箱と時計、傷む＝しおれた葉、宴会＝大皿と酒、
+ * 仕込み＝まな板と包丁
  */
 export function drawCondIcon(sc: Screen, _art: Art | null, id: ConditionId, x: number, y: number, size: number, a = 1) {
   const u = size / 16;
@@ -114,6 +115,16 @@ export function drawCondIcon(sc: Screen, _art: Art | null, id: ConditionId, x: n
     P(11.5, 3, 3, 9, '#e8e4c8');
     P(12.3, 1.5, 1.4, 2, '#e8e4c8');
     P(11.5, 6, 3, 1, '#c03a2a');
+  } else if (id === 'prep') {
+    // まな板と包丁
+    P(1.5, 8, 11, 5, '#c98f45');
+    P(1.5, 12, 11, 1, '#8a5a2a');
+    P(3, 9, 3, 2, '#e07a3a');
+    P(7, 9.5, 2.5, 2, '#8ac060');
+    P(9, 2, 1.6, 6, '#d8dde0');
+    P(10.6, 2.5, 1.2, 5, '#a8b0b8');
+    P(9.3, 8, 1.8, 3, '#5a3a1c');
+    P(13, 9, 2, 2, '#e8c890');
   } else if (id === 'noMiss') {
     // キーと、正しく打てた印の丸
     sc.PR(x + 3 * u, y + 5 * u, 10 * u, 9 * u, '#3a2414', a);

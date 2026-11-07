@@ -158,6 +158,14 @@ export class Shop {
     return this.rules.luckyTrips?.[phase] ?? null;
   }
 
+  /** 開店前の仕込み：開店時の在庫を、振り分けたとおりにする */
+  applyPrep(alloc: Record<IngredientId, number>) {
+    for (const id of INGREDIENT_ORDER) this.stock[id] = Math.max(0, Math.min(this.storageCap, Math.floor(alloc[id] ?? 0)));
+    if (this.rules.spoilAfter !== null) {
+      this.lots = INGREDIENT_ORDER.filter((id) => this.stock[id] > 0).map((id) => ({ ing: id, n: this.stock[id], at: 0 }));
+    }
+  }
+
   /** あと何回使えるか（そのお題の日でなければ 0） */
   skillLeft(skill: SkillId) {
     return Math.max(0, this.rules[skill] - this.used[skill]);
