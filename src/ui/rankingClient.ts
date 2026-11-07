@@ -34,6 +34,12 @@ export class RankingClient {
     return this.request(`/api/daily/top?${params}`, board);
   }
 
+  /** 3つの難易度の順位表をまとめて読む */
+  boards(date: string, player: string): Promise<Record<DifficultyId, DailyBoard>> {
+    const params = new URLSearchParams({ date, player });
+    return this.request(`/api/daily/boards?${params}`, (v: Record<string, DailyBoard>) => !!v && (['easy', 'normal', 'hard'] as const).every((id) => board(v[id])));
+  }
+
   /** ランキングの設定：Turnstile の公開キー（使わないときは null） */
   async config(): Promise<{ turnstile: string | null }> {
     try {

@@ -28,6 +28,14 @@ export function openRankingName(options: NameOptions, doc: Document = document) 
   label.style.cssText = 'display:block;color:#ffd98a;font-size:22px;line-height:1.5';
   const note = doc.createElement('p');
   note.textContent = '1〜10文字。名前と売上が公開されます。';
+  // 送る前に、何が公開・保存されるかを確かめられるように
+  const policy = doc.createElement('a');
+  policy.href = './about.html#privacy';
+  policy.target = '_blank';
+  policy.rel = 'noopener';
+  policy.textContent = '利用規約・プライバシー';
+  policy.style.cssText = 'color:#ffe7a0;margin-left:6px';
+  note.append(policy);
   note.style.cssText = 'font-size:14px;line-height:1.7;margin:12px 0';
   const input = doc.createElement('input');
   input.type = 'text';

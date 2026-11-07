@@ -51,6 +51,10 @@
     <style>
       html, body { margin: 0; height: 100%; background: #17101c; overflow: hidden; }
       canvas { display: block; width: 100%; height: 100%; outline: none; }
+      /* タイトル画面のときだけ、右下に小さく出す（ゲームのキー操作には関わらない） */
+      #legal-link { position: fixed; right: 8px; bottom: 6px; z-index: 5; font: 12px/1.4 system-ui, sans-serif; color: #f3dcb0; opacity: .7; text-decoration: underline; }
+      #legal-link:hover, #legal-link:focus { opacity: 1; }
+      #legal-link[hidden] { display: none; }
     </style>
   </head>
   <body>
@@ -80,8 +84,10 @@
             <li>難易度は「やさしい」「ふつう」「むずかしい」の3段階。自己ベストは難易度ごとに記録されます。</li>
             <li>連続で料理を出すとコンボが続き、売上がアップします。</li>
           </ul>
+          <p><a href="./about.html">利用規約・プライバシーポリシー・クレジット</a></p>
         </section>
       </canvas>
+      <a id="legal-link" href="./about.html" target="_blank" rel="noopener" hidden>利用規約・プライバシー</a>
     </main>
     <noscript>このゲームを遊ぶには JavaScript を有効にしてください。</noscript>
     <script type="module" src="/src/main.ts"></script>

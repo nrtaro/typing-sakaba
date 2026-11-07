@@ -13,7 +13,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "sim": "vitest run tests/day.sim.test.ts --silent=false",
-    "audit": "esbuild scripts/audit-scores.ts --bundle --platform=node --format=esm --outfile=.wrangler/tmp/audit-scores.mjs --log-level=warning && node .wrangler/tmp/audit-scores.mjs"
+    "audit": "esbuild scripts/audit-scores.ts --bundle --platform=node --format=esm --outfile=.wrangler/tmp/audit-scores.mjs --log-level=warning && node .wrangler/tmp/audit-scores.mjs",
+    "font-text": "esbuild scripts/font-text.ts --bundle --platform=node --format=esm --outfile=.wrangler/tmp/font-text.mjs --log-level=warning && node .wrangler/tmp/font-text.mjs"
   },
   "repository": {
     "type": "git",

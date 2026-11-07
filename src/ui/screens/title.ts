@@ -89,6 +89,7 @@ export function drawTitle(g: Game) {
     sc.TB(GAME_TITLE, 130, 15, 27, '#ffd98a', 'center', '#3a1408');
     sc.T(GAME_SUBTITLE, 130, 51, 9, '#f3dcb0', 'center');
     drawBestBoard(g, 330, 8, 138, 74);
+    drawTodayTop(g, 330, 86, 138);
   });
   // メニュー台：店の床から下をすべて覆う木の台（縦に長いウィンドウでも下に隙間を作らない）
   sc.PR(e.x0, 212, e.w, e.y1 - 212, '#2a1a10');
@@ -104,10 +105,11 @@ export function drawTitle(g: Game) {
     // メニューは打って選ぶ：キーボードの絵と短い一言
     drawKeyboard(g, 30, 212);
     sc.T('打って選ぶ', 56, 213.5, 8, C.cream, 'left', 0.95);
-    const [start, help, sound] = g.menuItems();
-    button(g, start, 30, 224, 180, 38, 'primary', 'Enter');
-    button(g, help, 218, 228, 130, 30, 'plain');
-    button(g, sound, 356, 228, 94, 30, 'plain');
+    const [start, help, ranking, sound] = g.menuItems();
+    button(g, start, 30, 224, 160, 38, 'primary', 'Enter');
+    button(g, help, 196, 228, 98, 30, 'plain');
+    button(g, ranking, 300, 228, 98, 30, 'plain');
+    button(g, sound, 404, 228, 66, 30, 'plain');
   });
 }
 
@@ -132,4 +134,19 @@ export function drawBestBoard(g: Game, x: number, y: number, w: number, h: numbe
       sc.T(rank.name, x + w - 13, rowY, 10, rank.name === 'S' ? '#ffd27a' : col, 'center');
     } else sc.T('―', x + w - 26, rowY, 10, col, 'right', 0.6);
   });
+}
+
+/** 黒板の下：今日のひがわりの1位（前回選んだ難易度）。「らんきんぐ」で全部見られる */
+export function drawTodayTop(g: Game, x: number, y: number, w: number) {
+  const sc = g.sc;
+  const d = g.settings.difficulty;
+  const board = g.boards?.state === 'ready' ? g.boards.value?.[d] : null;
+  const name = DIFFICULTIES.find((x) => x.id === d)?.name ?? '';
+  const top = board?.top[0];
+  const text = top ? `👑 ${top.name} ${top.score.toLocaleString()}円` : board ? 'まだ1位がいません' : '';
+  if (!text) return;
+  sc.PR(x + 3, y + 3, w, 26, '#0c0604', 0.5);
+  sc.panel(x, y, w, 26, 'rgba(42,27,20,0.94)', '#a8743f');
+  sc.T(`今日のひがわり・${name}の1位`, x + 6, y + 3, 7, C.gold3);
+  sc.T(text, x + 6, y + 13, sc.fitSize(text, 8, w - 12, 6), '#f2efe2');
 }

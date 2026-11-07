@@ -1,6 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { PLAYER_ID } from '../src/core/ranking';
-import { readBoard, submitScore, RateLimitError } from './repository';
+import { readBoard, readBoards, submitScore, RateLimitError } from './repository';
 import { isBoardDate, isDifficulty, validateSubmission } from './validation';
 import { verifyPlay } from './verify';
 import { checkTurnstile } from './turnstile';
@@ -64,6 +64,20 @@ export default {
     if (url.pathname === '/api/daily/config') {
       if (request.method !== 'GET') return json({ error: '使えない送信方法です' }, 405, { Allow: 'GET' });
       return json({ turnstile: env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET ? env.TURNSTILE_SITE_KEY : null });
+    }
+    // 3つの難易度の順位表（タイトル画面とランキングの画面）
+    if (url.pathname === '/api/daily/boards') {
+      if (request.method !== 'GET') return json({ error: '使えない送信方法です' }, 405, { Allow: 'GET' });
+      if (!env.DB) return json({ error: 'ランキングは準備中です。端末の記録は残っています' }, 503);
+      const date = url.searchParams.get('date');
+      const player = url.searchParams.get('player');
+      if (!isBoardDate(date) || (player !== null && !PLAYER_ID.test(player))) return json({ error: '日付・端末の情報を確かめてください' }, 400);
+      try {
+        return json(await readBoards(env.DB, date, player?.toLowerCase() ?? null));
+      } catch {
+        console.error('Daily ranking storage unavailable');
+        return json({ error: '今はランキングにつながりません。しばらくしてからお試しください' }, 503);
+      }
     }
     if (!isTop && !isScore) return json({ error: '見つかりませんでした' }, 404);
     const method = isTop ? 'GET' : 'POST';

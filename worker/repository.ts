@@ -29,6 +29,24 @@ export async function readBoard(db: D1Database, date: string, difficulty: Diffic
     total: Number(total.results[0].total) };
 }
 
+/** 3つの難易度の順位表を、まとめて1回で読む（タイトル画面とランキングの画面で使う） */
+export async function readBoards(db: D1Database, date: string, player: string | null): Promise<Record<DifficultyId, DailyBoard>> {
+  const ids: DifficultyId[] = ['easy', 'normal', 'hard'];
+  const results = await db.batch<Record<string, unknown>>(ids.flatMap((difficulty) => [
+    db.prepare(`SELECT name, score, RANK() OVER (ORDER BY score DESC) AS rank
+      FROM scores WHERE date = ? AND difficulty = ? ORDER BY score DESC, created_at, player LIMIT 5`).bind(date, difficulty),
+    myRank(db, date, difficulty, player), totalPlayers(db, date, difficulty),
+  ]));
+  return Object.fromEntries(ids.map((id, i) => {
+    const [top, me, total] = results.slice(i * 3, i * 3 + 3);
+    return [id, {
+      top: top.results as unknown as RankedScore[],
+      me: (me.results[0] as { rank: number; score: number } | undefined) ?? null,
+      total: Number(total.results[0].total),
+    }];
+  })) as Record<DifficultyId, DailyBoard>;
+}
+
 /** 回数制限・履歴・ベスト更新・順位は、ひとつのD1トランザクションで確定する。 */
 export async function submitScore(db: D1Database, s: ScoreSubmission, ipHash: string, now = Math.floor(Date.now() / 1000)): Promise<RankReceipt> {
   const requestId = crypto.randomUUID();

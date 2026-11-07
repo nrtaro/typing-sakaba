@@ -223,3 +223,21 @@ describe('記録を残して、あとから手元で確かめる', () => {
     expect(auditRow(rows(sqlite)[0]).status).toBe('noRecord');
   });
 });
+
+describe('3つの難易度の順位表をまとめて読む', () => {
+  it('難易度ごとの上位・自分の順位・人数を1回で返す', async () => {
+    const { db } = database();
+    await submitScore(db, score(1, 900), 'ip', 1000);
+    await submitScore(db, { ...score(2, 700), difficulty: 'hard' }, 'ip', 1001);
+    const env = { DB: db, RANKING_IP_SALT: 'secret' };
+    const res = await worker.fetch(new Request(`https://game.example/api/daily/boards?date=${jstDate()}&player=${player(1)}`), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      easy: { top: [], me: null, total: 0 },
+      normal: { top: [{ name: '店主1', score: 900, rank: 1 }], me: { rank: 1, score: 900 }, total: 1 },
+      hard: { top: [{ name: '店主2', score: 700, rank: 1 }], me: null, total: 1 },
+    });
+    expect((await worker.fetch(new Request('https://game.example/api/daily/boards?date=2026-02-30'), env)).status).toBe(400);
+    expect((await worker.fetch(new Request(`https://game.example/api/daily/boards?date=${jstDate()}`), {})).status).toBe(503);
+  });
+});

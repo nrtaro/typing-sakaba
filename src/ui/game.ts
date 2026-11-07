@@ -22,13 +22,14 @@ import { demoStep, drawCheers, drawTitle } from './screens/title';
 import { drawDifficulty } from './screens/difficulty';
 import { drawModeSelect } from './screens/modeSelect';
 import { drawDaily } from './screens/daily';
+import { drawRanking } from './screens/ranking';
 import { drawPrep, PREP_WORDS } from './screens/prep';
 import { helpPlay, drawHelp, openTripHelp, drawTripHelp, drawModeHelp } from './screens/help';
 import { resultStep, drawResult, drawResultMenu } from './screens/result';
 import { guideFor, drawCountdown, drawTripIntro, drawTripOutro } from './screens/play';
 import { PHASE_TRACK, RESULT_READY, COUNTDOWN, RESULT_LOCK, MenuItem } from './screens/shared';
 
-export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result';
+export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking';
 export type PlayMode = 'normal' | 'daily';
 
 const TYPABLE = /^[a-z\-]$/;
@@ -75,6 +76,10 @@ export class Game {
   board: { key: string; state: 'loading' | 'ready' | 'error'; value: DailyBoard | null } | null = null;
   submission: { state: 'idle' | 'sending' | 'sent' | 'error'; receipt: RankReceipt | null; message: string } = { state: 'idle', receipt: null, message: '' };
   nameEntry: ReturnType<typeof openRankingName> | null = null;
+  /** 今日の3つの難易度の順位表（タイトル画面とランキングの画面で使う） */
+  boards: { date: string; state: 'loading' | 'ready' | 'error'; value: Record<DifficultyId, DailyBoard> | null; at: number } | null = null;
+  /** ランキングの画面を閉じたときに戻る画面 */
+  rankingFrom: Mode = 'title';
   /** ひがわり営業で遊んでいるときの、日付とお題（通常営業では null） */
   daily: DailyPlay | null = null;
   /** 開店前の仕込み：振り分け（同じ日・同じ難易度なら、もういちどのときも前の振り分けから） */
@@ -160,6 +165,7 @@ export class Game {
         return [
           { text: 'はじめる', kana: 'はじめる', act: () => { this.mode = 'modeSelect'; } },
           { text: 'あそびかた', kana: 'あそびかた', act: () => { this.mode = 'help'; this.helpPage = 0; } },
+          { text: 'らんきんぐ', kana: 'らんきんぐ', act: () => this.openRanking() },
           { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
         ];
       case 'help':
@@ -197,6 +203,8 @@ export class Game {
           { text: 'おまかせ', kana: 'おまかせ', act: () => this.prepReset() },
           { text: 'もどる', kana: 'もどる', act: () => this.returnToDaily() },
         ];
+      case 'ranking':
+        return [{ text: 'もどる', kana: 'もどる', act: () => this.closeRanking() }];
       case 'result':
         return [
           ...(this.result?.daily && this.submission.state !== 'sent' ? [{
@@ -206,6 +214,8 @@ export class Game {
           // ひがわりは同じお題でもう一度。日付が変わっていたら、新しいお題を見せてから
           { text: 'もういちど', kana: 'もういちど', act: () => (this.daily && this.daily.date !== jstDate() ? this.openDaily() : this.daily ? this.afterDaily() : this.start()) },
           { text: 'Xにポスト', kana: 'ぽすと', act: () => this.shareToX() },
+          // 送ったあとは、今日のランキングをすぐ見られるように
+          ...(this.result?.daily && this.submission.state === 'sent' ? [{ text: 'らんきんぐ', kana: 'らんきんぐ', act: () => this.openRanking() }] : []),
           { text: 'たいとる', kana: 'たいとる', act: () => this.toTitle() },
         ];
       default:
@@ -285,6 +295,34 @@ export class Game {
     this.lastCall = sec;
     this.sound.final(sec);
     if (sec === FINAL_SECONDS) this.view.banner = { text: 'ラストスパート！ 閉店まで10秒', t: 1.8, col: C.gold3 };
+  }
+
+  /** ランキングの画面を開く（開くたびに読み直す） */
+  openRanking() {
+    if (this.mode !== 'ranking') this.rankingFrom = this.mode;
+    this.mode = 'ranking';
+    this.menu.reset();
+    void this.loadBoards(jstDate(), true);
+  }
+
+  closeRanking() {
+    this.mode = this.rankingFrom;
+    this.menu.reset();
+  }
+
+  /** 今日の順位表を読む。1分以内に読んだものは使い回す（force のときは読み直す） */
+  async loadBoards(date: string, force = false) {
+    const cur = this.boards;
+    if (cur && cur.date === date && (cur.state === 'loading' || (!force && this.t - cur.at < 60))) return;
+    const next = { date, state: 'loading' as 'loading' | 'ready' | 'error', value: cur?.date === date ? cur.value : null, at: this.t };
+    this.boards = next;
+    try {
+      next.value = await this.ranking.boards(date, this.store.playerId());
+      next.state = 'ready';
+    } catch {
+      next.state = next.value ? 'ready' : 'error';
+    }
+    next.at = this.t;
   }
 
   /** 結果を X にポストする画面を、新しいタブで開く（投稿するかは遊ぶ人が決める） */
@@ -472,6 +510,7 @@ export class Game {
       else if (this.mode === 'difficulty') this.mode = 'modeSelect';
       else if (this.mode === 'daily') this.mode = 'difficulty';
       else if (this.mode === 'prep') this.returnToDaily();
+      else if (this.mode === 'ranking') this.closeRanking();
       else this.mode = 'title';
       this.menu.reset();
       return;
@@ -565,6 +604,8 @@ export class Game {
     this.missFlash = Math.max(0, this.missFlash - dt);
     this.volumeShown = Math.max(0, this.volumeShown - dt);
     if (this.overTavern) demoStep(this, dt);
+    // タイトル画面では、今日のランキングの1位を見せるために順位表を読んでおく
+    if (this.mode === 'title' && this.artState !== 'loading') void this.loadBoards(jstDate());
     if (this.mode === 'result') resultStep(this);
     if (this.mode === 'play' && this.shop) this.view.guide = this.settings.guided ? null : guideFor(this, this.shop);
     if (this.mode !== 'play' || !this.shop || this.paused) return;
@@ -677,13 +718,19 @@ export class Game {
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
   get overTavern() {
-    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep';
+    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking';
   }
 
   // ---------- 描画 ----------
 
+  /** タイトル画面の右下の「利用規約・プライバシー」（HTML の小さな文字） */
+  private legalLink: HTMLElement | null | undefined;
+
   draw() {
     const sc = this.sc;
+    // タイトル画面のときだけ見せる（遊んでいる間は画面に重ねない）
+    if (this.legalLink === undefined) this.legalLink = typeof document !== 'undefined' ? document.getElementById('legal-link') : null;
+    if (this.legalLink) this.legalLink.hidden = this.mode !== 'title' || this.artState === 'loading';
     if (this.artState === 'loading') {
       sc.clearScreen();
       sc.TB(GAME_TITLE, LW / 2, 100, 24, C.gold3, 'center', C.red2);
@@ -740,6 +787,7 @@ export class Game {
     else if (this.mode === 'difficulty') drawDifficulty(this);
     else if (this.mode === 'daily') drawDaily(this);
     else if (this.mode === 'prep') drawPrep(this);
+    else if (this.mode === 'ranking') drawRanking(this);
     else drawResult(this);
     if (this.mode === 'result') { if (this.t - this.resultAt > RESULT_READY - 0.3) drawResultMenu(this); }
     else drawMenu(this, this.mode === 'help' ? 210 : this.mode === 'difficulty' ? 170 : 172);
