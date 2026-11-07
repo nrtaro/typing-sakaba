@@ -110,3 +110,21 @@ describe('ゲームとランキングの連携', () => {
     expect(g.daily?.date).toBe('2026-11-07');
   });
 });
+
+describe('ランキングの飾り（段階6）', () => {
+  it('送る瞬間に付けている飾りを送る（持っていないものは送らない）', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const g = game(new RankingClient(async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return new Response('{"rank":1,"total":1}'); }));
+    const owned = { 'f-nonbiri': 'x', 'b-minarai': 'x', 'p-kinari': 'x' };
+    g.store.updateCollection((c) => ({ ...c, owned, equip: { front: 'f-nonbiri', link: 'no', back: 'b-minarai', plate: 'p-kinari', sound: null } }));
+    await g.submitRanking('店主');
+    expect(bodies[0].decoration).toEqual({ titleFront: 'f-nonbiri', titleLink: 'no', titleBack: 'b-minarai', plate: 'p-kinari' });
+  });
+  it('何も付けていなければ飾りは空', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const g = game(new RankingClient(async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return new Response('{"rank":1,"total":1}'); }));
+    g.store.updateCollection((c) => ({ ...c, equip: { front: 'f-nonbiri', link: 'no', back: null, plate: 'p-kinari', sound: null } }));
+    await g.submitRanking('店主');
+    expect(bodies[0].decoration).toEqual({ titleFront: null, titleLink: null, titleBack: null, plate: null });
+  });
+});

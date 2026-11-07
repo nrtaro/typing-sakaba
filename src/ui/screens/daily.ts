@@ -1,4 +1,5 @@
 // 画面：今日のお題（ひがわり営業で、開店の前に見せる）
+import { titleOf } from '../nameplate';
 import { C } from '../palette';
 import { LW } from '../screen';
 import { dateLabel, rulesFor } from '../../core/daily';
@@ -62,7 +63,9 @@ export function drawDaily(g: Game) {
     if (board?.state === 'ready' && board.value?.top.length) {
       board.value.top.forEach((entry, i) => {
         const x = 72 + i * 84;
+        const title = titleOf(entry.decoration);
         const label = `${entry.rank}位 ${entry.name}`;
+        if (title) sc.T(title, x, 170, sc.fitSize(title, 6, 76, 4), '#d9c2a0', 'center');
         sc.T(label, x, 177, sc.fitSize(label, 9, 76), C.cream, 'center');
         sc.TB(`${entry.score.toLocaleString()}円`, x, 193, 9, C.gold3, 'center');
       });

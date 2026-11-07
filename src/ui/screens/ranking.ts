@@ -1,4 +1,5 @@
 // 画面：今日のランキング（タイトルの「らんきんぐ」と、結果画面から開く）
+import { drawNameplate } from '../nameplate';
 import { C } from '../palette';
 import { LW } from '../screen';
 import { dailyConditions, dateLabel, jstDate } from '../../core/daily';
@@ -60,7 +61,7 @@ export function drawRanking(g: Game) {
         const score = `${s.score.toLocaleString()}円`;
         sc.T(score, px + pw - 8, y + 3, 8, C.gold3, 'right');
         const nameW = pw - 34 - sc.W(score, 8) - 6;
-        sc.T(s.name, px + 28, y + 2.5, sc.fitSize(s.name, 9, nameW, 6), '#f2efe2');
+        drawNameplate(sc, px + 26, y, nameW + 2, 15, s.name, s.decoration, 9, g.t);
       });
       // 自分の順位
       sc.PR(px + 8, py + ph - 26, pw - 16, 0.8, '#6b4422');

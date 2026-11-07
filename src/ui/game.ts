@@ -1,4 +1,5 @@
 import { itemById, owns } from '../core/collection';
+import { readDecoration, type Decoration } from '../core/ranking';
 import { C } from './palette';
 import { Screen, LW } from './screen';
 import { Sound, VOLUME_NAMES } from './audio';
@@ -366,6 +367,20 @@ export class Game {
     } catch { this.sound.setKeyVoice(null); }
   }
 
+  /** 段階6：いま付けている二つ名とプレート（持っていないものは外す） */
+  currentDecoration(): Decoration {
+    try {
+      const c = this.store.loadCollection();
+      const u = this.store.loadRecords().unlocked;
+      const has = (id: string | null) => !!id && owns(c, u, id);
+      const title = has(c.equip.front) && has(c.equip.back);
+      return readDecoration({
+        titleFront: title ? c.equip.front : null, titleLink: title ? c.equip.link : null, titleBack: title ? c.equip.back : null,
+        plate: has(c.equip.plate) ? c.equip.plate : null,
+      });
+    } catch { return readDecoration(null); }
+  }
+
   /** この営業で確定した事実（記録・実績用） */
   playFacts(session: PlaySession): PlayFacts {
     const s = session.shop.stats;
@@ -516,6 +531,7 @@ export class Game {
         accuracy: result.accuracy, kps: result.kps, conds: result.daily.conds.map(c => c.id),
         // サーバーがこの記録どおりに営業をやり直して、成績を確かめる
         seed: result.play.seed, record: result.play.record, prep: result.play.prep,
+        decoration: this.currentDecoration(),
       }, token);
       if (this.result !== result || this.mode !== 'result') return;
       this.submission = { state: 'sent', receipt, message: '' };

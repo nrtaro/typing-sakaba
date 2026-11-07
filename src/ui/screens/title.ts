@@ -1,4 +1,5 @@
 // 画面：title
+import { titleOf } from '../nameplate';
 import { C } from '../palette';
 import { LW } from '../screen';
 import { SEATS, ShopView } from '../shopView';
@@ -148,7 +149,8 @@ export function drawTodayTop(g: Game, x: number, y: number, w: number) {
   const board = g.boards?.state === 'ready' ? g.boards.value?.[d] : null;
   const name = DIFFICULTIES.find((x) => x.id === d)?.name ?? '';
   const top = board?.top[0];
-  const text = top ? `👑 ${top.name} ${top.score.toLocaleString()}円` : board ? 'まだ1位がいません' : '';
+  const title = top ? titleOf(top.decoration) : null;
+  const text = top ? `👑 ${title ? `${title}・` : ''}${top.name} ${top.score.toLocaleString()}円` : board ? 'まだ1位がいません' : '';
   if (!text) return;
   sc.PR(x + 3, y + 3, w, 26, '#0c0604', 0.5);
   sc.panel(x, y, w, 26, 'rgba(42,27,20,0.94)', '#a8743f');
