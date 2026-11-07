@@ -844,6 +844,8 @@ export class Game {
       return;
     }
     // 記録・実績：↑↓でえらぶ、Enter で会話を開く／閉じる、会話の中は↑↓で送り、←→でほかの会話へ
+    // ふくびき：Enter の押しっぱなし（キーの自動の繰り返し）では、引いたり交換したりしない
+    if (this.mode === 'fukubiki' && k === 'Enter' && e.repeat) { e.preventDefault(); return; }
     // ふくびき：演出中はキーで飛ばす。交換の一覧は↑↓・Enter・Esc
     if (this.mode === 'fukubiki' && this.fukubiki && (this.fukubiki.anim < FUKUBIKI_ANIM || (this.fukubiki.exchange && (k.startsWith('Arrow') || k === 'Enter' || k === 'Escape')))) {
       e.preventDefault();

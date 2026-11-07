@@ -131,3 +131,35 @@ describe('結果の貯金', () => {
     expect(store.loadCollection().coins).toBe(4321);
   });
 });
+
+describe('最終確認での直し', () => {
+  const key = (k: string, repeat = false) => ({ key: k, repeat, preventDefault() {}, ctrlKey: false, metaKey: false, altKey: false, isComposing: false }) as unknown as KeyboardEvent;
+  it('Enter を押しっぱなしにしても、ふくびきや交換を続けて行わない', () => {
+    const { g, store } = game();
+    store.updateCollection((c) => ({ ...c, freeUsed: true, coins: PULL_PRICE * 20, tickets: 1000 }));
+    g.openFukubiki();
+    Object.assign(g, { artState: 'ready', nameEntry: null, lastInput: 0, clickHintAt: 0, resultAt: -99, missFlash: 0, menu: { reset: vi.fn(), typed: '', active: [], key: vi.fn(), backspace: vi.fn() } });
+    g.onKey(key('Enter'));
+    const after = store.loadCollection().coins;
+    expect(after).toBe(PULL_PRICE * 19);
+    for (let i = 0; i < 20; i++) g.onKey(key('Enter', true));
+    expect(store.loadCollection().coins).toBe(after);
+    g.fukubiki!.anim = 99;
+    g.fukubiki!.exchange = { sel: 0 };
+    for (let i = 0; i < 20; i++) g.onKey(key('Enter', true));
+    expect(store.loadCollection().tickets).toBe(1000);
+  });
+
+  it('タイトルの今日の1位：いちばん長い二つ名と長い名前でも枠からはみ出さない', async () => {
+    const { drawTodayTop } = await import('../src/ui/screens/title');
+    const { Screen } = await import('../src/ui/screen');
+    const texts: { text: string; x: number; size: number }[] = [];
+    const sc = { W: (t: string, s: number) => [...t].length * s, fitSize: Screen.prototype.fitSize, PR() {}, panel() {},
+      T(text: string, x: number, _y: number, size: number) { texts.push({ text, x, size }); } };
+    const { g } = game();
+    const deco = { titleFront: 'f-yarikuri', titleLink: 'noyouna', titleBack: 'b-hayagaeri', plate: null };
+    Object.assign(g, { sc, boards: { state: 'ready', value: { normal: { top: [{ rank: 1, name: '十文字の長い名前です', score: 120000, decoration: deco }], me: null, total: 1 } } } });
+    drawTodayTop(g, 336, 140, 138);
+    for (const t of texts) expect(t.x + sc.W(t.text, t.size)).toBeLessThanOrEqual(336 + 138);
+  });
+});
