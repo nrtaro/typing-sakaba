@@ -1,4 +1,5 @@
-// 段階6：飾りの一覧（データだけ）。名前・☆・割り当てを直すときはここを編集する。
+// 段階6：飾りの一覧（データだけ）。プレート・シールの絵は public/collection/（scripts/stage6-art.mjs で作る）。
+// 名前・☆・割り当てを直すときはここを編集する。
 // id は永続ID：一度公開したら変えない・使い回さない。並べ替えや改名（name）は自由。
 // 増やすときは行を足す（tests/collection.test.ts の内訳も合わせて直す）。
 import type { Item, Link, Series, Star } from './collection';
@@ -116,30 +117,30 @@ export const ITEM_LIST: Item[] = [
   word('back', 'ryorinokami', 5, '料理の神様'),
 
   // ---------- ネームプレート ----------
-  plate('furunajimi', 3, '古なじみの木札', '#6b4a2a', '#c99a5a', '#fff2d8', 'wood', ach('long-friends')),
-  plate('kondatecho', 2, '献立帳', '#efe2c0', '#8a6232', '#3a2412', 'stripe', ach('five-menus')),
-  plate('tairyobata', 3, '大漁旗', '#1f4f8a', '#e9443a', '#ffffff', 'stripe', ach('extra-bucket')),
-  plate('yonkyaku', 4, '四脚の椅子', '#4a2c1c', '#ffd98a', '#ffe9b8', 'wood', ach('past-four-chairs')),
-  plate('kinari', 1, '生成り', '#f2ead8', '#b8a888', '#3a2a1a'),
-  plate('wakakusa', 1, '若草', '#b8dc8a', '#5f8a3a', '#203a10'),
-  plate('sorairo', 1, '空色', '#a8d8f0', '#4a88b0', '#102a40'),
-  plate('sakurairo', 1, '桜色', '#f8c8d8', '#c87890', '#4a1a2a'),
-  plate('kuriiro', 1, '栗色', '#8a5a3a', '#4a2a1a', '#fff0e0'),
-  plate('sumiiro', 1, '墨色', '#2a2a2e', '#6a6a72', '#f0f0f0'),
-  plate('itabari', 2, '板張り', '#a8743f', '#5a3a1a', '#fff4e0', 'wood'),
-  plate('mizutama', 2, '水玉', '#f0e8ff', '#8a78c8', '#2a1a4a', 'dots'),
-  plate('shima', 2, '縞', '#e8d8b8', '#7a5a3a', '#2a1a0a', 'stripe'),
-  plate('yuyake', 2, '夕焼け', '#f0a060', '#a04a2a', '#2a0a00'),
-  plate('aizome', 2, '藍染', '#2a3a6a', '#8aa0d8', '#e8f0ff'),
-  plate('akagane', 3, '銅張り', '#b0603a', '#ffb88a', '#fff0e0'),
-  plate('hoshizora', 3, '星空', '#141a3a', '#8a9aff', '#f0f4ff', 'dots'),
-  plate('chochin', 3, '提灯', '#d8402a', '#ffd070', '#fff8e0'),
-  plate('namishibuki', 3, '波しぶき', '#2a7ab0', '#d8f4ff', '#ffffff', 'stripe'),
-  plate('ginzaiku', 4, '銀細工', '#c8ccd8', '#ffffff', '#202430', 'gold'),
-  plate('momijinishiki', 4, '紅葉錦', '#a0281e', '#ffb040', '#fff0d0', 'dots'),
-  plate('yoiyami', 4, '宵闇', '#1a1028', '#c88aff', '#f4e8ff', 'gold'),
-  plate('kinpaku', 5, '金箔', '#e8b830', '#fff4b0', '#3a2400', 'gold'),
-  plate('niji', 5, '虹の架け橋', '#ffffff', '#ff8ad8', '#3a1a4a', 'gold'),
+  plate('furunajimi', 3, '古なじみの木札', '#6b4a2a', '#c99a5a', '#fff6e0', 'wood', ach('long-friends')),
+  plate('kondatecho', 2, '献立帳', '#efe2c0', '#8a6232', '#2a1a10', 'stripe', ach('five-menus')),
+  plate('tairyobata', 3, '大漁旗', '#1f4f8a', '#e9443a', '#fff6e0', 'stripe', ach('extra-bucket')),
+  plate('yonkyaku', 4, '四脚の椅子', '#4a2c1c', '#ffd98a', '#fff6e0', 'wood', ach('past-four-chairs')),
+  plate('kinari', 1, '生成り', '#f2ead8', '#b8a888', '#2a1a10'),
+  plate('wakakusa', 1, '若草', '#b8dc8a', '#5f8a3a', '#2a1a10'),
+  plate('sorairo', 1, '空色', '#a8d8f0', '#4a88b0', '#2a1a10'),
+  plate('sakurairo', 1, '桜色', '#f8c8d8', '#c87890', '#2a1a10'),
+  plate('kuriiro', 1, '栗色', '#8a5a3a', '#4a2a1a', '#fff6e0'),
+  plate('sumiiro', 1, '墨色', '#2a2a2e', '#6a6a72', '#fff6e0'),
+  plate('itabari', 2, '板張り', '#a8743f', '#5a3a1a', '#fff6e0', 'wood'),
+  plate('mizutama', 2, '水玉', '#f0e8ff', '#8a78c8', '#2a1a10', 'dots'),
+  plate('shima', 2, '縞', '#e8d8b8', '#7a5a3a', '#2a1a10', 'stripe'),
+  plate('yuyake', 2, '夕焼け', '#f0a060', '#a04a2a', '#fff6e0'),
+  plate('aizome', 2, '藍染', '#2a3a6a', '#8aa0d8', '#fff6e0'),
+  plate('akagane', 3, '銅張り', '#b0603a', '#ffb88a', '#fff6e0'),
+  plate('hoshizora', 3, '星空', '#141a3a', '#8a9aff', '#fff6e0', 'dots'),
+  plate('chochin', 3, '提灯', '#d8402a', '#ffd070', '#fff6e0'),
+  plate('namishibuki', 3, '波しぶき', '#2a7ab0', '#d8f4ff', '#fff6e0', 'stripe'),
+  plate('ginzaiku', 4, '銀細工', '#c8ccd8', '#ffffff', '#fff6e0', 'gold'),
+  plate('momijinishiki', 4, '紅葉錦', '#a0281e', '#ffb040', '#fff6e0', 'dots'),
+  plate('yoiyami', 4, '宵闇', '#1a1028', '#c88aff', '#fff6e0', 'gold'),
+  plate('kinpaku', 5, '金箔', '#e8b830', '#fff4b0', '#2a1a10', 'gold'),
+  plate('niji', 5, '虹の架け橋', '#ffffff', '#ff8ad8', '#2a1a10', 'gold'),
 
   // ---------- 打鍵音 ----------
   sound('kifuda', 4, '魚の木札（カコン）', { wave: 'triangle', base: 520, decay: 0.07, partial: 3, noise: 0.03 }, ach('past-fish-tag')),

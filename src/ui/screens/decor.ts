@@ -18,7 +18,7 @@ export function drawDecor(g: Game) {
   sc.panel(14, 40, 456, 44, 'rgba(34,50,42,0.96)', '#6b4422');
   sc.T('ランキングでの見え方', 22, 44, 7.5, C.cream2);
   const deco = g.currentDecoration();
-  drawNameplate(sc, 60, 58, 360, 18, g.settings.rankingName || '店主', deco, 11, g.t);
+  drawNameplate(sc, 60, 58, 360, 18, g.settings.rankingName || '店主', deco, 11);
   if ((e.front && !e.back) || (!e.front && e.back)) sc.T('前と後ろの言葉がそろうと二つ名になります', 240, 77, 6.5, '#ffb6a4', 'center');
   // 下：欄
   sc.panel(14, 90, 456, 116, 'rgba(36,23,14,0.95)', '#8a6232');

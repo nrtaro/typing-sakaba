@@ -23,35 +23,38 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe('シールの絵', () => {
   it('ファイル名は永続ID', () => {
-    expect(stickerUrl('st-ale')).toBe('/stickers/st-ale.png');
-    expect(sheetUrl('food', false)).toBe('/stickers/sheet-food.png');
-    expect(sheetUrl('food', true)).toBe('/stickers/sheet-food-done.png');
+    expect(stickerUrl('st-ale')).toBe('/collection/stickers/st-ale.webp');
+    expect(sheetUrl('food', false)).toBe('/collection/sheets/sheet-food.webp');
+    expect(sheetUrl('food', true)).toBe('/collection/sheets/sheet-food-done.webp');
   });
 
   it('同じ絵を二度読まず、読めなかった絵は null のまま', async () => {
     images();
     const art = new StickerArt();
-    fail.add('/stickers/st-yakizakana.png');
-    art.load(['/stickers/st-ale.png', '/stickers/st-yakizakana.png']);
-    art.load(['/stickers/st-ale.png']);
+    fail.add('/collection/stickers/st-yakizakana.webp');
+    art.load(['/collection/stickers/st-ale.webp', '/collection/stickers/st-yakizakana.webp']);
+    art.load(['/collection/stickers/st-ale.webp']);
     await tick();
-    expect(requests.filter((u) => u === '/stickers/st-ale.png')).toHaveLength(1);
-    expect(art.get('/stickers/st-ale.png')).not.toBeNull();
-    expect(art.get('/stickers/st-yakizakana.png')).toBeNull();
-    expect(art.get('/stickers/never.png')).toBeNull();
+    expect(requests.filter((u) => u === '/collection/stickers/st-ale.webp')).toHaveLength(1);
+    expect(art.get('/collection/stickers/st-ale.webp')).not.toBeNull();
+    expect(art.get('/collection/stickers/st-yakizakana.webp')).toBeNull();
+    expect(art.get('/collection/stickers/never.webp')).toBeNull();
   });
 
   it('起動時の読み込みではシールの絵を取らない', async () => {
     images();
     await Art.load();
-    expect(requests.some((u) => u.includes('/stickers/'))).toBe(false);
+    expect(requests.some((u) => u.includes('/collection/'))).toBe(false);
   });
 
-  it('すべてのシールと台紙に仮の絵がある', () => {
-    const dir = new URL('../public/stickers/', import.meta.url);
-    for (const it of ITEMS.filter((i) => i.kind === 'sticker')) expect(existsSync(new URL(`${it.id}.png`, dir))).toBe(true);
-    for (const s of SERIES) for (const done of [false, true]) expect(existsSync(new URL(sheetUrl(s.id, done).replace('/stickers/', ''), dir))).toBe(true);
-    expect(readdirSync(dir).filter((f) => f.endsWith('.png')).length).toBe(36 + 8);
-    expect(readFileSync(new URL('README.md', dir), 'utf8')).toContain('64');
+  it('すべてのプレート・シール・台紙に絵がある', () => {
+    const dir = new URL('../public/collection/', import.meta.url);
+    for (const it of ITEMS.filter((i) => i.kind === 'sticker')) expect(existsSync(new URL(`stickers/${it.id}.webp`, dir))).toBe(true);
+    for (const it of ITEMS.filter((i) => i.kind === 'plate')) expect(existsSync(new URL(`plates/${it.id}.webp`, dir))).toBe(true);
+    for (const s of SERIES) for (const done of [false, true]) expect(existsSync(new URL(sheetUrl(s.id, done).replace('/collection/', ''), dir))).toBe(true);
+    expect(readdirSync(new URL('stickers/', dir))).toHaveLength(36);
+    expect(readdirSync(new URL('plates/', dir))).toHaveLength(24);
+    expect(readdirSync(new URL('sheets/', dir))).toHaveLength(8);
+    expect(readFileSync(new URL('README.md', dir), 'utf8')).toContain('stage6-art.mjs');
   });
 });

@@ -61,7 +61,7 @@ export function drawRanking(g: Game) {
         const score = `${s.score.toLocaleString()}円`;
         sc.T(score, px + pw - 8, y + 3, 8, C.gold3, 'right');
         const nameW = pw - 34 - sc.W(score, 8) - 6;
-        drawNameplate(sc, px + 26, y, nameW + 2, 15, s.name, s.decoration, 9, g.t);
+        drawNameplate(sc, px + 26, y, nameW + 2, 15, s.name, s.decoration, 9);
       });
       // 自分の順位
       sc.PR(px + 8, py + ph - 26, pw - 16, 0.8, '#6b4422');

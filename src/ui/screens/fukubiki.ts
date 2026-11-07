@@ -116,7 +116,7 @@ function drawCards(g: Game, x: number, w: number) {
     sc.T(KIND_NAME[it.kind], cx + cw / 2, cy + 18, 7, C.cream2, 'center');
     const mid = cy + 32;
     if (it.kind === 'sticker') drawSticker(sc, g.stickerArt, it, cx + cw / 2 - 20, mid, 40, g.t, true);
-    else if (it.kind === 'plate') drawNameplate(sc, cx + 8, mid + 12, cw - 16, 16, g.settings.rankingName || '店主', { titleFront: null, titleLink: null, titleBack: null, plate: it.id }, 9, g.t);
+    else if (it.kind === 'plate') drawNameplate(sc, cx + 8, mid + 12, cw - 16, 16, g.settings.rankingName || '店主', { titleFront: null, titleLink: null, titleBack: null, plate: it.id }, 9);
     else sc.TB(it.name, cx + cw / 2, mid + 12, sc.fitSize(it.name, 14, cw - 12, 8), '#f2efe2', 'center', C.ink);
     if (it.kind === 'sticker' || it.kind === 'plate') sc.T(it.name, cx + cw / 2, cy + 76, sc.fitSize(it.name, 8, cw - 10, 6), '#f2efe2', 'center');
     const tag = got.isNew ? 'NEW!' : `かぶり → おまけ札 +${got.tickets}`;
