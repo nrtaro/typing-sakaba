@@ -13,8 +13,8 @@
     {
       "binding": "DB",
       "database_name": "typing-sakaba",
-      // 本番に反映する前に、ユーザーが作成した D1 の ID に置き換える。
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // 2026-11-07 にユーザーが作成した本番 D1。
+      "database_id": "35ff6810-9150-4962-a7e3-c93ddb069b75",
       "migrations_dir": "migrations"
     }
   ]
