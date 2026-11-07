@@ -12,7 +12,10 @@
   // Workers の無料プランは1回の処理の計算時間が約10ms。遊んだ記録のやり直し（約40〜70ms）は
   // 入りきらないため止めておく（有料プランにしたら、この行を消すか "on" にする）。
   "vars": {
-    "RANKING_REPLAY": "off"
+    "RANKING_REPLAY": "off",
+    // Turnstile の公開キー（公開してよい値）。秘密キー TURNSTILE_SECRET は `wrangler secret put` で登録する。
+    // 両方そろったときだけ、名前入力で確認する。
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAF3LwfArFYzcipjL"
   },
   "d1_databases": [
     {
