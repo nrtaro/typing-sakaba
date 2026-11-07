@@ -1,3 +1,4 @@
+import { itemById, owns } from '../core/collection';
 import { C } from './palette';
 import { Screen, LW } from './screen';
 import { Sound, VOLUME_NAMES } from './audio';
@@ -132,6 +133,7 @@ export class Game {
   volumeShown = 0;
 
   constructor(canvas: HTMLCanvasElement) {
+    this.applyKeyVoice();
     this.sc = new Screen(canvas);
     Art.load((done, total) => { this.artProgress = done / total; })
       .then((art) => {
@@ -352,6 +354,16 @@ export class Game {
     this.lastCall = sec;
     this.sound.final(sec);
     if (sec === FINAL_SECONDS) this.view.banner = { text: 'ラストスパート！ 閉店まで10秒', t: 1.8, col: C.gold3 };
+  }
+
+  /** 段階6：付けている打鍵音を音に伝える（持っていない・一覧にないものは元の音） */
+  applyKeyVoice() {
+    try {
+      const c = this.store.loadCollection();
+      const id = c.equip.sound;
+      const item = id && owns(c, this.store.loadRecords().unlocked, id) ? itemById(id) : undefined;
+      this.sound.setKeyVoice(item?.sound ?? null);
+    } catch { this.sound.setKeyVoice(null); }
   }
 
   /** この営業で確定した事実（記録・実績用） */

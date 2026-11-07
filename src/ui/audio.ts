@@ -92,6 +92,9 @@ const SONGS: Record<Track, Song> = {
   },
 };
 
+/** 打鍵音の作り方（飾りの一覧の sound と同じ形） */
+export interface KeyVoice { wave: OscillatorType; base: number; decay: number; partial?: number; noise?: number }
+
 export class Sound {
   /** 曲の一覧（音の確認用に外から読めるようにする） */
   static readonly SONGS = SONGS;
@@ -237,11 +240,27 @@ export class Sound {
 
   /** 打鍵音。n 打目ほど音階が上がる（同じ言葉の中で） */
   key(n: number) {
-    if (!this.ok) return;
+    if (!this.ok || this.settings.muted) return;
     const t = this.now;
-    const f = this.note(Math.min(Math.max(0, n - 1), 14));
+    const step = Math.min(Math.max(0, n - 1), 14);
+    const v = this.keyVoice;
+    if (v) {
+      // 段階6：選んだ打鍵音。音の高さの上がり方は元の音と同じ
+      const f = v.base * (this.note(step) / this.note(0));
+      this.tone(f, t, v.decay, v.wave, 0.05, this.sfx!);
+      if (v.partial) this.tone(f * v.partial, t, v.decay * 0.6, v.wave, 0.025, this.sfx!);
+      if (v.noise) this.noise(t, 0.03, v.noise, this.sfx!, 'bandpass', 2500);
+      return;
+    }
+    const f = this.note(step);
     this.tone(f, t, 0.08, 'square', 0.05, this.sfx!);
     this.tone(f * 2, t, 0.04, 'triangle', 0.035, this.sfx!);
+  }
+
+  private keyVoice: KeyVoice | null = null;
+  /** 段階6：打鍵音を選ぶ（null で元の音） */
+  setKeyVoice(v: KeyVoice | null) {
+    this.keyVoice = v;
   }
 
   miss() {
