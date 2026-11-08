@@ -1,6 +1,6 @@
 import { ITEMS, LINKS, SERIES, PULL_PRICE, canPull, exchange, itemById, owns, pull, setEquip, type CollectionState, type Equip, type Kind, type PullResult } from '../core/collection';
 import { StickerArt, sheetUrl, stickerUrl } from './stickerArt';
-import { drawFukubiki, FUKUBIKI_ANIM } from './screens/fukubiki';
+import { drawFukubiki, FUKUBIKI_ANIM, FUKUBIKI_ART, SPIN_END, ROLL_END, RISE_END } from './screens/fukubiki';
 import { drawSettings, SETTING_ROWS } from './screens/settings';
 import { readDecoration, type Decoration } from '../core/ranking';
 import { C } from './palette';
@@ -599,6 +599,7 @@ export class Game {
     this.fukubiki = { anim: FUKUBIKI_ANIM, last: null, message: '', exchange: null };
     this.refreshCollection();
     this.loadStickerArt();
+    this.stickerArt.load(FUKUBIKI_ART);
     this.mode = 'fukubiki';
     this.menu.reset();
   }
@@ -640,6 +641,19 @@ export class Game {
     else if (k === 'ArrowRight') ex.sel = Math.min(n - 1, ex.sel + 8);
     else if (k === 'Enter') { if (list[ex.sel]) this.exchangeItem(list[ex.sel].id); return; }
     this.sound.key(1);
+  }
+
+  /** ふくびきの演出の音：回す音 → 玉が落ちる音 → はじける音（☆が高いほど華やか） */
+  private fukubikiSounds(before: number, now: number, star: number) {
+    const crossed = (at: number) => before < at && now >= at;
+    if (now < SPIN_END && Math.floor(before * 12) !== Math.floor(now * 12)) this.sound.tick();
+    if (crossed(SPIN_END)) this.sound.coin();
+    if (crossed(ROLL_END)) this.sound.serve();
+    if (crossed(RISE_END + 0.2)) {
+      if (star >= 4) this.sound.sparkle();
+      else this.sound.chord(star);
+    }
+    if (crossed(RISE_END + 0.25) && star >= 5) this.sound.tripReturn();
   }
 
   /** 引いた打鍵音をその場で鳴らす（鳴らしたら付けている音に戻す）。打鍵音のカードがなければ false */
@@ -1083,7 +1097,12 @@ export class Game {
 
   /** 動作確認からも呼べる1コマの進行 */
   step(dt: number) {
-    if (this.fukubiki && this.fukubiki.anim < 10) this.fukubiki.anim += dt;
+    if (this.fukubiki && this.fukubiki.anim < 10) {
+      const f = this.fukubiki;
+      const before = f.anim;
+      f.anim += dt;
+      if (f.last && before < FUKUBIKI_ANIM) this.fukubikiSounds(before, f.anim, f.last.star);
+    }
     this.t += dt;
     this.missFlash = Math.max(0, this.missFlash - dt);
     this.volumeShown = Math.max(0, this.volumeShown - dt);
@@ -1215,7 +1234,7 @@ export class Game {
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
   get overTavern() {
-    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'fukubiki' || this.mode === 'settings';
+    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'settings';
   }
 
   // ---------- 描画 ----------
