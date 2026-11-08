@@ -15,10 +15,26 @@
 ## コードで描く絵・生成した音
 
 - 画像を読み込めなかったときの代わりの絵、注文の吹き出し・ローマ字・在庫数・待ち時間のバー・画面上部の表示・下の4色の調達欄: プログラムで描いています（`src/ui/sprites.ts`、`src/ui/room.ts`、`src/ui/shopView.ts`、`src/ui/minigameView.ts`）。
-- 効果音・BGM: Web Audio API で生成した電子音です（`src/ui/audio.ts`）。音声ファイルは使っていません。
+- 効果音・打鍵音: Web Audio API で生成した電子音です（`src/ui/audio.ts`）。BGM は下の「ゲーム内BGM」の音源を使っています（`assets/bgm/`）。
 
-外部の素材集の画像・音声は使用していません。
+外部の素材集の画像は使用していません。音声の外部素材は、上記の BGM（音楽の卵）だけです。
 
 ## 規約など
 
 利用規約・プライバシーポリシー・クレジットは、サイトの `/about.html`（`public/about.html`）に載せています。
+
+## ゲーム内BGM
+
+作曲は takai。配布元は [音楽の卵](https://ontama-m.com/) です。[音楽素材の利用規約](https://ontama-m.com/ongaku.html) に従い、配布元のループ対応 OGG を使用しています。
+
+| 場面 | 曲名 |
+| --- | --- |
+| タイトル | [ピズベリーの香り](https://ontama-m.com/ongaku_rpg_machi.html#:~:text=ピズベリーの香り) |
+| 朝の営業 | [そよ風とリンゴの村](https://ontama-m.com/ongaku_rpg_machi.html#:~:text=そよ風とリンゴの村) |
+| 昼の営業 | [楽しい作業工程](https://ontama-m.com/ongaku_rpg_renkin.html#:~:text=楽しい作業工程) |
+| 夜の営業 | [にぎやかな田舎町](https://ontama-m.com/ongaku_rpg_machi.html#:~:text=にぎやかな田舎町) |
+| 釣り | [泉のほとりで](https://ontama-m.com/ongaku_rpg_machi.html#:~:text=泉のほとりで) |
+| 狩り | [ぷにぷに警報](https://ontama-m.com/ongaku_rpg_battle.html#:~:text=ぷにぷに警報) |
+| 採取 | [晴天の資材集め](https://ontama-m.com/ongaku_rpg_field.html#:~:text=晴天の資材集め) |
+| 仕入れ | [手作りの街](https://ontama-m.com/ongaku_rpg_machi.html#:~:text=手作りの街) |
+| 営業結果 | [故郷](https://ontama-m.com/ongaku_rpg_machi.html#:~:text=故郷) |

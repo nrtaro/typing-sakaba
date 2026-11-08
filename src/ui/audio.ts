@@ -1,6 +1,5 @@
 import { comboFx } from './comboFx';
-// 効果音とBGM（Web Audio で生成。音声ファイルは使っていない）
-// BGM は場面ごとに別の曲（コード進行・旋律・リズム・音色）を持ち、効果音も場面ごとに鳴らし分ける。
+// 効果音は Web Audio で合成し、BGM は場面ごとの音源を再生する。
 import type { Settings } from '../core/save';
 
 const SCALE = [0, 2, 4, 7, 9]; // ハ長調のペンタトニック（打鍵音・コンボに使う）
@@ -28,92 +27,32 @@ export const FX_NAMES = ['miss', 'select', 'chord', 'serve', 'coin', 'lack', 'an
 
 export type Track = 'title' | 'morning' | 'noon' | 'night' | 'fishing' | 'hunting' | 'gathering' | 'trading' | 'result';
 
-/** 1 小節は 8 拍（8 分音符）。数字は C4 からの半音。null は休み */
-interface Song {
-  tempo: number;
-  chords: number[][];
-  /** 低音を鳴らす拍 */
-  bass: number[];
-  /** 和音を分散して鳴らす拍と、何番目の音か */
-  arp: (number | null)[];
-  lead: (number | null)[];
-  leadWave: OscillatorType;
-  arpWave: OscillatorType;
-  kick?: number[];
-  snare?: number[];
-  hat?: number[];
-  /** 全体の音量 */
-  vol: number;
-}
+const BGM_SAMPLE_RATE = 44100;
+const BGM_GAIN = 0.22;
+/**
+ * 閉店前に曲を速める強さ。音源の再生では速さと一緒に音程も上がるので、頼まれた速さの3割だけ速める
+ * （setRate(1.25) で 1.075 倍。音程は1音ほど上がる）。
+ */
+const RATE_STRENGTH = 0.3;
 
-const _ = null;
-const SONGS: Record<Track, Song> = {
-  // タイトル：ゆったりした夜の酒場。打楽器なし、柔らかい音色
-  title: {
-    tempo: 84, chords: [[5, 9, 12], [2, 5, 9], [-2, 2, 5], [0, 4, 7]],
-    bass: [0, 4], arp: [0, _, 1, _, 2, _, 1, _], leadWave: 'triangle', arpWave: 'sine', vol: 0.9,
-    lead: [17, _, 16, _, 14, _, 12, _, 14, _, _, _, 9, _, _, _, 10, _, 12, _, 14, _, 17, _, 16, _, _, _, _, _, _, _],
-  },
-  // 朝：明るく軽い。鈴のような音
-  morning: {
-    tempo: 104, chords: [[0, 4, 7], [-5, -1, 2], [-3, 0, 4], [-7, -3, 0]],
-    bass: [0, 4], arp: [0, 1, 2, 1, 0, 1, 2, 1], leadWave: 'triangle', arpWave: 'square', vol: 0.8, hat: [2, 6],
-    lead: [12, 14, 16, _, 19, _, 16, _, 14, _, 11, _, 7, _, _, _, 9, 12, 16, _, 14, _, 12, _, 9, _, _, _, 12, _, _, _],
-  },
-  // 昼：はずむ忙しさ
-  noon: {
-    tempo: 120, chords: [[-5, -1, 2], [0, 4, 7], [2, 6, 9], [4, 7, 11]],
-    bass: [0, 3, 4, 6], arp: [0, 2, 1, 2, 0, 2, 1, 2], leadWave: 'square', arpWave: 'triangle', vol: 0.8,
-    kick: [0, 4], snare: [2, 6], hat: [1, 3, 5, 7],
-    lead: [14, _, 14, 16, 19, _, 16, 14, 12, _, 11, _, 9, _, 7, _, 9, _, 11, 12, 14, _, 16, _, 18, _, 14, _, 19, _, _, _],
-  },
-  // 夜：にぎやかで少し哀愁のある短調
-  night: {
-    tempo: 138, chords: [[-3, 0, 4], [-7, -3, 0], [0, 4, 7], [-5, -1, 2]],
-    bass: [0, 2, 3, 4, 6], arp: [0, 1, 2, 1, 0, 1, 2, 1], leadWave: 'square', arpWave: 'square', vol: 0.75,
-    kick: [0, 3, 4], snare: [2, 6], hat: [0, 1, 2, 3, 4, 5, 6, 7],
-    lead: [9, 12, 16, 12, 17, 16, 12, 9, 9, _, 12, _, 7, _, _, _, 9, 12, 16, 19, 21, 19, 16, 12, 14, _, 12, _, 11, _, 12, _],
-  },
-  // 釣り：水面のようにゆれる
-  fishing: {
-    tempo: 112, chords: [[2, 5, 9], [-5, -1, 2], [2, 5, 9], [0, 4, 7]],
-    bass: [0, 5], arp: [0, 1, 2, 1, 2, 1, 0, 1], leadWave: 'sine', arpWave: 'triangle', vol: 0.85, hat: [3, 7],
-    lead: [14, _, _, 17, 21, _, 19, _, 17, _, _, _, 14, _, _, _, 12, _, _, 14, 17, _, 19, _, 14, _, _, _, _, _, _, _],
-  },
-  // 狩り：力強く駆ける
-  hunting: {
-    tempo: 146, chords: [[-8, -5, -1], [-12, -8, -5], [-10, -6, -3], [-8, -5, -1]],
-    bass: [0, 1, 2, 3, 4, 5, 6, 7], arp: [_, _, 2, _, _, _, 2, _], leadWave: 'sawtooth', arpWave: 'square', vol: 0.6,
-    kick: [0, 2, 4, 6], snare: [4], hat: [1, 3, 5, 7],
-    lead: [4, _, 7, _, 11, 9, 7, _, 4, _, _, _, 2, _, 4, _, 7, _, 11, _, 14, 12, 11, _, 9, _, _, _, 7, _, _, _],
-  },
-  // 採取：温室の明るい陽だまり
-  gathering: {
-    tempo: 126, chords: [[5, 9, 12], [0, 4, 7], [-2, 2, 5], [0, 4, 7]],
-    bass: [0, 4], arp: [0, 1, 2, 3, 2, 1, 0, 1], leadWave: 'triangle', arpWave: 'triangle', vol: 0.8, hat: [2, 6], kick: [0],
-    lead: [17, 19, 21, _, 24, _, 21, _, 19, _, 16, _, 17, _, _, _, 14, 16, 17, _, 21, _, 19, _, 17, _, _, _, _, _, _, _],
-  },
-  // 仕入れ：せり市の小気味よさ
-  trading: {
-    tempo: 132, chords: [[-3, 0, 4], [2, 5, 9], [-5, -1, 2], [0, 4, 7]],
-    bass: [0, 2, 4, 6], arp: [_, 0, _, 1, _, 2, _, 1], leadWave: 'square', arpWave: 'square', vol: 0.7,
-    kick: [0, 4], snare: [2, 6, 7], hat: [1, 5],
-    lead: [16, 16, _, 14, 12, _, 9, _, 14, 14, _, 12, 11, _, _, _, 12, 12, _, 14, 16, _, 19, _, 16, _, 14, _, 12, _, _, _],
-  },
-  // 結果：一日の終わりのあたたかい余韻
-  result: {
-    tempo: 92, chords: [[0, 4, 7], [-3, 0, 4], [-7, -3, 0], [-5, -1, 2]],
-    bass: [0, 4], arp: [0, 1, 2, 1, 2, 1, 0, 1], leadWave: 'triangle', arpWave: 'sine', vol: 0.85, hat: [4],
-    lead: [16, _, 19, _, 24, _, 23, _, 21, _, _, _, 19, _, _, _, 17, _, 16, _, 14, _, 12, _, 14, _, _, _, _, _, _, _],
-  },
+// 音楽の卵の OGG に入っている LOOPSTART と LOOPLENGTH から求めたサンプル位置。
+const TRACKS: Record<Track, { url: string; start: number; end: number; offsetSeconds?: number }> = {
+  title: { url: new URL('../../assets/bgm/title.ogg', import.meta.url).href, start: 187642, end: 3297305 },
+  morning: { url: new URL('../../assets/bgm/morning.ogg', import.meta.url).href, start: 179389, end: 3043963 },
+  noon: { url: new URL('../../assets/bgm/noon.ogg', import.meta.url).href, start: 159744, end: 2847445 },
+  // 打楽器が入る直前から始め、最初の一打を残す。
+  night: { url: new URL('../../assets/bgm/night.ogg', import.meta.url).href, start: 730857, end: 2921016, offsetSeconds: 8.25 },
+  fishing: { url: new URL('../../assets/bgm/fishing.ogg', import.meta.url).href, start: 247381, end: 3725941 },
+  hunting: { url: new URL('../../assets/bgm/hunting.ogg', import.meta.url).href, start: 142120, end: 2718352 },
+  gathering: { url: new URL('../../assets/bgm/gathering.ogg', import.meta.url).href, start: 365118, end: 2654998 },
+  trading: { url: new URL('../../assets/bgm/trading.ogg', import.meta.url).href, start: 99145, end: 3186203 },
+  result: { url: new URL('../../assets/bgm/result.ogg', import.meta.url).href, start: 1323283, end: 3467158 },
 };
 
 /** 打鍵音の作り方（飾りの一覧の sound と同じ形） */
 export interface KeyVoice { wave: OscillatorType; base: number; decay: number; partial?: number; noise?: number }
 
 export class Sound {
-  /** 曲の一覧（音の確認用に外から読めるようにする） */
-  static readonly SONGS = SONGS;
   private ac: AudioContext | null = null;
   private sfx: GainNode | null = null;
   /** 打鍵音だけの出口（設定で効果音とは別に音量を変える） */
@@ -121,17 +60,15 @@ export class Sound {
   /** 効果音ごとの出口（大きさをそろえる係数 FX_GAIN をかける） */
   private fxBus = new Map<string, GainNode>();
   private music: GainNode | null = null;
-  private timer: number | null = null;
-  private step = 0;
-  /** 次の拍を鳴らす時刻（音の時計）。先読みして予約し、タイマーの遅れで拍がずれないようにする */
-  private nextTime = 0;
-  /** BGM の速さの倍率（閉店前に速める。曲を変えると 1 に戻る） */
+  private playing: AudioBufferSourceNode | null = null;
+  private pending: AbortController | null = null;
+  /** 読み込んだ曲のデータ（場面を行き来するたびに読み直さない。展開前のデータなので小さい） */
+  private encoded = new Map<Track, ArrayBuffer>();
   private rate = 1;
   /** 全体の音量と、音割れを防ぐリミッター */
   private master: GainNode | null = null;
   /** ノイズ用の音（1秒分を一度だけ作り、毎回切り出して使う） */
   private noiseBuf: AudioBuffer | null = null;
-  private track: Track | null = null;
   private wanted: Track | null = null;
 
   constructor(private settings: Settings) {}
@@ -147,11 +84,7 @@ export class Sound {
       this.build(new Ctor());
       this.apply(this.settings);
       // 音が使えるようになる前に頼まれていた曲を、ここで始める
-      if (this.wanted) {
-        const w = this.wanted;
-        this.track = null;
-        this.play(w);
-      }
+      if (this.wanted) this.play(this.wanted);
     } catch {
       this.ac = null;
     }
@@ -200,7 +133,7 @@ export class Sound {
     const part = (v: number | undefined) => Math.max(0, Math.min(10, v ?? DEFAULT_PART)) / DEFAULT_PART;
     this.sfx.gain.setTargetAtTime(level * part(s.seLevel), t, 0.02);
     this.keyBus?.gain.setTargetAtTime(level * part(s.keyLevel), t, 0.02);
-    this.music.gain.setTargetAtTime(level * 0.85 * part(s.bgmLevel), t, 0.05);
+    this.music.gain.setTargetAtTime(level * BGM_GAIN * part(s.bgmLevel), t, 0.05);
   }
 
   // ---------- 音の部品 ----------
@@ -481,7 +414,8 @@ export class Sound {
 
   /** BGM の速さを変える（1 が元の速さ） */
   setRate(rate: number) {
-    this.rate = rate;
+    this.rate = 1 + (rate - 1) * RATE_STRENGTH;
+    if (this.playing) this.playing.playbackRate.value = this.rate;
   }
 
   /** 閉店前の秒読み：残り秒数が少ないほど高く、最後の3秒は2音にする */
@@ -535,46 +469,45 @@ export class Sound {
 
   /** 場面の曲を流す（同じ曲ならそのまま続ける） */
   play(track: Track) {
-    this.wanted = track;
-    if (this.track === track && this.timer !== null) return;
+    if (this.wanted === track && (this.playing || this.pending)) return;
     this.stop();
-    this.track = track;
-    if (!this.ac) return;
-    const song = SONGS[track];
-    this.step = 0;
+    this.wanted = track;
     this.rate = 1;
-    this.nextTime = this.ac.currentTime + 0.06;
-    // 25ミリ秒ごとに、少し先（0.15秒）までの拍を音の時計で予約する。
-    // 画面の処理で一瞬止まっても、拍の時刻はずれない
-    this.timer = window.setInterval(() => {
-      const ac = this.ac;
-      if (!ac || !this.music || ac.state !== 'running') return;
-      // 裏に回るなどで大きく遅れたら、まとめて鳴らさずに今から仕切り直す
-      if (this.nextTime < ac.currentTime - 0.1) this.nextTime = ac.currentTime + 0.05;
-      const beat = 60 / song.tempo / 2 / this.rate;
-      while (this.nextTime < ac.currentTime + 0.15) {
-        this.beatAt(song, this.step++, this.nextTime, beat);
-        this.nextTime += beat;
-      }
-    }, 25);
+    if (!this.ac || !this.music) return;
+
+    const pending = new AbortController();
+    this.pending = pending;
+    void this.startTrack(track, this.ac, this.music, pending);
   }
 
-  /** 1拍分の伴奏・旋律・打楽器を、時刻 t に予約する */
-  private beatAt(song: Song, i: number, t: number, beat: number) {
-    const out = this.music!;
-    const bar = song.chords.length * 8;
-    const pos = i % 8;
-    const ch = song.chords[Math.floor(i / 8) % song.chords.length];
-    const v = song.vol;
-    if (song.bass.includes(pos)) this.tone(this.semi(ch[0] - 24), t, beat * 1.7, 'triangle', 0.12 * v, out);
-    const a = song.arp[pos];
-    if (a !== null && a !== undefined) this.tone(this.semi(ch[a % ch.length] + (a >= ch.length ? 24 : 12)), t, beat * 0.9, song.arpWave, 0.016 * v, out);
-    const l = song.lead[i % bar % song.lead.length];
-    // 旋律は2周に1回だけ鳴らし、伴奏だけの小節で息継ぎさせる
-    if (l !== null && l !== undefined && Math.floor(i / bar) % 2 === 0) this.tone(this.semi(l), t, beat * 1.7, song.leadWave, (song.leadWave === 'sawtooth' ? 0.016 : 0.028) * v, out);
-    if (song.kick?.includes(pos)) this.tone(130, t, 0.12, 'sine', 0.13 * v, out, 45);
-    if (song.snare?.includes(pos)) this.noise(t, 0.09, 0.05 * v, out, 'bandpass', 1800);
-    if (song.hat?.includes(pos)) this.noise(t, 0.03, 0.025 * v, out);
+  private async startTrack(track: Track, ac: AudioContext, output: GainNode, pending: AbortController) {
+    const { url, start, end, offsetSeconds = 0 } = TRACKS[track];
+    try {
+      let data = this.encoded.get(track);
+      if (!data) {
+        const response = await fetch(url, { signal: pending.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        data = await response.arrayBuffer();
+        this.encoded.set(track, data);
+      }
+      // 展開すると元のデータは使えなくなるので、写しを渡す
+      const buffer = await ac.decodeAudioData(data.slice(0));
+      // デコードの間に場面が変わった場合は、古い曲を鳴らさない。
+      if (pending.signal.aborted) return;
+      const source = ac.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.playbackRate.value = this.rate;
+      source.loopStart = start / BGM_SAMPLE_RATE;
+      source.loopEnd = Math.min(buffer.duration, end / BGM_SAMPLE_RATE);
+      source.connect(output);
+      source.start(0, offsetSeconds);
+      this.playing = source;
+    } catch (error) {
+      if (!pending.signal.aborted) console.warn(`BGM を再生できませんでした: ${track}`, error);
+    } finally {
+      if (this.pending === pending) this.pending = null;
+    }
   }
 
   /** 互換用：昔の呼び方（mode と速さ）を曲に読み替える */
@@ -585,7 +518,10 @@ export class Sound {
   }
 
   stop() {
-    if (this.timer !== null) window.clearInterval(this.timer);
-    this.timer = null;
+    this.wanted = null;
+    this.pending?.abort();
+    this.pending = null;
+    this.playing?.stop();
+    this.playing = null;
   }
 }
