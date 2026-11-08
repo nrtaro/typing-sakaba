@@ -7,6 +7,7 @@ import type { Game } from '../game';
 import { chipWidth, drawCondChip } from './conditions';
 import { button } from './common';
 import { ACHIEVEMENTS } from '../../core/achievements';
+import { DIFFICULTIES, type DifficultyId } from '../../core/shopConfig';
 
 /** 結果画面の演出が終わって、選べるようになるまでの時間 */
 export function resultStep(g: Game) {
@@ -42,11 +43,12 @@ export function drawResult(g: Game) {
   sc.radialGlow(LW / 2, 62, 140, '#ffb45a', 0.22 * ease(age / 0.6), 0.45);
   const daily = r.daily;
   sc.TB(daily ? `ひがわり営業 ${dateLabel(daily.date)}` : '本日の営業終了', LW / 2, 16, daily ? 14 : 16, C.gold3, 'center', C.ink, ease(age / 0.3));
-  // ひがわり：上の両端に今日のお題
+  // ひがわり：今日のお題は2つとも右上に縦に並べ、左上に今日のランキング
   if (daily) {
     const d = g.settings.difficulty;
     const a = ease(age / 0.3);
-    daily.conds.forEach((c, i) => drawCondChip(sc, g.art, c, d, i === 0 ? 10 : LW - 10 - chipWidth(sc, c, d), 6, a));
+    daily.conds.forEach((c, i) => drawCondChip(sc, g.art, c, d, LW - 8 - chipWidth(sc, c, d), 6 + i * 17, a));
+    drawTodayBoard(g, r.difficultyId, a);
   }
   // 売上：数字が駆け上がり、止まった瞬間に少し弾む
   const count = Math.round(r.score * ease((age - 0.3) / 1.3));
@@ -106,7 +108,7 @@ export function drawResult(g: Game) {
       : sent.state === 'sending' ? 'ランキングに送信中…'
       : sent.state === 'error' ? `${sent.message}（端末の記録は保存済み）`
       : '名前を付けて、今日のランキングへ';
-    sc.T(text, LW / 2, 185, sc.fitSize(text, 9, LW - 24), sent.state === 'error' ? '#ffb6a4' : C.gold3, 'center');
+    sc.T(text, LW / 2, 183, sc.fitSize(text, 9, LW - 24), sent.state === 'error' ? '#ffb6a4' : C.gold3, 'center');
   }
   // 新しく開いた実績（判子の右）
   if (r.unlocked?.length && age > 2.6) {
@@ -131,17 +133,48 @@ export function drawResult(g: Game) {
     const y = r.unlocked?.length ? 112 : 72;
     const w = 138;
     const can = r.canPull ?? (r.coins ?? 0) >= PULL_PRICE;
-    sc.panel(x, y, w, can ? 22 : 13, 'rgba(36,40,30,0.95)', can ? C.gold3 : '#8a6232', p);
     const line = `本日の売上 ＋${r.credited.toLocaleString()}円 → 貯金箱`;
-    sc.T(line, x + 6, y + 2.5, sc.fitSize(line, 7.5, w - 12, 5.5), '#f2efe2', 'left', p);
-    if (can) sc.T('ふくびきが引けます（タイトルの「ふくびき」）', x + 6, y + 12, sc.fitSize('ふくびきが引けます（タイトルの「ふくびき」）', 6.5, w - 12, 5), C.gold3, 'left', p);
+    sc.TB(line, x + 4, y + 2.5, sc.fitSize(line, 7.5, w - 8, 5.5), '#f2efe2', 'left', C.ink, p);
+    if (can) sc.TB('ふくびきが引けます（タイトルの「ふくびき」）', x + 4, y + 12, sc.fitSize('ふくびきが引けます（タイトルの「ふくびき」）', 6.5, w - 8, 5), C.gold3, 'left', C.ink, p);
   }
   // 家族が見送る
   if (g.art) {
     const p = ease((age - 0.4) / 0.5);
-    for (const [id, x, hgt] of [['master', 28, 58], ['wife', 452, 52]] as const) {
+    for (const [id, x, hgt] of [['master', 28, 58], ['wife', 430, 52], ['daughter', 458, 46]] as const) {
       g.art.drawAnim(sc, `family-${id}`, '待機', g.t, x, 268 + (1 - p) * 30, g.art.scaleFor(`family-${id}`, 0, hgt), false, p);
     }
+  }
+}
+
+/** 左上：今日のひがわり（遊んだ難易度）のランキングの上位5人と、自分の順位 */
+function drawTodayBoard(g: Game, difficulty: DifficultyId, a: number) {
+  const sc = g.sc;
+  const boards = g.boards;
+  const board = boards?.date === g.result?.daily?.date && boards?.state === 'ready' ? boards.value?.[difficulty] : null;
+  const x = 8;
+  const y = 6;
+  const w = 134;
+  const rows = board?.top.slice(0, 5) ?? [];
+  const h = 18 + Math.max(1, rows.length) * 11 + (board?.me ? 11 : 0);
+  sc.panel(x, y, w, h, 'rgba(34,50,42,0.92)', '#6b4422', a);
+  const name = DIFFICULTIES.find((d) => d.id === difficulty)?.name ?? '';
+  sc.T(`今日のランキング・${name}`, x + 6, y + 4, 7.5, C.gold3, 'left', a);
+  if (!board) {
+    sc.T(boards?.state === 'error' ? '今はつながりません' : '読み込み中…', x + 6, y + 18, 7.5, C.cream2, 'left', a);
+    return;
+  }
+  if (!rows.length) sc.T('まだ記録がありません', x + 6, y + 18, 7.5, C.cream2, 'left', a);
+  rows.forEach((s, k) => {
+    const ry = y + 17 + k * 11;
+    const col = k === 0 ? '#ffd27a' : k === 1 ? '#e8e4d4' : k === 2 ? '#e8b48a' : C.cream;
+    const score = `${s.score.toLocaleString()}円`;
+    sc.T(`${s.rank}`, x + 10, ry, 7.5, col, 'center', a);
+    sc.T(s.name, x + 18, ry, sc.fitSize(s.name, 7.5, w - 26 - sc.W(score, 7), 5), '#f2efe2', 'left', a);
+    sc.T(score, x + w - 6, ry + 0.5, 7, col, 'right', a);
+  });
+  if (board.me) {
+    const my = `あなた：${board.me.rank}位（${board.me.score.toLocaleString()}円）`;
+    sc.T(my, x + 6, y + 17 + rows.length * 11, sc.fitSize(my, 7, w - 12, 5), '#a9f0e4', 'left', a);
   }
 }
 
@@ -153,13 +186,13 @@ export function drawResultMenu(g: Game) {
   const items = g.menuItems();
   if (!items.length) return;
   const [main, ...rest] = items;
-  const mw = 186;
-  button(g, main, LW / 2 - mw / 2, 194, mw, 37, 'primary', 'Enter');
+  const mw = 168;
+  button(g, main, LW / 2 - mw / 2, 196, mw, 33, 'primary', 'Enter');
   const w = 104;
   const gap = 8;
   const total = rest.length * w + (rest.length - 1) * gap;
   rest.forEach((it, k) => {
     const last = k === rest.length - 1;
-    button(g, it, LW / 2 - total / 2 + k * (w + gap), 237, w, 27, 'plain', last ? 'Esc' : undefined);
+    button(g, it, LW / 2 - total / 2 + k * (w + gap), 238, w, 27, 'plain', last ? 'Esc' : undefined);
   });
 }

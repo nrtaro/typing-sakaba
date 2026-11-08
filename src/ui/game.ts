@@ -842,6 +842,8 @@ export class Game {
       if (this.result !== result || this.mode !== 'result') return;
       this.submission = { state: 'sent', receipt, message: '' };
       this.menu.reset();
+      // 結果画面の今日のランキングを、送った記録を含めて読み直す
+      void this.loadBoards(result.daily.date, true);
     } catch (err) {
       if (this.result !== result || this.mode !== 'result') return;
       this.submission = { state: 'error', receipt: null, message: err instanceof Error ? err.message : '送信できませんでした' };
@@ -1230,6 +1232,8 @@ export class Game {
     this.resultAt = this.t;
     this.resultFx = { tick: 0, stamped: false, sparkled: false, unlocked: false };
     this.sound.play('result');
+    // ひがわり：結果画面の左上に今日のランキングを出すため、読み直す
+    if (this.daily && this.ranking) void this.loadBoards(this.daily.date, true);
   }
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
