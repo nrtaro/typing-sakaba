@@ -37,7 +37,7 @@ export function achievementItem(achievementId: string): Item | undefined {
 
 // ---------- ふくびき（値段・確率・枚数はここで調整する） ----------
 
-export const PULL_PRICE = 8000;
+export const PULL_PRICE = 5000;
 export const STAR_RATE: Record<Star, number> = { 1: 0.4, 2: 0.3, 3: 0.18, 4: 0.11, 5: 0.01 };
 /** かぶったときにもらえるおまけ札 */
 export const DUP_TICKETS: Record<Star, number> = { 1: 1, 2: 2, 3: 5, 4: 15, 5: 50 };

@@ -83,7 +83,7 @@ export class Game {
   view = new ShopView();
   tripView = new MinigameView();
   paused = false;
-  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord; unlocked: string[]; credited?: number; coins?: number }) | null = null;
+  result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord; unlocked: string[]; credited?: number; coins?: number; canPull?: boolean }) | null = null;
   /** 記録・実績の画面で見ている記録と、選んでいる実績・読んでいる会話 */
   records: Records | null = null;
   recordsView: { tab: RecordsTab; sel: number; reading: number | null; scroll: number; series: number; decorRow: number } | null = null;
@@ -291,6 +291,7 @@ export class Game {
   toTitle() {
     this.leavePlay();
     this.mode = 'title';
+    this.applyKeyVoice();
   }
 
   /** 営業・れんしゅうを片付けて、メニューの画面へ戻る準備をする */
@@ -437,6 +438,16 @@ export class Game {
   /** 段階6：ふくびきが引けるか（タイトルの印。毎コマ保存を読まないよう、少し間を置いて確かめる） */
   private pullAt = -10;
   private pullCache = false;
+  private coinsAt = -10;
+  private coinsCache = 0;
+  coinsNow() {
+    if (this.t - this.coinsAt > 2) {
+      this.coinsAt = this.t;
+      try { this.coinsCache = this.store.loadCollection().coins; } catch { this.coinsCache = 0; }
+    }
+    return this.coinsCache;
+  }
+
   canPullNow() {
     if (this.t - this.pullAt > 2) {
       this.pullAt = this.t;
@@ -527,7 +538,6 @@ export class Game {
     f.last = result;
     f.anim = 0;
     f.message = '';
-    this.sound.select();
   }
 
   /** ふくびき画面のキー：演出中は飛ばすだけ、交換の一覧では↑↓・Enter・Esc */
@@ -572,7 +582,9 @@ export class Game {
   /** 記録・実績の画面のキー操作 */
   recordsKey(k: string) {
     const v = this.recordsView!;
-    if (k === 'Tab' && v.reading === null) {
+    if (k === 'Tab') {
+      // 会話を読んでいる間の Tab は何もしない（閉じてから切り替える）
+      if (v.reading !== null) return;
       const order: RecordsTab[] = ['achievements', 'stickers', 'decor'];
       this.setRecordsTab(order[(order.indexOf(v.tab) + 1) % order.length]);
       return;
@@ -1073,8 +1085,10 @@ export class Game {
     let unlocked: string[] = [];
     let credited = 0;
     let coins = 0;
+    let pullable = false;
     try { ({ unlocked, credited, coins } = this.store.recordPlay(this.playFacts(session))); } catch { unlocked = []; }
-    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: sum.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily, play, unlocked, credited, coins };
+    try { pullable = canPull(this.store.loadCollection()); } catch { pullable = false; }
+    this.result = { ...rec, best, rank: rank.name, title: rank.title, trips: sum.trips, difficulty: diff.name, difficultyId: diff.id, daily: this.daily, play, unlocked, credited, coins, canPull: pullable };
     this.submission = { state: 'idle', receipt: null, message: '' };
     this.mode = 'result';
     this.menu.reset();

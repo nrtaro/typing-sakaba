@@ -124,7 +124,8 @@ export function ghostCount(g: Game, len: number) {
 export function drawKeyboard(g: Game, x: number, y: number, a = 1) {
   const sc = g.sc;
   sc.panel(x, y, 22, 11, '#f1dcae', '#8a6232', a);
-  const press = Math.floor(g.t * 4) % 7;
+  // 12個のキーを左上から右下まで順に押し、少し間を置いて最初に戻る
+  const press = Math.floor(g.t * 4) % 14;
   for (let r = 0; r < 2; r++) for (let c = 0; c < 6; c++) {
     const on = r * 6 + c === press;
     sc.PR(x + 2.5 + c * 3, y + 2.5 + r * 3, 2, 2, on ? C.gold2 : '#8a6232', a);

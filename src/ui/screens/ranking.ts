@@ -60,7 +60,7 @@ export function drawRanking(g: Game) {
         } else sc.T(`${s.rank}`, px + 16, y + 2.5, 9, C.cream2, 'center');
         const score = `${s.score.toLocaleString()}円`;
         sc.T(score, px + pw - 8, y + 3, 8, C.gold3, 'right');
-        const nameW = pw - 34 - sc.W(score, 8) - 6;
+        const nameW = pw - 34 - sc.W(score, 8) - 10;
         drawNameplate(sc, px + 26, y, nameW + 2, 15, s.name, s.decoration, 9);
       });
       // 自分の順位

@@ -60,8 +60,10 @@ export function drawNameplate(sc: Screen, x: number, y: number, w: number, h: nu
   }
   // 二つ名を上に小さく、名前をその下に（狭い欄でも重ならない）
   const titleSize = sc.fitSize(title, Math.max(4, size * 0.6), inner, 4);
+  let shown = title;
+  while ([...shown].length > 1 && sc.W(shown, titleSize) > inner) shown = `${[...shown].slice(0, -2).join('')}…`;
   const nameSize = sc.fitSize(name, size * 0.85, inner, 5);
   const top = y + Math.max(0.5, (h - titleSize - nameSize - 0.5) / 2);
-  text(title, x + pad, top, titleSize, p ? textCol : '#d9c2a0');
+  text(shown, x + pad, top, titleSize, p ? textCol : '#d9c2a0');
   text(name, x + pad, top + titleSize + 0.5, nameSize, textCol);
 }

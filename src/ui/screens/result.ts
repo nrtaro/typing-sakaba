@@ -125,12 +125,12 @@ export function drawResult(g: Game) {
     sc.T('タイトルの「きろく」で会話が読めます', x + 6, y + 27, sc.fitSize('タイトルの「きろく」で会話が読めます', 6.5, w - 12, 5), C.cream2, 'left', p);
   }
   // 段階6：売上を貯金箱へ（実績のお知らせがあればその下）
-  if (r.credited !== undefined && age > 2.6) {
+  if (r.credited && age > 2.6) {
     const p = ease((age - 2.6) / 0.3);
     const x = 334;
     const y = r.unlocked?.length ? 112 : 72;
     const w = 138;
-    const can = (r.coins ?? 0) >= PULL_PRICE;
+    const can = r.canPull ?? (r.coins ?? 0) >= PULL_PRICE;
     sc.panel(x, y, w, can ? 22 : 13, 'rgba(36,40,30,0.95)', can ? C.gold3 : '#8a6232', p);
     const line = `本日の売上 ＋${r.credited.toLocaleString()}円 → 貯金箱`;
     sc.T(line, x + 6, y + 2.5, sc.fitSize(line, 7.5, w - 12, 5.5), '#f2efe2', 'left', p);

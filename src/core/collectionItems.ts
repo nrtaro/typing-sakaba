@@ -11,6 +11,14 @@ export const LINK_LIST: Link[] = [
   { id: 'noyouna', text: 'のような' },
   { id: 'mitaina', text: 'みたいな' },
   { id: 'toiu', text: 'という' },
+  { id: 'sugiru', text: 'すぎる' },
+  { id: 'kyuno', text: '級の' },
+  { id: 'jirushino', text: '印の' },
+  { id: 'ppoi', text: 'っぽい' },
+  { id: 'ryuno', text: '流の' },
+  { id: 'jikomino', text: '仕込みの' },
+  { id: 'dehyobanno', text: 'で評判の' },
+  { id: 'wokiwameshi', text: 'を極めし' },
 ];
 
 export const SERIES_LIST: Series[] = [

@@ -91,6 +91,7 @@ export function drawTitle(g: Game) {
     sc.T(GAME_SUBTITLE, 130, 51, 9, '#f3dcb0', 'center');
     drawBestBoard(g, 330, 8, 138, 74);
     drawTodayTop(g, 330, 86, 138);
+    drawCoins(g, 14, 78);
   });
   // メニュー台：店の床から下をすべて覆う木の台（縦に長いウィンドウでも下に隙間を作らない）
   sc.PR(e.x0, 212, e.w, e.y1 - 212, '#2a1a10');
@@ -146,6 +147,17 @@ export function drawBestBoard(g: Game, x: number, y: number, w: number, h: numbe
       sc.T(rank.name, x + w - 13, rowY, 10, rank.name === 'S' ? '#ffd27a' : col, 'center');
     } else sc.T('―', x + w - 26, rowY, 10, col, 'right', 0.6);
   });
+}
+
+/** 看板の下：貯金箱（ふくびきに使うお金）。毎コマ保存を読まないよう、少し間を置いて読む */
+function drawCoins(g: Game, x: number, y: number) {
+  const sc = g.sc;
+  const coins = g.coinsNow();
+  const text = `貯金箱 ${coins.toLocaleString()}円`;
+  const w = sc.W(text, 8) + 14;
+  sc.PR(x + 2, y + 2, w, 14, '#0c0604', 0.5);
+  sc.panel(x, y, w, 14, 'rgba(42,27,20,0.94)', '#a8743f');
+  sc.T(text, x + 7, y + 3, 8, C.gold3);
 }
 
 /** 黒板の下：今日のひがわりの1位（前回選んだ難易度）。「らんきんぐ」で全部見られる */

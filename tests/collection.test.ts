@@ -18,8 +18,8 @@ describe('飾りの一覧', () => {
     expect(itemById('nope')).toBeUndefined();
   });
 
-  it('つなぎは6つ', () => {
-    expect(LINKS.map((l) => l.text)).toEqual(['な', 'の', '', 'のような', 'みたいな', 'という']);
+  it('つなぎは最初の6つを含む', () => {
+    expect(LINKS.slice(0, 6).map((l) => l.text)).toEqual(['な', 'の', '', 'のような', 'みたいな', 'という']);
     expect(LINKS[0].id).toBe('na');
   });
 

@@ -3,6 +3,7 @@ import { C, type Color } from '../palette';
 import { LW, type Screen } from '../screen';
 import { ACHIEVEMENTS, GROUP_NAME, currentStreak, longestStreak, type Records } from '../../core/achievements';
 import { jstDate } from '../../core/daily';
+import { achievementItem, type Kind } from '../../core/collection';
 import type { Game } from '../game';
 import { button, drawSignboard } from './common';
 import { drawStickerBook } from './stickerBook';
@@ -40,6 +41,15 @@ export function dialogueRows(sc: Pick<Screen, 'W'>, index: number, width: number
     wrapText(sc, `「${l.text}」`, 9, width - FACE_W).forEach((t, k) => rows.push({ who: k === 0 ? l.who : '', text: t }));
   }
   return rows;
+}
+
+const REWARD_KIND: Record<Kind, string> = { front: '前の言葉', back: '後ろの言葉', plate: 'プレート', sound: '打鍵音', sticker: 'シール' };
+
+/** 実績でもらえる飾りの説明（もらえていれば「受け取り済み」） */
+export function rewardText(achievementId: string, got: boolean): string {
+  const it = achievementItem(achievementId);
+  if (!it) return '';
+  return `報酬：${REWARD_KIND[it.kind]}「${it.name}」☆${it.star}${got ? '（受け取り済み）' : ''}`;
 }
 
 function progressText(r: Records, i: number) {
@@ -109,13 +119,15 @@ export function drawRecords(g: Game) {
     sc.panel(lx, 170, lw, 36, 'rgba(48,30,18,0.96)', opened ? C.gold2 : '#6b4422');
     sc.T(`${GROUP_NAME[a.group]}・${String(a.no).padStart(2, '0')}「${a.title}」`, lx + 8, 173, 8, C.gold3);
     sc.T(a.condition, lx + 8, 185, sc.fitSize(a.condition, 8, lw - 16, 6), C.cream);
+    const reward = rewardText(a.id, opened);
+    sc.T(reward, lx + 8, 196, sc.fitSize(reward, 7, lw * 0.62, 5), opened ? '#ffd98a' : '#ffb8d0');
     if (a.progress && !opened) {
       const p = a.progress(r);
-      const w = lw - 16;
-      sc.PR(lx + 8, 198, w, 3, C.ink);
-      sc.PR(lx + 8, 198, w * Math.min(1, p.now / p.goal), 3, C.gold2);
+      const w = lw * 0.3;
+      sc.PR(lx + lw - 8 - w, 198, w, 3, C.ink);
+      sc.PR(lx + lw - 8 - w, 198, w * Math.min(1, p.now / p.goal), 3, C.gold2);
     }
-    if (opened) sc.T('Enter で会話を読む', lx + lw - 8, 197, 7, '#a9f0e4', 'right');
+    if (opened) sc.T('Enter で会話を読む', lx + lw - 8, 196, 7, '#a9f0e4', 'right');
     const hint = '↑↓でえらぶ　Enterで会話を読む　Tabでタブを切り替える';
     sc.T(hint, LW / 2, 210, 7, C.cream2, 'center');
   });
