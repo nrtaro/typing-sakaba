@@ -16,15 +16,40 @@ const plateArt = new StickerArt();
 
 /**
  * プレートの絵を、両端の飾りの形を保ったまま横に伸ばして敷く（真ん中だけ伸ばす）。
+ * 光り方（☆3以上）は、表示する縦横の比率に組み立てた絵の上に重ねる。
+ * 元の長い絵に光を付けてから縮めると、光の帯が真ん中だけ縮んで不自然になるため。
  */
-function drawPlateImage(sc: Screen, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+const plateScratch = new Map<string, HTMLCanvasElement>();
+function drawPlateImage(sc: Screen, img: HTMLImageElement, x: number, y: number, w: number, h: number, star: number, phase: number) {
   const sw = img.naturalWidth || img.width;
   const sh = img.naturalHeight || img.height;
   const cap = Math.min(sh * 2, sw / 3);
-  const dcap = Math.min(cap * (h / sh), w / 2);
-  sc.blit(img, 0, 0, cap, sh, x, y, dcap, h);
-  sc.blit(img, cap, 0, sw - cap * 2, sh, x + dcap, y, w - dcap * 2, h);
-  sc.blit(img, sw - cap, 0, cap, sh, x + w - dcap, y, dcap, h);
+  // 絵の高さのまま、表示の比率の横幅に組み立てる
+  const H = sh;
+  const W = Math.max(2, Math.round(H * (w / h)));
+  const key = `${W}x${H}`;
+  let c = plateScratch.get(key) ?? null;
+  if (!c && typeof document !== 'undefined') {
+    c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    plateScratch.set(key, c);
+  }
+  const g = c?.getContext('2d');
+  if (!c || !g) {
+    const dcap = Math.min(cap * (h / sh), w / 2);
+    sc.blit(img, 0, 0, cap, sh, x, y, dcap, h);
+    sc.blit(img, cap, 0, sw - cap * 2, sh, x + dcap, y, w - dcap * 2, h);
+    sc.blit(img, sw - cap, 0, cap, sh, x + w - dcap, y, dcap, h);
+    return;
+  }
+  const dcap = Math.min(cap, W / 2);
+  g.clearRect(0, 0, W, H);
+  g.imageSmoothingEnabled = false;
+  g.drawImage(img, 0, 0, cap, sh, 0, 0, dcap, H);
+  g.drawImage(img, cap, 0, sw - cap * 2, sh, dcap, 0, W - dcap * 2, H);
+  g.drawImage(img, sw - cap, 0, cap, sh, W - dcap, 0, dcap, H);
+  sc.blit(shined(c, star, Date.now() / 1000, phase), 0, 0, W, H, x, y, w, h);
 }
 
 /**
@@ -40,8 +65,7 @@ export function drawNameplate(sc: Screen, x: number, y: number, w: number, h: nu
     const url = plateUrl(plate.id);
     plateArt.load([url]);
     const img = plateArt.get(url);
-    // ☆3以上は光り方を重ねる（時刻で動かす）
-    if (img) drawPlateImage(sc, shined(img, plate.star, Date.now() / 1000, phaseOf(plate.id)) as HTMLImageElement, x, y, w, h);
+    if (img) drawPlateImage(sc, img, x, y, w, h, plate.star, phaseOf(plate.id));
     else sc.panel(x, y, w, h, p.bg, p.border);
     textCol = p.text;
     // 角の飾りにかからないよう、文字を内側から（☆4〜5は飾りが大きいので、さらに内側）
