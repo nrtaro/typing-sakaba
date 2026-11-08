@@ -38,7 +38,8 @@ const DRUM = { x: 76.5, y: 90.5, w: 89, h: 99.5 };
 // 看板娘はカウンターの奥に立つ（カウンターより下は描かない）。手が取っ手に届く位置
 const GIRL = { x: 155.5, y: 106, w: 82, h: 85 };
 const COUNTER_Y = 184;
-const CARD_CENTER = { x: 362, y: 108 };
+// 景品のカードは、右上のお金の札（y 6〜42）とカウンターの案内（y 199〜）の間に収める
+const CARD_CENTER = { x: 362, y: 121 };
 
 const ease = (p: number) => 1 - (1 - Math.max(0, Math.min(1, p))) ** 3;
 
@@ -182,14 +183,14 @@ function drawPurse(g: Game) {
   const x = 330;
   const y = 6;
   const w = 144;
-  sc.PR(x + 2, y + 2, w, 30, '#0c0604', 0.5);
-  sc.panel(x, y, w, 30, 'rgba(36,23,14,0.94)', '#a8743f');
+  sc.PR(x + 2, y + 2, w, 36, '#0c0604', 0.5);
+  sc.panel(x, y, w, 36, 'rgba(36,23,14,0.94)', '#a8743f');
   sc.T('貯金箱', x + 8, y + 4, 7, C.cream2);
   sc.TB(`${c.coins.toLocaleString()}円`, x + 8, y + 13, 11, C.gold3, 'left', C.ink);
   sc.T('おまけ札', x + 92, y + 4, 7, C.cream2);
   sc.TB(`${c.tickets}枚`, x + 92, y + 13, 11, '#a9f0e4', 'left', C.ink);
   const price = c.freeUsed ? `1回 ${PULL_PRICE.toLocaleString()}円` : '最初の1回は無料！';
-  sc.T(price, x + w - 6, y + 33, 7, c.freeUsed ? C.cream : '#ffb8d0', 'right');
+  sc.T(price, x + w - 6, y + 26.5, 7, c.freeUsed ? C.cream : '#ffb8d0', 'right');
 }
 
 function drawWelcome(g: Game) {
@@ -212,10 +213,10 @@ function drawCards(g: Game, a: number) {
   r.items.forEach((got, k) => {
     const it = itemById(got.id);
     if (!it) return;
-    const w = (n === 2 ? 104 : 132) * (0.6 + 0.4 * intro);
+    const w = (n === 2 ? 100 : 108) * (0.6 + 0.4 * intro);
     const h = w * (4 / 3);
-    const cx = n === 2 ? CARD_CENTER.x + (k === 0 ? -57 : 57) : CARD_CENTER.x;
-    drawCard(g, it, got, cx - w / 2, CARD_CENTER.y - h / 2 + 4, w, h, intro);
+    const cx = n === 2 ? CARD_CENTER.x + (k === 0 ? -55 : 55) : CARD_CENTER.x;
+    drawCard(g, it, got, cx - w / 2, CARD_CENTER.y - h / 2, w, h, intro);
   });
 }
 
