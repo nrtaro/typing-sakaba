@@ -9,6 +9,22 @@ const BASE = 261.63;
 /** 音量の段階（なし・小・中・大） */
 export const VOLUME_LEVELS = [0, 0.35, 0.65, 1];
 export const VOLUME_NAMES = ['なし', '小', '中', '大'];
+/** BGM・効果音・打鍵音の音量の初期値（0〜10。8 がこれまでの大きさ） */
+export const DEFAULT_PART = 8;
+
+/**
+ * 効果音ごとの大きさをそろえる係数（1 がもとの大きさ）。
+ * 測り方と測った値は docs/sfx-loudness.md。ふつうの効果音は同じくらいの大きさに、
+ * 大きな出来事（大物・開店の合図）は少し大きく、頻繁に鳴るもの（コンボ・残り時間の音）は少し控えめにする。
+ */
+export const FX_GAIN: Record<string, number> = {
+  miss: 2.0, select: 1.35, chord: 1.0, serve: 1.05, coin: 1.35, lack: 1.3, angry: 1.75, bell: 0.72,
+  tripStart: 0.8, tripReturn: 1.0, gain: 1.15, shot: 1.05, kill: 0.73, poison: 1.23, bite: 1.33, loss: 1.7,
+  count: 1.15, final: 1.35, tick: 2.3, stamp: 1.17, sparkle: 0.91, combo: 0.6,
+};
+
+/** 大きさをそろえる対象の効果音（測るときに使う） */
+export const FX_NAMES = ['miss', 'select', 'chord', 'serve', 'coin', 'lack', 'angry', 'bell', 'tripStart', 'tripReturn', 'gain', 'shot', 'kill', 'poison', 'bite', 'loss', 'count', 'final', 'tick', 'stamp', 'sparkle', 'combo'] as const;
 
 export type Track = 'title' | 'morning' | 'noon' | 'night' | 'fishing' | 'hunting' | 'gathering' | 'trading' | 'result';
 
@@ -100,6 +116,10 @@ export class Sound {
   static readonly SONGS = SONGS;
   private ac: AudioContext | null = null;
   private sfx: GainNode | null = null;
+  /** 打鍵音だけの出口（設定で効果音とは別に音量を変える） */
+  private keyBus: GainNode | null = null;
+  /** 効果音ごとの出口（大きさをそろえる係数 FX_GAIN をかける） */
+  private fxBus = new Map<string, GainNode>();
   private music: GainNode | null = null;
   private timer: number | null = null;
   private step = 0;
@@ -154,6 +174,9 @@ export class Sound {
     limit.attack.value = 0.002;
     limit.release.value = 0.2;
     this.sfx.connect(this.master);
+    this.keyBus = ac.createGain();
+    this.keyBus.connect(this.master);
+    this.fxBus.clear();
     this.music.connect(this.master);
     this.master.connect(limit).connect(ac.destination);
     const len = ac.sampleRate;
@@ -173,8 +196,11 @@ export class Sound {
     const t = this.ac.currentTime;
     // 段階ごとの音量。「大」は以前の約2.5倍
     const level = s.muted ? 0 : VOLUME_LEVELS[Math.max(0, Math.min(3, s.volume ?? 3))];
-    this.sfx.gain.setTargetAtTime(level * 1.0, t, 0.02);
-    this.music.gain.setTargetAtTime(level * 0.85, t, 0.05);
+    // 種類ごとの音量（0〜10。8 がこれまでの大きさ）
+    const part = (v: number | undefined) => Math.max(0, Math.min(10, v ?? DEFAULT_PART)) / DEFAULT_PART;
+    this.sfx.gain.setTargetAtTime(level * part(s.seLevel), t, 0.02);
+    this.keyBus?.gain.setTargetAtTime(level * part(s.keyLevel), t, 0.02);
+    this.music.gain.setTargetAtTime(level * 0.85 * part(s.bgmLevel), t, 0.05);
   }
 
   // ---------- 音の部品 ----------
@@ -228,6 +254,18 @@ export class Sound {
     return BASE * Math.pow(2, s / 12);
   }
 
+  /** 効果音ごとの出口。大きさをそろえる係数をかけてから、効果音の音量へつなぐ */
+  private fx(name: string): GainNode {
+    let g = this.fxBus.get(name);
+    if (!g) {
+      g = this.ac!.createGain();
+      g.gain.value = FX_GAIN[name] ?? 1;
+      g.connect(this.sfx!);
+      this.fxBus.set(name, g);
+    }
+    return g;
+  }
+
   private get now() {
     return this.ac?.currentTime ?? 0;
   }
@@ -247,14 +285,14 @@ export class Sound {
     if (v) {
       // 段階6：選んだ打鍵音。音の高さの上がり方は元の音と同じ
       const f = v.base * (this.note(step) / this.note(0));
-      this.tone(f, t, v.decay, v.wave, 0.05, this.sfx!);
-      if (v.partial) this.tone(f * v.partial, t, v.decay * 0.6, v.wave, 0.025, this.sfx!);
-      if (v.noise) this.noise(t, 0.03, v.noise, this.sfx!, 'bandpass', 2500);
+      this.tone(f, t, v.decay, v.wave, 0.05, this.keyBus!);
+      if (v.partial) this.tone(f * v.partial, t, v.decay * 0.6, v.wave, 0.025, this.keyBus!);
+      if (v.noise) this.noise(t, 0.03, v.noise, this.keyBus!, 'bandpass', 2500);
       return;
     }
     const f = this.note(step);
-    this.tone(f, t, 0.08, 'square', 0.05, this.sfx!);
-    this.tone(f * 2, t, 0.04, 'triangle', 0.035, this.sfx!);
+    this.tone(f, t, 0.08, 'square', 0.05, this.keyBus!);
+    this.tone(f * 2, t, 0.04, 'triangle', 0.035, this.keyBus!);
   }
 
   private keyVoice: KeyVoice | null = null;
@@ -266,23 +304,23 @@ export class Sound {
   miss() {
     if (!this.ok) return;
     const t = this.now;
-    this.tone(150, t, 0.12, 'sawtooth', 0.06, this.sfx!, 110);
-    this.noise(t, 0.05, 0.04, this.sfx!, 'lowpass', 900);
+    this.tone(150, t, 0.12, 'sawtooth', 0.06, this.fx('miss'), 110);
+    this.noise(t, 0.05, 0.04, this.fx('miss'), 'lowpass', 900);
   }
 
   /** メニューを選んだ */
   select() {
     if (!this.ok) return;
     const t = this.now;
-    this.tone(this.semi(19), t, 0.12, 'triangle', 0.06, this.sfx!);
-    this.tone(this.semi(24), t + 0.06, 0.18, 'triangle', 0.06, this.sfx!);
+    this.tone(this.semi(19), t, 0.12, 'triangle', 0.06, this.fx('select'));
+    this.tone(this.semi(24), t + 0.06, 0.18, 'triangle', 0.06, this.fx('select'));
   }
 
   /** 互換用の短い和音（level が高いほど高い） */
   chord(level: number) {
     if (!this.ok) return;
     const t = this.now;
-    [0, 2, 4].forEach((s, i) => this.tone(this.note(s + Math.min(level, 8)), t + i * 0.045, 0.22, 'square', 0.04, this.sfx!));
+    [0, 2, 4].forEach((s, i) => this.tone(this.note(s + Math.min(level, 8)), t + i * 0.045, 0.22, 'square', 0.04, this.fx('chord')));
   }
 
   // ---------- 店 ----------
@@ -291,34 +329,34 @@ export class Sound {
   serve() {
     if (!this.ok) return;
     const t = this.now;
-    this.tone(2350, t, 0.09, 'triangle', 0.05, this.sfx!);
-    this.tone(2490, t + 0.004, 0.07, 'triangle', 0.035, this.sfx!);
-    this.noise(t, 0.04, 0.05, this.sfx!, 'bandpass', 3200);
+    this.tone(2350, t, 0.09, 'triangle', 0.05, this.fx('serve'));
+    this.tone(2490, t + 0.004, 0.07, 'triangle', 0.035, this.fx('serve'));
+    this.noise(t, 0.04, 0.05, this.fx('serve'), 'bandpass', 3200);
     this.coin(t + 0.06);
   }
 
   coin(at?: number) {
     if (!this.ok) return;
     const t = at ?? this.now;
-    this.tone(1568, t, 0.05, 'square', 0.04, this.sfx!);
-    this.tone(2093, t + 0.05, 0.1, 'square', 0.04, this.sfx!);
+    this.tone(1568, t, 0.05, 'square', 0.04, this.fx('coin'));
+    this.tone(2093, t + 0.05, 0.1, 'square', 0.04, this.fx('coin'));
   }
 
   /** 素材が足りない：短いブザー2回 */
   lack() {
     if (!this.ok) return;
     const t = this.now;
-    this.tone(196, t, 0.08, 'square', 0.05, this.sfx!);
-    this.tone(196, t + 0.11, 0.08, 'square', 0.05, this.sfx!);
+    this.tone(196, t, 0.08, 'square', 0.05, this.fx('lack'));
+    this.tone(196, t + 0.11, 0.08, 'square', 0.05, this.fx('lack'));
   }
 
   /** 客が怒って帰った：低くうなる声と、足を踏み鳴らす音 */
   angry() {
     if (!this.ok) return;
     const t = this.now;
-    this.tone(240, t, 0.32, 'sawtooth', 0.05, this.sfx!, 120);
-    this.noise(t + 0.12, 0.08, 0.08, this.sfx!, 'lowpass', 300);
-    this.noise(t + 0.26, 0.08, 0.06, this.sfx!, 'lowpass', 300);
+    this.tone(240, t, 0.32, 'sawtooth', 0.05, this.fx('angry'), 120);
+    this.noise(t + 0.12, 0.08, 0.08, this.fx('angry'), 'lowpass', 300);
+    this.noise(t + 0.26, 0.08, 0.06, this.fx('angry'), 'lowpass', 300);
   }
 
   /** 互換用：失敗音 */
@@ -330,24 +368,24 @@ export class Sound {
   bell() {
     if (!this.ok) return;
     const t = this.now;
-    for (const [f, d] of [[880, 1.2], [1318, 0.9], [1760, 0.6]] as const) this.tone(f, t, d, 'sine', 0.035, this.sfx!);
+    for (const [f, d] of [[880, 1.2], [1318, 0.9], [1760, 0.6]] as const) this.tone(f, t, d, 'sine', 0.035, this.fx('bell'));
   }
 
   /** 調達に出かける：扉の鈴と足音 */
   tripStart() {
     if (!this.ok) return;
     const t = this.now;
-    this.tone(1318, t, 0.5, 'sine', 0.05, this.sfx!);
-    this.tone(1760, t + 0.07, 0.45, 'sine', 0.04, this.sfx!);
-    for (let i = 0; i < 3; i++) this.noise(t + 0.18 + i * 0.12, 0.05, 0.06, this.sfx!, 'lowpass', 500);
+    this.tone(1318, t, 0.5, 'sine', 0.05, this.fx('tripStart'));
+    this.tone(1760, t + 0.07, 0.45, 'sine', 0.04, this.fx('tripStart'));
+    for (let i = 0; i < 3; i++) this.noise(t + 0.18 + i * 0.12, 0.05, 0.06, this.fx('tripStart'), 'lowpass', 500);
   }
 
   /** 調達から帰った：明るく駆け上がる「ただいま」 */
   tripReturn() {
     if (!this.ok) return;
     const t = this.now;
-    [12, 16, 19, 24].forEach((s, i) => this.tone(this.semi(s), t + i * 0.07, 0.2, 'triangle', 0.05, this.sfx!));
-    this.tone(this.semi(28), t + 0.28, 0.35, 'sine', 0.04, this.sfx!);
+    [12, 16, 19, 24].forEach((s, i) => this.tone(this.semi(s), t + i * 0.07, 0.2, 'triangle', 0.05, this.fx('tripReturn')));
+    this.tone(this.semi(28), t + 0.28, 0.35, 'sine', 0.04, this.fx('tripReturn'));
   }
 
   // ---------- 調達 ----------
@@ -358,20 +396,20 @@ export class Sound {
     const t = this.now;
     if (kind === 'fishing') {
       // 水しぶき
-      this.noise(t, 0.25, 0.08, this.sfx!, 'bandpass', 1400);
-      this.tone(600, t, 0.18, 'sine', 0.05, this.sfx!, 1200);
+      this.noise(t, 0.25, 0.08, this.fx('gain'), 'bandpass', 1400);
+      this.tone(600, t, 0.18, 'sine', 0.05, this.fx('gain'), 1200);
     } else if (kind === 'hunting') {
       // 銃声：乾いた破裂と低い響き
-      this.noise(t, 0.12, 0.14, this.sfx!, 'lowpass', 2500);
-      this.tone(110, t, 0.18, 'sine', 0.1, this.sfx!, 50);
+      this.noise(t, 0.12, 0.14, this.fx('gain'), 'lowpass', 2500);
+      this.tone(110, t, 0.18, 'sine', 0.1, this.fx('gain'), 50);
     } else if (kind === 'gathering') {
       // 摘み取る「ぽん」
-      this.tone(420, t, 0.1, 'sine', 0.08, this.sfx!, 900);
-      this.tone(this.semi(24), t + 0.06, 0.12, 'triangle', 0.04, this.sfx!);
+      this.tone(420, t, 0.1, 'sine', 0.08, this.fx('gain'), 900);
+      this.tone(this.semi(24), t + 0.06, 0.12, 'triangle', 0.04, this.fx('gain'));
     } else {
       // 落札の木槌2回と硬貨
-      this.tone(330, t, 0.06, 'triangle', 0.09, this.sfx!);
-      this.tone(330, t + 0.1, 0.06, 'triangle', 0.09, this.sfx!);
+      this.tone(330, t, 0.06, 'triangle', 0.09, this.fx('gain'));
+      this.tone(330, t + 0.1, 0.06, 'triangle', 0.09, this.fx('gain'));
       this.coin(t + 0.18);
     }
   }
@@ -380,8 +418,8 @@ export class Sound {
   shot() {
     if (!this.ok) return;
     const t = this.now;
-    this.noise(t, 0.1, 0.12, this.sfx!, 'lowpass', 3000);
-    this.tone(160, t, 0.12, 'sine', 0.08, this.sfx!, 70);
+    this.noise(t, 0.1, 0.12, this.fx('shot'), 'lowpass', 3000);
+    this.tone(160, t, 0.12, 'sine', 0.08, this.fx('shot'), 70);
   }
 
   /** 仕留めた：小物は弾む音、大物は二連の銃声と重い響きとファンファーレ */
@@ -389,41 +427,41 @@ export class Sound {
     if (!this.ok) return;
     const t = this.now;
     if (!big) {
-      this.noise(t, 0.14, 0.16, this.sfx!, 'lowpass', 2600);
-      this.tone(130, t, 0.2, 'sine', 0.12, this.sfx!, 50);
-      [19, 24].forEach((s, i) => this.tone(this.semi(s), t + 0.06 + i * 0.06, 0.18, 'triangle', 0.05, this.sfx!));
+      this.noise(t, 0.14, 0.16, this.fx('kill'), 'lowpass', 2600);
+      this.tone(130, t, 0.2, 'sine', 0.12, this.fx('kill'), 50);
+      [19, 24].forEach((s, i) => this.tone(this.semi(s), t + 0.06 + i * 0.06, 0.18, 'triangle', 0.05, this.fx('kill')));
       return;
     }
     for (const d of [0, 0.12]) {
-      this.noise(t + d, 0.2, 0.2, this.sfx!, 'lowpass', 2200);
-      this.tone(110, t + d, 0.35, 'sine', 0.16, this.sfx!, 38);
+      this.noise(t + d, 0.2, 0.2, this.fx('kill'), 'lowpass', 2200);
+      this.tone(110, t + d, 0.35, 'sine', 0.16, this.fx('kill'), 38);
     }
-    this.noise(t + 0.15, 0.5, 0.06, this.sfx!, 'lowpass', 400);
-    [12, 16, 19, 24, 28].forEach((s, i) => this.tone(this.semi(s), t + 0.28 + i * 0.07, 0.32, 'square', 0.035, this.sfx!));
-    this.tone(this.semi(31), t + 0.65, 0.6, 'triangle', 0.05, this.sfx!);
+    this.noise(t + 0.15, 0.5, 0.06, this.fx('kill'), 'lowpass', 400);
+    [12, 16, 19, 24, 28].forEach((s, i) => this.tone(this.semi(s), t + 0.28 + i * 0.07, 0.32, 'square', 0.035, this.fx('kill')));
+    this.tone(this.semi(31), t + 0.65, 0.6, 'triangle', 0.05, this.fx('kill'));
   }
 
   /** 毒きのこを摘んだ：くぐもった「ぼふっ」 */
   poison() {
     if (!this.ok) return;
     const t = this.now;
-    this.noise(t, 0.25, 0.1, this.sfx!, 'lowpass', 600);
-    this.tone(200, t, 0.3, 'triangle', 0.06, this.sfx!, 90);
+    this.noise(t, 0.25, 0.1, this.fx('poison'), 'lowpass', 600);
+    this.tone(200, t, 0.3, 'triangle', 0.06, this.fx('poison'), 90);
   }
 
   /** 魚がかかった */
   bite() {
     if (!this.ok) return;
     const t = this.now;
-    this.tone(300, t, 0.12, 'sine', 0.08, this.sfx!, 700);
-    this.noise(t, 0.1, 0.05, this.sfx!, 'bandpass', 1800);
+    this.tone(300, t, 0.12, 'sine', 0.08, this.fx('bite'), 700);
+    this.noise(t, 0.1, 0.05, this.fx('bite'), 'bandpass', 1800);
   }
 
   /** 調達の失敗（逃げられた・取られた・毒） */
   loss() {
     if (!this.ok) return;
     const t = this.now;
-    this.tone(330, t, 0.2, 'triangle', 0.06, this.sfx!, 165);
+    this.tone(330, t, 0.2, 'triangle', 0.06, this.fx('loss'), 165);
   }
 
   // ---------- 結果画面 ----------
@@ -433,11 +471,11 @@ export class Sound {
     if (!this.ok) return;
     const t = this.now;
     if (n > 0) {
-      this.tone(this.semi(19), t, 0.16, 'square', 0.05, this.sfx!);
-      this.tone(this.semi(31), t, 0.08, 'triangle', 0.03, this.sfx!);
+      this.tone(this.semi(19), t, 0.16, 'square', 0.05, this.fx('count'));
+      this.tone(this.semi(31), t, 0.08, 'triangle', 0.03, this.fx('count'));
     } else {
-      [24, 28, 31, 36].forEach((s, i) => this.tone(this.semi(s), t + i * 0.03, 0.5, 'square', 0.04, this.sfx!));
-      this.noise(t, 0.08, 0.05, this.sfx!);
+      [24, 28, 31, 36].forEach((s, i) => this.tone(this.semi(s), t + i * 0.03, 0.5, 'square', 0.04, this.fx('count')));
+      this.noise(t, 0.08, 0.05, this.fx('count'));
     }
   }
 
@@ -451,29 +489,29 @@ export class Sound {
     if (!this.ok) return;
     const t = this.now;
     const s = 26 + (10 - n);
-    this.tone(this.semi(s), t, 0.09, 'square', 0.045, this.sfx!);
-    if (n <= 3) this.tone(this.semi(s + 12), t + 0.1, 0.09, 'square', 0.035, this.sfx!);
+    this.tone(this.semi(s), t, 0.09, 'square', 0.045, this.fx('final'));
+    if (n <= 3) this.tone(this.semi(s + 12), t + 0.1, 0.09, 'square', 0.035, this.fx('final'));
   }
 
   /** 売上を数える間のカチカチ音 */
   tick() {
     if (!this.ok) return;
-    this.tone(1800, this.now, 0.025, 'square', 0.025, this.sfx!);
+    this.tone(1800, this.now, 0.025, 'square', 0.025, this.fx('tick'));
   }
 
   /** ランクの判子を押す */
   stamp() {
     if (!this.ok) return;
     const t = this.now;
-    this.noise(t, 0.12, 0.12, this.sfx!, 'lowpass', 400);
-    this.tone(90, t, 0.2, 'sine', 0.12, this.sfx!, 50);
+    this.noise(t, 0.12, 0.12, this.fx('stamp'), 'lowpass', 400);
+    this.tone(90, t, 0.2, 'sine', 0.12, this.fx('stamp'), 50);
   }
 
   /** 自己ベスト更新のきらめき */
   sparkle() {
     if (!this.ok) return;
     const t = this.now;
-    [24, 28, 31, 36, 40].forEach((s, i) => this.tone(this.semi(s), t + i * 0.06, 0.3, 'triangle', 0.04, this.sfx!));
+    [24, 28, 31, 36, 40].forEach((s, i) => this.tone(this.semi(s), t + i * 0.06, 0.3, 'triangle', 0.04, this.fx('sparkle')));
   }
 
   /**
@@ -484,13 +522,13 @@ export class Sound {
     if (!this.ok) return;
     const t = this.now, fx = comboFx(count);
     const step = Math.max(0.026, 0.045 - fx.level * 0.002);
-    fx.notes.forEach((n, i) => this.tone(this.note(n), t + i * step, fx.level ? 0.22 : 0.12, fx.level >= 5 ? 'square' : 'triangle', fx.level >= 5 ? 0.032 : 0.05, this.sfx!));
+    fx.notes.forEach((n, i) => this.tone(this.note(n), t + i * step, fx.level ? 0.22 : 0.12, fx.level >= 5 ? 'square' : 'triangle', fx.level >= 5 ? 0.032 : 0.05, this.fx('combo')));
     const end = t + fx.notes.length * step;
-    if (fx.level >= 1) this.tone(this.note(fx.notes[fx.notes.length - 1] + 2), end, 0.3, 'sine', 0.04, this.sfx!);
-    if (fx.level >= 2) this.noise(t, 0.05, 0.025 + fx.level * 0.002, this.sfx!);
-    if (fx.level >= 4) [0, 2, 4].forEach((s) => this.tone(this.note(Math.min(fx.level, 6) + s), end, 0.4, 'sine', 0.022, this.sfx!));
-    if (fx.level >= 7) for (let i = 0; i < 4; i++) this.tone(this.note(10 + i * 2), end + 0.04 + i * 0.03, 0.12, 'square', 0.018, this.sfx!);
-    if (fx.max) [0, 2, 4, 5].forEach((s, i) => this.tone(this.note(8 + s), end + 0.12 + i * 0.02, 0.6, 'triangle', 0.028, this.sfx!));
+    if (fx.level >= 1) this.tone(this.note(fx.notes[fx.notes.length - 1] + 2), end, 0.3, 'sine', 0.04, this.fx('combo'));
+    if (fx.level >= 2) this.noise(t, 0.05, 0.025 + fx.level * 0.002, this.fx('combo'));
+    if (fx.level >= 4) [0, 2, 4].forEach((s) => this.tone(this.note(Math.min(fx.level, 6) + s), end, 0.4, 'sine', 0.022, this.fx('combo')));
+    if (fx.level >= 7) for (let i = 0; i < 4; i++) this.tone(this.note(10 + i * 2), end + 0.04 + i * 0.03, 0.12, 'square', 0.018, this.fx('combo'));
+    if (fx.max) [0, 2, 4, 5].forEach((s, i) => this.tone(this.note(8 + s), end + 0.12 + i * 0.02, 0.6, 'triangle', 0.028, this.fx('combo')));
   }
 
   // ---------- BGM ----------

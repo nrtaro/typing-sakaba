@@ -1,6 +1,7 @@
 import { ITEMS, LINKS, SERIES, PULL_PRICE, canPull, exchange, itemById, owns, pull, setEquip, type CollectionState, type Equip, type Kind, type PullResult } from '../core/collection';
 import { StickerArt, sheetUrl, stickerUrl } from './stickerArt';
 import { drawFukubiki, FUKUBIKI_ANIM } from './screens/fukubiki';
+import { drawSettings, SETTING_ROWS } from './screens/settings';
 import { readDecoration, type Decoration } from '../core/ranking';
 import { C } from './palette';
 import { Screen, LW } from './screen';
@@ -41,7 +42,7 @@ export type RecordsTab = 'achievements' | 'stickers' | 'decor';
 /** 飾りの欄：前の言葉・つなぎ・後ろの言葉・プレート・打鍵音 */
 export const DECOR_KEYS = ['front', 'link', 'back', 'plate', 'sound'] as const;
 const DECOR_ROWS: (Kind | 'link')[] = ['front', 'link', 'back', 'plate', 'sound'];
-export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki';
+export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki' | 'settings';
 export type PlayMode = 'normal' | 'daily';
 
 const TYPABLE = /^[a-z\-]$/;
@@ -89,6 +90,8 @@ export class Game {
   recordsView: { tab: RecordsTab; sel: number; reading: number | null; scroll: number; series: number; decorRow: number } | null = null;
   /** 段階6：コレクション（画面を開いたときと変えたときに読み直す） */
   collection: CollectionState | null = null;
+  /** 設定の画面：選んでいる欄 */
+  settingsView: { row: number } | null = null;
   readonly stickerArt = new StickerArt();
   /** ふくびきの画面：演出の経過秒・最後の結果・案内・交換の一覧 */
   fukubiki: { anim: number; last: PullResult | null; message: string; exchange: { sel: number } | null } | null = null;
@@ -201,7 +204,7 @@ export class Game {
           { text: 'らんきんぐ', kana: 'らんきんぐ', act: () => this.openRanking() },
           { text: 'きろく', kana: 'きろく', act: () => this.openRecords() },
           { text: 'ふくびき', kana: 'ふくびき', act: () => this.openFukubiki() },
-          { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
+          { text: 'せってい', kana: 'せってい', act: () => this.openSettings() },
         ];
       case 'help':
         // 遊び方の画面では、例の言葉を実際に打って試せる（打ち切ると演出が出て、また打てる）
@@ -246,6 +249,8 @@ export class Game {
           { text: 'シール', kana: 'しーる', act: () => this.setRecordsTab('stickers') },
           { text: 'かざり', kana: 'かざり', act: () => this.setRecordsTab('decor') },
         ];
+      case 'settings':
+        return [{ text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } }];
       case 'fukubiki':
         if (this.fukubiki?.exchange) return [{ text: 'もどる', kana: 'もどる', act: () => { this.fukubiki!.exchange = null; } }];
         return [
@@ -507,6 +512,39 @@ export class Game {
       this.applyKeyVoice();
       this.sound.key(1);
     }
+  }
+
+  // ---------- 設定 ----------
+
+  openSettings() {
+    this.settingsView = { row: 0 };
+    this.mode = 'settings';
+    this.menu.reset();
+  }
+
+  /** 設定の画面のキー：↑↓で欄、←→で音量 */
+  settingsKey(k: string) {
+    const v = this.settingsView;
+    if (!v) return;
+    if (k === 'ArrowUp' || k === 'ArrowDown') {
+      v.row = (v.row + (k === 'ArrowDown' ? 1 : SETTING_ROWS.length - 1)) % SETTING_ROWS.length;
+      this.sound.key(1);
+      return;
+    }
+    if (k !== 'ArrowLeft' && k !== 'ArrowRight') return;
+    const d = k === 'ArrowRight' ? 1 : -1;
+    const row = SETTING_ROWS[v.row];
+    const s = this.settings;
+    if (row.key === 'volume') {
+      const now = s.muted ? 0 : s.volume ?? 3;
+      s.volume = Math.max(0, Math.min(3, now + d));
+      s.muted = s.volume === 0;
+    } else s[row.key] = Math.max(0, Math.min(10, (s[row.key] ?? 8) + d));
+    this.store.saveSettings(s);
+    this.sound.apply(s);
+    // 変えた音をその場で鳴らして確かめる（BGM は流れている曲で確かめる）
+    if (row.key === 'keyLevel') this.sound.key(3);
+    else if (row.key !== 'bgmLevel') this.sound.select();
   }
 
   // ---------- ふくびき ----------
@@ -864,6 +902,11 @@ export class Game {
       this.fukubikiKey(k);
       return;
     }
+    if (this.mode === 'settings' && this.settingsView && k.startsWith('Arrow')) {
+      e.preventDefault();
+      this.settingsKey(k);
+      return;
+    }
     if (this.mode === 'records' && this.recordsView && (k.startsWith('Arrow') || k === 'Enter' || k === 'Tab' || (k === 'Escape' && this.recordsView.reading !== null))) {
       e.preventDefault();
       this.recordsKey(k);
@@ -1099,7 +1142,7 @@ export class Game {
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
   get overTavern() {
-    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'fukubiki';
+    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'fukubiki' || this.mode === 'settings';
   }
 
   // ---------- 描画 ----------
@@ -1173,6 +1216,7 @@ export class Game {
     else if (this.mode === 'ranking') drawRanking(this);
     else if (this.mode === 'records') drawRecords(this);
     else if (this.mode === 'fukubiki') drawFukubiki(this);
+    else if (this.mode === 'settings') drawSettings(this);
     else drawResult(this);
     if (this.mode === 'result') { if (this.t - this.resultAt > RESULT_READY - 0.3) drawResultMenu(this); }
     else drawMenu(this, this.mode === 'help' ? 210 : this.mode === 'difficulty' ? 170 : 172);

@@ -15,6 +15,10 @@ export interface Settings {
   muted: boolean;
   bgmVolume: number;
   seVolume: number;
+  /** 段階6：BGM・効果音・打鍵音の音量（0〜10。8 がこれまでの大きさ） */
+  bgmLevel: number;
+  seLevel: number;
+  keyLevel: number;
   /** 前回選んだ難易度（Enter で始めるときに使う） */
   difficulty: 'easy' | 'normal' | 'hard';
   /** 音量の段階（0=なし, 1=小, 2=中, 3=大） */
@@ -29,7 +33,7 @@ export interface Settings {
   rankingName: string;
 }
 
-export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '', tutorialDone: false };
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '', tutorialDone: false, bgmLevel: 8, seLevel: 8, keyLevel: 8 };
 
 export interface DayRecord {
   score: number;
