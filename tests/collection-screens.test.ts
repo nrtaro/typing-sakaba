@@ -90,7 +90,7 @@ describe('きろくのタブと飾り', () => {
     expect(g.recordsView!.tab).toBe('decor');
     g.recordsKey('Tab');
     expect(g.recordsView!.tab).toBe('achievements');
-    expect(g.menuItems().map((i) => i.kana)).toEqual(['もどる', 'じっせき', 'しーる', 'かざり']);
+    expect(g.menuItems().map((i) => i.kana)).toEqual(['もどる', 'じっせき', 'しーる', 'ぷろふぃーる']);
   });
 
   it('付けた飾りは保存され、読み直しても戻る。打鍵音を変えると音に伝える', () => {

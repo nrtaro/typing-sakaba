@@ -92,3 +92,20 @@ describe('Turnstile の確認つきの名前入力', () => {
     expect(remove).toHaveBeenCalledWith('w1');
   });
 });
+
+describe('名前入力の使い分け（プロフィール・ランキングに載せる）', () => {
+  it('見出し・説明・ボタンの文字を変えられる', () => {
+    openRankingName({ initialName: '', title: 'なまえ', note: 'ランキングに載せるときの名前です。', submitLabel: '決める（Enter）', onSubmit: vi.fn(), onClose: vi.fn() });
+    expect(document.querySelector('label')!.textContent).toContain('なまえ');
+    expect(document.querySelector('p')!.textContent).toContain('ランキングに載せるときの名前です。');
+    expect(document.querySelector('button[type="submit"]')!.textContent).toBe('決める（Enter）');
+  });
+  it('名前が決まっているときは書き換えられず、その名前で送る', () => {
+    const onSubmit = vi.fn();
+    openRankingName({ initialName: '店主', lockName: true, onSubmit, onClose: vi.fn() });
+    const input = document.querySelector('input')!;
+    expect(input.readOnly).toBe(true);
+    document.querySelector('form')!.requestSubmit();
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith('店主', null);
+  });
+});

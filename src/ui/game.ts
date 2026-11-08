@@ -42,6 +42,9 @@ export type RecordsTab = 'achievements' | 'stickers' | 'decor';
 /** 飾りの欄：前の言葉・つなぎ・後ろの言葉・プレート・打鍵音 */
 export const DECOR_KEYS = ['front', 'link', 'back', 'plate', 'sound'] as const;
 const DECOR_ROWS: (Kind | 'link')[] = ['front', 'link', 'back', 'plate', 'sound'];
+/** プロフィールの「名前」と「今日のランキングに反映」の欄の番号 */
+export const NAME_ROW = DECOR_ROWS.length;
+export const APPLY_ROW = DECOR_ROWS.length + 1;
 /** 飾りの一覧の列の数 */
 export const PICKER_COLS = 3;
 export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki' | 'settings';
@@ -253,7 +256,7 @@ export class Game {
           { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
           { text: 'じっせき', kana: 'じっせき', act: () => this.setRecordsTab('achievements') },
           { text: 'シール', kana: 'しーる', act: () => this.setRecordsTab('stickers') },
-          { text: 'かざり', kana: 'かざり', act: () => this.setRecordsTab('decor') },
+          { text: 'プロフィール', kana: 'ぷろふぃーる', act: () => this.setRecordsTab('decor') },
         ];
       case 'settings':
         return [{ text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } }];
@@ -269,8 +272,8 @@ export class Game {
       case 'result':
         return [
           ...(this.result?.daily && this.submission.state !== 'sent' ? [{
-            text: this.submission.state === 'sending' ? '送信中…' : this.submission.state === 'error' ? 'もういちど送る' : 'なまえをいれる',
-            kana: 'なまえ', act: () => this.openRankingName(),
+            text: this.submission.state === 'sending' ? '送信中…' : this.submission.state === 'error' ? 'もういちど送る' : '載せる',
+            kana: 'のせる', act: () => this.openRankingName(),
           }] : []),
           // ひがわりは同じお題でもう一度。日付が変わっていたら、新しいお題を見せてから
           { text: 'もういちど', kana: 'もういちど', act: () => (this.daily && this.daily.date !== jstDate() ? this.openDaily() : this.daily ? this.afterDaily() : this.start()) },
@@ -536,6 +539,24 @@ export class Game {
     } else this.sound.key(1);
   }
 
+  /** プロフィールで名前を決める・変える（ランキングに載せるときの名前） */
+  openProfileName() {
+    if (this.nameEntry) return;
+    this.nameEntry = openRankingName({
+      initialName: this.settings.rankingName,
+      title: 'なまえ',
+      note: 'ランキングに載せるときの名前です（1〜10文字）。',
+      submitLabel: '決める（Enter）',
+      onClose: () => { this.nameEntry = null; this.menu.reset(); this.sc.canvas.focus(); },
+      onSubmit: (name) => {
+        this.settings.rankingName = name;
+        this.store.saveSettings(this.settings);
+        this.decorMessage = `名前を「${name}」にしました`;
+        this.sound.select();
+      },
+    });
+  }
+
   /** 今の飾りを、今日のランキングに載っている自分の記録へ反映する */
   async applyDecorationToRanking() {
     this.decorMessage = 'ランキングに反映しています…';
@@ -707,10 +728,12 @@ export class Game {
     }
     if (v.tab === 'decor') {
       if (v.picker) { this.pickerKey(k); return; }
-      const rows = DECOR_ROWS.length + 1; // 最後の欄は「ランキングに反映」
+      // 飾りの欄のあとに「名前」と「今日のランキングに反映」
+      const rows = DECOR_ROWS.length + 2;
       if (k === 'ArrowUp' || k === 'ArrowDown') { v.decorRow = (v.decorRow + (k === 'ArrowDown' ? 1 : rows - 1)) % rows; this.sound.key(1); return; }
       if (k === 'Enter') {
-        if (v.decorRow === DECOR_ROWS.length) { void this.applyDecorationToRanking(); return; }
+        if (v.decorRow === NAME_ROW) { this.openProfileName(); return; }
+        if (v.decorRow === APPLY_ROW) { void this.applyDecorationToRanking(); return; }
         const opts = this.decorOptions(v.decorRow);
         const cur = (this.collection ?? this.store.loadCollection()).equip[DECOR_KEYS[v.decorRow]];
         v.picker = { row: v.decorRow, sel: Math.max(0, opts.indexOf(cur)) };
@@ -815,9 +838,16 @@ export class Game {
     this.rankingConfig ??= this.ranking.config();
     void this.rankingConfig.then((config) => {
       if (this.nameEntry !== pending || this.mode !== 'result') return;
+      const named = !!this.settings.rankingName;
       this.nameEntry = openRankingName({
         initialName: this.settings.rankingName,
         turnstile: config.turnstile,
+        title: 'ランキングに載せる',
+        // 名前はプロフィールで決める。まだ決めていなければ、ここで決めて載せられる
+        lockName: named,
+        note: named ? 'この名前と売上が、今日のランキングに公開されます。名前は「きろく」の「プロフィール」で変えられます。'
+          : '載せる名前を決めてください（1〜10文字）。名前と売上が公開されます。',
+        submitLabel: '載せる（Enter）',
         onClose: () => { this.nameEntry = null; this.menu.reset(); this.sc.canvas.focus(); },
         onSubmit: (name, token) => { void this.submitRanking(name, token); },
       });

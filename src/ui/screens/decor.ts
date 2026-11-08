@@ -1,8 +1,8 @@
-// 「きろく」の飾りタブ（段階6）：二つ名（前・つなぎ・後ろ）・プレート・打鍵音を選んで付ける。
-// 欄で Enter を押すと、持っている飾りの一覧から選べる。最後の欄でランキングに反映する
+// 「きろく」のプロフィールタブ：二つ名（前・つなぎ・後ろ）・プレート・打鍵音を選んで付け、名前を決める。
+// 飾りの欄で Enter を押すと、持っている飾りの一覧から選べる。最後の欄でランキングに反映する
 import { C } from '../palette';
 import type { Game } from '../game';
-import { DECOR_KEYS, PICKER_COLS } from '../game';
+import { APPLY_ROW, DECOR_KEYS, NAME_ROW, PICKER_COLS } from '../game';
 import { LINKS, itemById } from '../../core/collection';
 import { drawNameplate } from '../nameplate';
 import { STAR_COLOR } from './fukubiki';
@@ -30,25 +30,37 @@ export function drawDecor(g: Game) {
   sc.T('ランキングでの見え方', 22, 44, 7.5, C.cream2);
   drawNameplate(sc, 60, 58, 360, 18, g.settings.rankingName || '店主', g.currentDecoration(), 11);
   if ((e.front && !e.back) || (!e.front && e.back)) sc.T('前と後ろの言葉がそろうと二つ名になります', 240, 77, 6.5, '#ffb6a4', 'center');
-  // 下：欄
+  // 下：欄（飾りの5つ・名前・今日のランキングに反映）
   sc.panel(14, 88, 456, 120, 'rgba(36,23,14,0.95)', '#8a6232');
+  const rowY = (row: number) => 91 + row * 16;
   DECOR_KEYS.forEach((key, row) => {
-    const y = 92 + row * 18;
+    const y = rowY(row);
     const sel = row === v.decorRow;
-    if (sel) sc.PR(18, y - 2, 448, 17, '#4a2c1c');
-    if (sel) sc.T('▶', 22, y + 2.5, 8, C.gold3);
-    sc.T(LABEL[row], 34, y + 1.5, 9, sel ? C.gold3 : C.cream);
+    if (sel) sc.PR(18, y - 2, 448, 15, '#4a2c1c');
+    if (sel) sc.T('▶', 22, y + 2, 8, C.gold3);
+    sc.T(LABEL[row], 34, y + 1, 9, sel ? C.gold3 : C.cream);
     const { text, col } = nameOf(row, e[key]);
-    sc.T(sel ? `◀ ${text} ▶` : text, 270, y + 1, sc.fitSize(text, 10, 220, 7), col, 'center');
+    sc.T(sel ? `◀ ${text} ▶` : text, 270, y + 0.5, sc.fitSize(text, 10, 220, 7), col, 'center');
     const count = g.decorOptions(row).length - (key === 'link' ? 0 : 1);
-    sc.T(key === 'link' ? `${count}種類` : `${count}個持っている`, 460, y + 2.5, 7, C.cream2, 'right');
+    sc.T(key === 'link' ? `${count}種類` : `${count}個持っている`, 460, y + 2, 7, C.cream2, 'right');
   });
+  // 名前（Enter で変える）
+  const ny = rowY(NAME_ROW);
+  const nameSel = v.decorRow === NAME_ROW;
+  sc.PR(22, ny - 3, 440, 0.6, '#6b4422');
+  if (nameSel) sc.PR(18, ny - 2, 448, 15, '#4a2c1c');
+  if (nameSel) sc.T('▶', 22, ny + 2, 8, C.gold3);
+  sc.T('名前', 34, ny + 1, 9, nameSel ? C.gold3 : C.cream);
+  const nm = g.settings.rankingName;
+  sc.T(nm || '（まだ決めていません）', 270, ny + 0.5, sc.fitSize(nm || '（まだ決めていません）', 10, 220, 7), nm ? '#f2efe2' : '#a89a90', 'center');
+  sc.T('Enter で変える', 460, ny + 2, 7, C.cream2, 'right');
   // 最後の欄：ランキングに反映
-  const ay = 92 + DECOR_KEYS.length * 18 + 2;
-  const applySel = v.decorRow === DECOR_KEYS.length;
-  sc.panel(150, ay - 2, 180, 17, applySel ? '#ebc47e' : 'rgba(58,36,22,0.95)', applySel ? C.w : '#a8743f');
-  sc.T('今日のランキングに反映', 240, ay + 1.5, 9, applySel ? '#3a2414' : C.gold3, 'center');
+  const ay = rowY(APPLY_ROW) + 2;
+  const applySel = v.decorRow === APPLY_ROW;
+  sc.panel(150, ay - 2, 180, 15, applySel ? '#ebc47e' : 'rgba(58,36,22,0.95)', applySel ? C.w : '#a8743f');
+  sc.T('今日のランキングに反映', 240, ay + 0.5, 9, applySel ? '#3a2414' : C.gold3, 'center');
   const hint = g.decorMessage || (applySel ? 'Enter で、今日載っている自分の記録の飾りを今の飾りにします'
+    : nameSel ? 'Enter で、ランキングに載せるときの名前を決めます'
     : '↑↓で欄をえらぶ　←→で付け替える　Enter で一覧から選ぶ');
   sc.T(hint, 240, 211, sc.fitSize(hint, 7, 450, 5.5), g.decorMessage ? '#ffd98a' : C.cream2, 'center');
   if (v.picker) drawPicker(g);

@@ -148,7 +148,7 @@ export function drawRecords(g: Game) {
   if (view.reading !== null) drawReader(g, view.reading, view.scroll);
 }
 
-const TAB_TITLE = { achievements: '記録・実績', stickers: 'シール帳', decor: '飾り' } as const;
+const TAB_TITLE = { achievements: '記録・実績', stickers: 'シール帳', decor: 'プロフィール' } as const;
 
 /** 会話を読む画面：話者ごとに色を分け、長い会話は↑↓で送る */
 export function drawReader(g: Game, index: number, scroll: number) {

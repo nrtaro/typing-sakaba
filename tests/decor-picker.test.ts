@@ -69,7 +69,7 @@ describe('ランキングに反映', () => {
   it('「ランキングに反映」で Enter を押すと、今の飾りを今日の記録に送る', async () => {
     const { g, decorate } = game();
     g.setDecor({ front: 'f-nonbiri', link: 'no', back: 'b-minarai', plate: 'p-kinari' });
-    g.recordsView!.decorRow = 5;
+    g.recordsView!.decorRow = 6;
     g.recordsKey('Enter');
     await Promise.resolve(); await Promise.resolve();
     expect(decorate).toHaveBeenCalledWith(expect.any(String), g.store.playerId(), { titleFront: 'f-nonbiri', titleLink: 'no', titleBack: 'b-minarai', plate: 'p-kinari' });
@@ -78,12 +78,12 @@ describe('ランキングに反映', () => {
 
   it('まだ送っていない日は、その旨を伝える。通信できなければ理由を出す', async () => {
     const { g } = game(vi.fn(async () => ({ updated: 0 })));
-    g.recordsView!.decorRow = 5;
+    g.recordsView!.decorRow = 6;
     g.recordsKey('Enter');
     await Promise.resolve(); await Promise.resolve();
     expect(g.decorMessage).toContain('まだ');
     const bad = game(vi.fn(async () => { throw new Error('今はランキングにつながりません'); }));
-    bad.g.recordsView!.decorRow = 5;
+    bad.g.recordsView!.decorRow = 6;
     bad.g.recordsKey('Enter');
     await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
     expect(bad.g.decorMessage).toContain('つながりません');

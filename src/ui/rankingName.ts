@@ -6,6 +6,12 @@ interface NameOptions {
   /** Turnstile の公開キー。あるときは、確認が済むまで送信しない */
   turnstile?: string | null;
   onSubmit(name: string, token: string | null): void;
+  /** 見出し・説明・送るボタンの文字（省くとランキングの名前入力の文字） */
+  title?: string;
+  note?: string;
+  submitLabel?: string;
+  /** 名前を書き換えさせない（決まった名前で、ランキングに載せるかだけを決める） */
+  lockName?: boolean;
   onClose(): void;
   /** 動作確認用：Turnstile の読み込みを差し替える */
   loadTurnstile?: () => Promise<TurnstileApi>;
@@ -19,15 +25,15 @@ export function openRankingName(options: NameOptions, doc: Document = document) 
   const wrap = doc.createElement('div');
   wrap.setAttribute('role', 'dialog');
   wrap.setAttribute('aria-modal', 'true');
-  wrap.setAttribute('aria-label', 'ランキングのなまえ');
+  wrap.setAttribute('aria-label', options.title ?? 'ランキングのなまえ');
   wrap.style.cssText = "position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,10,8,.85);font-family:'DotGothic16','MS Gothic',monospace";
   const form = doc.createElement('form');
   form.style.cssText = 'width:340px;max-width:100%;padding:24px;border:3px solid #a8743f;border-radius:6px;background:#2a1a10;color:#f3dcb0;box-shadow:0 6px 0 #0c0604';
   const label = doc.createElement('label');
-  label.textContent = 'ランキングのなまえ';
+  label.textContent = options.title ?? 'ランキングのなまえ';
   label.style.cssText = 'display:block;color:#ffd98a;font-size:22px;line-height:1.5';
   const note = doc.createElement('p');
-  note.textContent = '1〜10文字。名前と売上が公開されます。';
+  note.textContent = options.note ?? '1〜10文字。名前と売上が公開されます。';
   // 送る前に、何が公開・保存されるかを確かめられるように
   const policy = doc.createElement('a');
   policy.href = './about.html#privacy';
@@ -43,7 +49,11 @@ export function openRankingName(options: NameOptions, doc: Document = document) 
   input.autocomplete = 'off';
   input.maxLength = 20; // UTF-16では絵文字が2文字になるため、最後にコードポイントで確認する。
   input.value = options.initialName;
-  input.style.cssText = 'display:block;box-sizing:border-box;width:100%;margin-top:12px;padding:10px;border:2px solid #c79a52;border-radius:3px;font:20px inherit;font-family:inherit;font-size:20px;background:#fff3d6;color:#2a1a10';
+  if (options.lockName) {
+    input.readOnly = true;
+    input.setAttribute('aria-readonly', 'true');
+  }
+  input.style.cssText = `display:block;box-sizing:border-box;width:100%;margin-top:12px;padding:10px;border:2px solid #c79a52;border-radius:3px;font:20px inherit;font-family:inherit;font-size:20px;background:${options.lockName ? '#e8d6b0' : '#fff3d6'};color:#2a1a10`;
   label.append(input);
   const error = doc.createElement('p');
   error.setAttribute('role', 'alert');
@@ -52,7 +62,7 @@ export function openRankingName(options: NameOptions, doc: Document = document) 
   actions.style.cssText = 'display:flex;gap:12px';
   const submit = doc.createElement('button');
   submit.type = 'submit';
-  submit.textContent = '送信する（Enter）';
+  submit.textContent = options.submitLabel ?? '送信する（Enter）';
   const cancel = doc.createElement('button');
   cancel.type = 'button';
   cancel.textContent = 'やめる（Esc）';
@@ -125,7 +135,8 @@ export function openRankingName(options: NameOptions, doc: Document = document) 
   });
   cancel.addEventListener('click', close);
   doc.body.append(wrap);
-  input.focus();
-  input.select();
+  // 名前が決まっているときは、そのまま Enter で送れるよう送るボタンに合わせる
+  if (options.lockName) submit.focus();
+  else { input.focus(); input.select(); }
   return { close };
 }

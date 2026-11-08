@@ -106,7 +106,7 @@ export function drawResult(g: Game) {
     const text = sent.receipt ? `今日${sent.receipt.rank}位 ／ ${sent.receipt.total}人中（自分のベスト）`
       : sent.state === 'sending' ? 'ランキングに送信中…'
       : sent.state === 'error' ? `${sent.message}（端末の記録は保存済み）`
-      : '名前を付けて、今日のランキングへ';
+      : g.settings.rankingName ? `この結果を今日のランキングに載せますか？（名前：${g.settings.rankingName}）` : 'この結果を今日のランキングに載せますか？';
     sc.T(text, LW / 2, 183, sc.fitSize(text, 9, LW - 24), sent.state === 'error' ? '#ffb6a4' : C.gold3, 'center');
   }
   // 新しく開いた実績（判子の右）
