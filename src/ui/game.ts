@@ -557,12 +557,13 @@ export class Game {
     });
   }
 
-  /** 今の飾りを、今日のランキングに載っている自分の記録へ反映する */
+  /** 今の飾りと名前を、今日のランキングに載っている自分の記録へ反映する */
   async applyDecorationToRanking() {
     this.decorMessage = 'ランキングに反映しています…';
     try {
-      const { updated } = await this.ranking.decorate(jstDate(), this.store.playerId(), this.currentDecoration());
-      this.decorMessage = updated > 0 ? 'ランキングの飾りを更新しました'
+      const name = this.settings.rankingName || undefined;
+      const { updated } = await this.ranking.decorate(jstDate(), this.store.playerId(), this.currentDecoration(), name);
+      this.decorMessage = updated > 0 ? (name ? 'ランキングの名前と飾りを更新しました' : 'ランキングの飾りを更新しました')
         : '今日はまだランキングに名前を送っていません（送ると、この飾りで載ります）';
       if (updated > 0) this.sound.chord(3);
     } catch (err) {

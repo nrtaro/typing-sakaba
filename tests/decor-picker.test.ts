@@ -72,7 +72,7 @@ describe('ランキングに反映', () => {
     g.recordsView!.decorRow = 6;
     g.recordsKey('Enter');
     await Promise.resolve(); await Promise.resolve();
-    expect(decorate).toHaveBeenCalledWith(expect.any(String), g.store.playerId(), { titleFront: 'f-nonbiri', titleLink: 'no', titleBack: 'b-minarai', plate: 'p-kinari' });
+    expect(decorate).toHaveBeenCalledWith(expect.any(String), g.store.playerId(), { titleFront: 'f-nonbiri', titleLink: 'no', titleBack: 'b-minarai', plate: 'p-kinari' }, undefined);
     expect(g.decorMessage).toContain('更新しました');
   });
 
@@ -101,5 +101,17 @@ describe('ふくびきで引いた打鍵音を試す', () => {
     g.onKey({ key: ' ', repeat: false, preventDefault() {}, ctrlKey: false, metaKey: false, altKey: false, isComposing: false } as unknown as KeyboardEvent);
     expect(setKeyVoice).toHaveBeenNthCalledWith(1, expect.objectContaining({ base: 1320 }));
     expect(setKeyVoice).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('反映で名前も替える', () => {
+  it('プロフィールの名前があれば、飾りと一緒に送る', async () => {
+    const { g, decorate } = game();
+    g.settings.rankingName = '看板娘';
+    g.recordsView!.decorRow = 6;
+    g.recordsKey('Enter');
+    await Promise.resolve(); await Promise.resolve();
+    expect(decorate).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.any(Object), '看板娘');
+    expect(g.decorMessage).toContain('名前と飾り');
   });
 });

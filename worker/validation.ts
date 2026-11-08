@@ -44,12 +44,18 @@ function numberIn(v: unknown, max: number, integer = true): v is number {
 
 /** 段階C：飾りだけの更新の入力。日付は記録の送信と同じく今日（0時すぎの少しは前日も） */
 export function validateDecorationUpdate(input: unknown, now = new Date()):
-  { ok: true; value: { date: string; player: string; decoration: Decoration } } | { ok: false; error: string } {
+  { ok: true; value: { date: string; player: string; decoration: Decoration; name: string | null } } | { ok: false; error: string } {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, error: '飾りを読み取れませんでした' };
   const v = input as Record<string, unknown>;
   if (!isBoardDate(v.date) || !submissionDate(v.date, now)) return { ok: false, error: 'この日のランキングは終了しました' };
   if (typeof v.player !== 'string' || !PLAYER_ID.test(v.player)) return { ok: false, error: '端末の情報を読み取れませんでした' };
-  return { ok: true, value: { date: v.date, player: v.player.toLowerCase(), decoration: readDecoration(v.decoration) } };
+  // 名前は送られたときだけ替える（送られなければ、載っている名前のまま）
+  let name: string | null = null;
+  if (v.name !== undefined && v.name !== null) {
+    name = normalizeRankingName(v.name);
+    if (!name) return { ok: false, error: '名前は1〜10文字で入力してください（使えない文字や言葉があります）' };
+  }
+  return { ok: true, value: { date: v.date, player: v.player.toLowerCase(), decoration: readDecoration(v.decoration), name } };
 }
 
 /** Worker の外でも同じ入力を確かめられる、保存や通信を行わない関数。 */

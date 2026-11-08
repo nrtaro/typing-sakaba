@@ -58,10 +58,11 @@ export class RankingClient {
     }
   }
 
-  /** 段階C：今日のランキングの自分の記録に、今の飾りを反映する（更新した件数が返る） */
-  decorate(date: string, player: string, decoration: Decoration): Promise<{ updated: number }> {
+  /** 段階C：今日のランキングの自分の記録に、今の飾り（と、渡したときは名前）を反映する（更新した件数が返る） */
+  decorate(date: string, player: string, decoration: Decoration, name?: string): Promise<{ updated: number }> {
+    const body = name ? { date, player, decoration, name } : { date, player, decoration };
     return this.request('/api/daily/decoration', (v: { updated: number }) => !!v && Number.isInteger(v.updated) && v.updated >= 0,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, player, decoration }) });
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   }
 
   submit(value: ScoreSubmission, turnstile: string | null = null): Promise<RankReceipt> {

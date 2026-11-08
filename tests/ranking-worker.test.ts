@@ -299,3 +299,28 @@ describe('飾りだけを更新する送り口（段階C）', () => {
     expect(last).toBe(429);
   });
 });
+
+describe('飾りと一緒に名前も替える（反映）', () => {
+  const deco = { titleFront: null, titleLink: null, titleBack: null, plate: 'p-kinari' };
+  const send = (body: unknown) => new Request('https://game.example/api/daily/decoration', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '192.0.2.10' }, body: JSON.stringify(body),
+  });
+  it('名前を送ると、今日の自分の記録の名前も替わる（点数はそのまま）', async () => {
+    const { db } = database();
+    const env = { DB: db, RANKING_IP_SALT: 'secret' };
+    await submitScore(db, score(1, 1000), 'ip', 1000);
+    const res = await worker.fetch(send({ date: jstDate(), player: player(1), decoration: deco, name: ' 新しい名前 ' }), env);
+    expect(await res.json()).toEqual({ updated: 1 });
+    expect((await readBoard(db, jstDate(), 'normal', null)).top[0]).toMatchObject({ name: '新しい名前', score: 1000 });
+  });
+  it('名前を送らなければ名前はそのまま。使えない名前は受け付けない', async () => {
+    const { db } = database();
+    const env = { DB: db, RANKING_IP_SALT: 'secret' };
+    await submitScore(db, score(2, 900), 'ip', 1000);
+    await worker.fetch(send({ date: jstDate(), player: player(2), decoration: deco }), env);
+    expect((await readBoard(db, jstDate(), 'normal', null)).top[0].name).toBe('店主2');
+    const bad = await worker.fetch(send({ date: jstDate(), player: player(2), decoration: deco, name: 'あ'.repeat(11) }), env);
+    expect(bad.status).toBe(400);
+    expect((await readBoard(db, jstDate(), 'normal', null)).top[0].name).toBe('店主2');
+  });
+});

@@ -79,7 +79,7 @@ export default {
         return json({ error: '今はランキングにつながりません。しばらくしてからお試しください' }, 503);
       }
     }
-    // 段階C：今日のランキングに載っている自分の記録の飾りだけを書き換える
+    // 段階C：今日のランキングに載っている自分の記録の飾り（と名前）を書き換える
     if (url.pathname === '/api/daily/decoration') {
       if (request.method !== 'POST') return json({ error: '使えない送信方法です' }, 405, { Allow: 'POST' });
       if (!env.DB || !env.RANKING_IP_SALT) return json({ error: 'ランキングは準備中です' }, 503);
@@ -93,7 +93,7 @@ export default {
       if (!checked.ok) return json({ error: checked.error }, 400);
       try {
         const hash = await ipHash(request.headers.get('CF-Connecting-IP') ?? 'local', env.RANKING_IP_SALT);
-        return json(await updateDecoration(env.DB, checked.value.date, checked.value.player, checked.value.decoration, hash));
+        return json(await updateDecoration(env.DB, checked.value.date, checked.value.player, checked.value.decoration, hash, undefined, checked.value.name));
       } catch (err) {
         if (err instanceof RateLimitError) return json({ error: err.message }, 429, { 'Retry-After': '600' });
         console.error('Daily ranking storage unavailable');

@@ -73,3 +73,13 @@ describe('飾りだけを更新する（段階C）', () => {
     expect(await client.decorate('2026-11-09', 'p', { titleFront: null, titleLink: null, titleBack: null, plate: 'p-kinari' })).toEqual({ updated: 1 });
   });
 });
+
+describe('反映で名前も送る', () => {
+  it('名前を渡すと一緒に送る', async () => {
+    const client = new RankingClient(async (_url, init) => {
+      expect(JSON.parse(String(init?.body))).toMatchObject({ name: '女将' });
+      return new Response('{"updated":1}');
+    });
+    expect(await client.decorate('2026-11-09', 'p', { titleFront: null, titleLink: null, titleBack: null, plate: null }, '女将')).toEqual({ updated: 1 });
+  });
+});

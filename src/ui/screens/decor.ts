@@ -59,7 +59,7 @@ export function drawDecor(g: Game) {
   const applySel = v.decorRow === APPLY_ROW;
   sc.panel(150, ay - 2, 180, 15, applySel ? '#ebc47e' : 'rgba(58,36,22,0.95)', applySel ? C.w : '#a8743f');
   sc.T('今日のランキングに反映', 240, ay + 0.5, 9, applySel ? '#3a2414' : C.gold3, 'center');
-  const hint = g.decorMessage || (applySel ? 'Enter で、今日載っている自分の記録の飾りを今の飾りにします'
+  const hint = g.decorMessage || (applySel ? 'Enter で、今日載っている自分の記録の名前と飾りを、今のものにします'
     : nameSel ? 'Enter で、ランキングに載せるときの名前を決めます'
     : '↑↓で欄をえらぶ　←→で付け替える　Enter で一覧から選ぶ');
   sc.T(hint, 240, 211, sc.fitSize(hint, 7, 450, 5.5), g.decorMessage ? '#ffd98a' : C.cream2, 'center');

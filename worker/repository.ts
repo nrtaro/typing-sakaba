@@ -98,10 +98,10 @@ export async function submitScore(db: D1Database, s: ScoreSubmission, ipHash: st
 }
 
 /**
- * 段階C：その日に載っている自分の記録（すべての難易度）の飾りだけを書き換える。点数・名前・順位は変えない。
+ * 段階C：その日に載っている自分の記録（すべての難易度）の飾りと、送られたときは名前を書き換える。点数・順位は変えない。
  * 回数制限は記録の送信と同じ枠で数える。書き換えた件数を返す（まだ送っていなければ 0）。
  */
-export async function updateDecoration(db: D1Database, date: string, player: string, decoration: Decoration, ipHash: string, now = Math.floor(Date.now() / 1000)): Promise<{ updated: number }> {
+export async function updateDecoration(db: D1Database, date: string, player: string, decoration: Decoration, ipHash: string, now = Math.floor(Date.now() / 1000), name: string | null = null): Promise<{ updated: number }> {
   const requestId = crypto.randomUUID();
   const cutoff = now - 600;
   const d = readDecoration(decoration);
@@ -112,9 +112,10 @@ export async function updateDecoration(db: D1Database, date: string, player: str
       WHERE (SELECT COUNT(*) FROM score_requests WHERE player = ? AND created_at > ?) < 10
         AND (SELECT COUNT(*) FROM score_requests WHERE ip_hash = ? AND created_at > ?) < 10`)
       .bind(requestId, player, ipHash, now, player, cutoff, ipHash, cutoff),
-    db.prepare(`UPDATE scores SET title_front = ?, title_link = ?, title_back = ?, plate = ?
+    // 名前が送られたときは名前も替える（null なら今の名前のまま）
+    db.prepare(`UPDATE scores SET title_front = ?, title_link = ?, title_back = ?, plate = ?, name = COALESCE(?, name)
       WHERE date = ? AND player = ? AND EXISTS (SELECT 1 FROM score_requests WHERE request_id = ?)`)
-      .bind(d.titleFront, d.titleLink, d.titleBack, d.plate, date, player, requestId),
+      .bind(d.titleFront, d.titleLink, d.titleBack, d.plate, name, date, player, requestId),
   ]);
   if (results[1].meta.changes !== 1) throw new RateLimitError();
   return { updated: Number(results[2].meta.changes) };
