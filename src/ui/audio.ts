@@ -28,7 +28,14 @@ export const FX_NAMES = ['miss', 'select', 'chord', 'serve', 'coin', 'lack', 'an
 export type Track = 'title' | 'morning' | 'noon' | 'night' | 'fishing' | 'hunting' | 'gathering' | 'trading' | 'result';
 
 const BGM_SAMPLE_RATE = 44100;
-const BGM_GAIN = 0.22;
+/**
+ * BGM・効果音・打鍵音の大きさの釣り合い（docs/sfx-loudness.md）。
+ * 音源の BGM は合成の効果音よりずっと大きく作られているので、BGM を下げ、効果音と打鍵音を上げる。
+ * 効果音が BGM より約 6dB 上、打鍵音が BGM より少し上に聞こえるようにする。
+ */
+const BGM_GAIN = 0.085;
+const SFX_GAIN = 2.0;
+const KEY_GAIN = 2.2;
 /**
  * 閉店前に曲を速める強さ。音源の再生では速さと一緒に音程も上がるので、頼まれた速さの3割だけ速める
  * （setRate(1.25) で 1.075 倍。音程は1音ほど上がる）。
@@ -131,8 +138,8 @@ export class Sound {
     const level = s.muted ? 0 : VOLUME_LEVELS[Math.max(0, Math.min(3, s.volume ?? 3))];
     // 種類ごとの音量（0〜10。8 がこれまでの大きさ）
     const part = (v: number | undefined) => Math.max(0, Math.min(10, v ?? DEFAULT_PART)) / DEFAULT_PART;
-    this.sfx.gain.setTargetAtTime(level * part(s.seLevel), t, 0.02);
-    this.keyBus?.gain.setTargetAtTime(level * part(s.keyLevel), t, 0.02);
+    this.sfx.gain.setTargetAtTime(level * SFX_GAIN * part(s.seLevel), t, 0.02);
+    this.keyBus?.gain.setTargetAtTime(level * KEY_GAIN * part(s.keyLevel), t, 0.02);
     this.music.gain.setTargetAtTime(level * BGM_GAIN * part(s.bgmLevel), t, 0.05);
   }
 
