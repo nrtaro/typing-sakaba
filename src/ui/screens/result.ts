@@ -1,5 +1,4 @@
 // 画面：result
-import { PULL_PRICE } from '../../core/collection';
 import { C } from '../palette';
 import { LW } from '../screen';
 import { dateLabel } from '../../core/daily';
@@ -125,17 +124,6 @@ export function drawResult(g: Game) {
       sc.T(name, x + 6, y + 15, sc.fitSize(name, 8, w - 12, 6), '#f2efe2', 'left', p);
     }
     sc.T('タイトルの「きろく」で会話が読めます', x + 6, y + 27, sc.fitSize('タイトルの「きろく」で会話が読めます', 6.5, w - 12, 5), C.cream2, 'left', p);
-  }
-  // 段階6：売上を貯金箱へ（実績のお知らせがあればその下）
-  if (r.credited && age > 2.6) {
-    const p = ease((age - 2.6) / 0.3);
-    const x = 334;
-    const y = r.unlocked?.length ? 112 : 72;
-    const w = 138;
-    const can = r.canPull ?? (r.coins ?? 0) >= PULL_PRICE;
-    const line = `本日の売上 ＋${r.credited.toLocaleString()}円 → 貯金箱`;
-    sc.TB(line, x + 4, y + 2.5, sc.fitSize(line, 7.5, w - 8, 5.5), '#f2efe2', 'left', C.ink, p);
-    if (can) sc.TB('ふくびきが引けます（タイトルの「ふくびき」）', x + 4, y + 12, sc.fitSize('ふくびきが引けます（タイトルの「ふくびき」）', 6.5, w - 8, 5), C.gold3, 'left', C.ink, p);
   }
   // 家族が見送る
   if (g.art) {
