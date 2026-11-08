@@ -642,6 +642,20 @@ export class Game {
     this.sound.key(1);
   }
 
+  /** 引いた打鍵音をその場で鳴らす（鳴らしたら付けている音に戻す）。打鍵音のカードがなければ false */
+  private previewCount = 0;
+  previewPulledSound(): boolean {
+    const f = this.fukubiki;
+    if (!f?.last || f.anim < FUKUBIKI_ANIM || f.exchange) return false;
+    const it = f.last.items.map((x) => itemById(x.id)).find((x) => x?.kind === 'sound');
+    if (!it?.sound) return false;
+    this.previewCount = (this.previewCount % 6) + 1;
+    this.sound.setKeyVoice(it.sound);
+    this.sound.key(this.previewCount);
+    this.applyKeyVoice();
+    return true;
+  }
+
   /** 交換できる飾り（まだ持っていないふくびきの飾り）。☆の高い順 */
   exchangeList() {
     const c = this.collection ?? this.store.loadCollection();
@@ -953,6 +967,8 @@ export class Game {
     // 記録・実績：↑↓でえらぶ、Enter で会話を開く／閉じる、会話の中は↑↓で送り、←→でほかの会話へ
     // ふくびき：Enter の押しっぱなし（キーの自動の繰り返し）では、引いたり交換したりしない
     if (this.mode === 'fukubiki' && k === 'Enter' && e.repeat) { e.preventDefault(); return; }
+    // ふくびき：打鍵音のカードが出ているときは、スペースでその音を試せる
+    if (this.mode === 'fukubiki' && k === ' ' && this.previewPulledSound()) { e.preventDefault(); return; }
     // ふくびき：演出中はキーで飛ばす。交換の一覧は↑↓・Enter・Esc
     if (this.mode === 'fukubiki' && this.fukubiki && (this.fukubiki.anim < FUKUBIKI_ANIM || (this.fukubiki.exchange && (k.startsWith('Arrow') || k === 'Enter' || k === 'Escape')))) {
       e.preventDefault();

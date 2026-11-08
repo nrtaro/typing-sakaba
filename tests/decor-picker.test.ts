@@ -89,3 +89,17 @@ describe('ランキングに反映', () => {
     expect(bad.g.decorMessage).toContain('つながりません');
   });
 });
+
+describe('ふくびきで引いた打鍵音を試す', () => {
+  it('打鍵音のカードが出ているときは、スペースでその音を鳴らし、付けている音に戻す', () => {
+    const { g, setKeyVoice } = game();
+    Object.assign(g, { artState: 'ready', nameEntry: null, lastInput: 0, clickHintAt: 0, resultAt: -99 });
+    g.openFukubiki();
+    g.fukubiki!.last = { state: g.store.loadCollection(), star: 2, items: [{ id: 'k-suzu', isNew: true, tickets: 0 }] };
+    g.fukubiki!.anim = 99;
+    setKeyVoice.mockClear();
+    g.onKey({ key: ' ', repeat: false, preventDefault() {}, ctrlKey: false, metaKey: false, altKey: false, isComposing: false } as unknown as KeyboardEvent);
+    expect(setKeyVoice).toHaveBeenNthCalledWith(1, expect.objectContaining({ base: 1320 }));
+    expect(setKeyVoice).toHaveBeenCalledTimes(2);
+  });
+});

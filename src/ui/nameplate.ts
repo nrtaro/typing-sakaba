@@ -2,7 +2,8 @@
 import type { Screen } from './screen';
 import type { Decoration } from '../core/ranking';
 import { itemById, titleText } from '../core/collection';
-import { StickerArt } from './stickerArt';
+import { StickerArt, phaseOf } from './stickerArt';
+import { shined } from './shine';
 
 /** 飾りの二つ名の文字列（そろっていなければ null） */
 export function titleOf(d: Decoration | undefined): string | null {
@@ -39,7 +40,8 @@ export function drawNameplate(sc: Screen, x: number, y: number, w: number, h: nu
     const url = plateUrl(plate.id);
     plateArt.load([url]);
     const img = plateArt.get(url);
-    if (img) drawPlateImage(sc, img, x, y, w, h);
+    // ☆3以上は光り方を重ねる（時刻で動かす）
+    if (img) drawPlateImage(sc, shined(img, plate.star, Date.now() / 1000, phaseOf(plate.id)) as HTMLImageElement, x, y, w, h);
     else sc.panel(x, y, w, h, p.bg, p.border);
     textCol = p.text;
     // 角の飾りにかからないよう、文字を内側から（☆4〜5は飾りが大きいので、さらに内側）
