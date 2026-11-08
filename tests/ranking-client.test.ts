@@ -61,3 +61,15 @@ describe('ランキング通信の飾り（段階6）', () => {
     expect(got.top[1].decoration).toBeUndefined();
   });
 });
+
+describe('飾りだけを更新する（段階C）', () => {
+  it('日付・端末ID・飾りを送り、更新した件数を受け取る', async () => {
+    const client = new RankingClient(async (url, init) => {
+      expect(String(url)).toBe('/api/daily/decoration');
+      expect(init?.method).toBe('POST');
+      expect(JSON.parse(String(init?.body))).toEqual({ date: '2026-11-09', player: 'p', decoration: { titleFront: null, titleLink: null, titleBack: null, plate: 'p-kinari' } });
+      return new Response('{"updated":1}');
+    });
+    expect(await client.decorate('2026-11-09', 'p', { titleFront: null, titleLink: null, titleBack: null, plate: 'p-kinari' })).toEqual({ updated: 1 });
+  });
+});

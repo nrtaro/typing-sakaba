@@ -1,7 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { PLAYER_ID } from '../src/core/ranking';
-import { readBoard, readBoards, submitScore, RateLimitError } from './repository';
-import { isBoardDate, isDifficulty, validateSubmission } from './validation';
+import { readBoard, readBoards, submitScore, updateDecoration, RateLimitError } from './repository';
+import { isBoardDate, isDifficulty, validateDecorationUpdate, validateSubmission } from './validation';
 import { verifyPlay } from './verify';
 import { checkTurnstile } from './turnstile';
 
@@ -75,6 +75,27 @@ export default {
       try {
         return json(await readBoards(env.DB, date, player?.toLowerCase() ?? null));
       } catch {
+        console.error('Daily ranking storage unavailable');
+        return json({ error: '今はランキングにつながりません。しばらくしてからお試しください' }, 503);
+      }
+    }
+    // 段階C：今日のランキングに載っている自分の記録の飾りだけを書き換える
+    if (url.pathname === '/api/daily/decoration') {
+      if (request.method !== 'POST') return json({ error: '使えない送信方法です' }, 405, { Allow: 'POST' });
+      if (!env.DB || !env.RANKING_IP_SALT) return json({ error: 'ランキングは準備中です' }, 503);
+      const origin = request.headers.get('Origin');
+      if ((origin !== null && origin !== url.origin) || request.headers.get('Sec-Fetch-Site') === 'cross-site') return json({ error: 'ゲームの画面から送信してください' }, 403);
+      if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json') return json({ error: '飾りを読み取れませんでした' }, 415);
+      let input: unknown;
+      try { input = await readJson(request); }
+      catch (err) { return json({ error: err instanceof BodyTooLarge ? '送信する内容が大きすぎます' : '飾りを読み取れませんでした' }, err instanceof BodyTooLarge ? 413 : 400); }
+      const checked = validateDecorationUpdate(input);
+      if (!checked.ok) return json({ error: checked.error }, 400);
+      try {
+        const hash = await ipHash(request.headers.get('CF-Connecting-IP') ?? 'local', env.RANKING_IP_SALT);
+        return json(await updateDecoration(env.DB, checked.value.date, checked.value.player, checked.value.decoration, hash));
+      } catch (err) {
+        if (err instanceof RateLimitError) return json({ error: err.message }, 429, { 'Retry-After': '600' });
         console.error('Daily ranking storage unavailable');
         return json({ error: '今はランキングにつながりません。しばらくしてからお試しください' }, 503);
       }

@@ -1,4 +1,4 @@
-import { decorationOrNone, readDecoration, type DailyBoard, type RankReceipt, type ScoreSubmission } from '../core/ranking';
+import { decorationOrNone, readDecoration, type Decoration, type DailyBoard, type RankReceipt, type ScoreSubmission } from '../core/ranking';
 import type { DifficultyId } from '../core/shopConfig';
 
 const OFFLINE = '今はランキングにつながりません。しばらくしてからお試しください';
@@ -56,6 +56,12 @@ export class RankingClient {
     } catch {
       return { turnstile: null };
     }
+  }
+
+  /** 段階C：今日のランキングの自分の記録に、今の飾りを反映する（更新した件数が返る） */
+  decorate(date: string, player: string, decoration: Decoration): Promise<{ updated: number }> {
+    return this.request('/api/daily/decoration', (v: { updated: number }) => !!v && Number.isInteger(v.updated) && v.updated >= 0,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date, player, decoration }) });
   }
 
   submit(value: ScoreSubmission, turnstile: string | null = null): Promise<RankReceipt> {

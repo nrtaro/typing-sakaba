@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { decorationOrNone, readDecoration, type DailyBoard, type RankedScore, type RankReceipt, type ScoreSubmission } from '../src/core/ranking';
+import { decorationOrNone, readDecoration, type Decoration, type DailyBoard, type RankedScore, type RankReceipt, type ScoreSubmission } from '../src/core/ranking';
 import type { DifficultyId } from '../src/core/shopConfig';
 
 export class RateLimitError extends Error {
@@ -87,8 +87,35 @@ export async function submitScore(db: D1Database, s: ScoreSubmission, ipHash: st
       .bind(s.date, s.difficulty, s.name, s.score, s.served, s.maxCombo, s.angry, s.accuracy, s.kps, s.player, ipHash, now,
         s.seed, s.record, s.prep ? JSON.stringify(s.prep) : null,
         ...decorationArgs(s), requestId),
+    // 段階C：自己ベストを超えない送信でも、飾りだけは送った時点のものにする
+    db.prepare(`UPDATE scores SET title_front = ?, title_link = ?, title_back = ?, plate = ?
+      WHERE date = ? AND difficulty = ? AND player = ? AND EXISTS (SELECT 1 FROM score_requests WHERE request_id = ?)`)
+      .bind(...decorationArgs(s), s.date, s.difficulty, s.player, requestId),
     myRank(db, s.date, s.difficulty, s.player), totalPlayers(db, s.date, s.difficulty),
   ]);
   if (results[1].meta.changes !== 1) throw new RateLimitError();
-  return { rank: Number(results[3].results[0].rank), total: Number(results[4].results[0].total) };
+  return { rank: Number(results[4].results[0].rank), total: Number(results[5].results[0].total) };
+}
+
+/**
+ * 段階C：その日に載っている自分の記録（すべての難易度）の飾りだけを書き換える。点数・名前・順位は変えない。
+ * 回数制限は記録の送信と同じ枠で数える。書き換えた件数を返す（まだ送っていなければ 0）。
+ */
+export async function updateDecoration(db: D1Database, date: string, player: string, decoration: Decoration, ipHash: string, now = Math.floor(Date.now() / 1000)): Promise<{ updated: number }> {
+  const requestId = crypto.randomUUID();
+  const cutoff = now - 600;
+  const d = readDecoration(decoration);
+  const results = await db.batch<Record<string, unknown>>([
+    db.prepare('DELETE FROM score_requests WHERE created_at <= ?').bind(cutoff),
+    db.prepare(`INSERT INTO score_requests (request_id, player, ip_hash, created_at)
+      SELECT ?, ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM score_requests WHERE player = ? AND created_at > ?) < 10
+        AND (SELECT COUNT(*) FROM score_requests WHERE ip_hash = ? AND created_at > ?) < 10`)
+      .bind(requestId, player, ipHash, now, player, cutoff, ipHash, cutoff),
+    db.prepare(`UPDATE scores SET title_front = ?, title_link = ?, title_back = ?, plate = ?
+      WHERE date = ? AND player = ? AND EXISTS (SELECT 1 FROM score_requests WHERE request_id = ?)`)
+      .bind(d.titleFront, d.titleLink, d.titleBack, d.plate, date, player, requestId),
+  ]);
+  if (results[1].meta.changes !== 1) throw new RateLimitError();
+  return { updated: Number(results[2].meta.changes) };
 }

@@ -42,6 +42,8 @@ export type RecordsTab = 'achievements' | 'stickers' | 'decor';
 /** 飾りの欄：前の言葉・つなぎ・後ろの言葉・プレート・打鍵音 */
 export const DECOR_KEYS = ['front', 'link', 'back', 'plate', 'sound'] as const;
 const DECOR_ROWS: (Kind | 'link')[] = ['front', 'link', 'back', 'plate', 'sound'];
+/** 飾りの一覧の列の数 */
+export const PICKER_COLS = 3;
 export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki' | 'settings';
 export type PlayMode = 'normal' | 'daily';
 
@@ -87,7 +89,11 @@ export class Game {
   result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord; unlocked: string[]; credited?: number; coins?: number; canPull?: boolean }) | null = null;
   /** 記録・実績の画面で見ている記録と、選んでいる実績・読んでいる会話 */
   records: Records | null = null;
-  recordsView: { tab: RecordsTab; sel: number; reading: number | null; scroll: number; series: number; decorRow: number } | null = null;
+  recordsView: { tab: RecordsTab; sel: number; reading: number | null; scroll: number; series: number; decorRow: number;
+    /** 飾りの一覧（欄で Enter を押すと開く） */
+    picker: { row: number; sel: number } | null } | null = null;
+  /** 飾りタブの案内（ランキングへの反映の結果など） */
+  decorMessage = '';
   /** 段階6：コレクション（画面を開いたときと変えたときに読み直す） */
   collection: CollectionState | null = null;
   /** 設定の画面：選んでいる欄 */
@@ -466,7 +472,8 @@ export class Game {
     this.records = this.store.loadRecords();
     const r = this.records;
     const unread = ACHIEVEMENTS.findIndex((a) => r.unlocked[a.id] && !r.read.includes(a.id));
-    this.recordsView = { tab: 'achievements', sel: Math.max(0, unread), reading: null, scroll: 0, series: 0, decorRow: 0 };
+    this.recordsView = { tab: 'achievements', sel: Math.max(0, unread), reading: null, scroll: 0, series: 0, decorRow: 0, picker: null };
+    this.decorMessage = '';
     this.refreshCollection();
     this.mode = 'records';
     this.menu.reset();
@@ -502,6 +509,45 @@ export class Game {
     const c = this.collection ?? this.store.loadCollection();
     const u = this.records?.unlocked ?? {};
     return [null, ...ITEMS.filter((i) => i.kind === kind && owns(c, u, i.id)).map((i) => i.id)];
+  }
+
+  /** 飾りの一覧のキー：←→で1つ、↑↓で1段（3つ）動く。Enter で付けて閉じる、Esc で閉じる */
+  pickerKey(k: string) {
+    const v = this.recordsView!;
+    const p = v.picker!;
+    const opts = this.decorOptions(p.row);
+    if (k === 'Escape') { v.picker = null; this.applyKeyVoice(); this.sound.select(); return; }
+    if (k === 'Enter') {
+      this.setDecor({ [DECOR_KEYS[p.row]]: opts[p.sel] ?? null } as Partial<Equip>);
+      v.picker = null;
+      if (DECOR_KEYS[p.row] !== 'sound') this.sound.select();
+      return;
+    }
+    const step = k === 'ArrowRight' ? 1 : k === 'ArrowLeft' ? -1 : k === 'ArrowDown' ? PICKER_COLS : k === 'ArrowUp' ? -PICKER_COLS : 0;
+    if (!step) return;
+    const next = Math.max(0, Math.min(opts.length - 1, p.sel + step));
+    if (next === p.sel) return;
+    p.sel = next;
+    // 打鍵音の一覧では、選んでいる音でその場で鳴らす（閉じたら付けている音に戻す）
+    const id = opts[next];
+    if (DECOR_KEYS[p.row] === 'sound') {
+      this.sound.setKeyVoice(id ? itemById(id)?.sound ?? null : null);
+      this.sound.key(3);
+    } else this.sound.key(1);
+  }
+
+  /** 今の飾りを、今日のランキングに載っている自分の記録へ反映する */
+  async applyDecorationToRanking() {
+    this.decorMessage = 'ランキングに反映しています…';
+    try {
+      const { updated } = await this.ranking.decorate(jstDate(), this.store.playerId(), this.currentDecoration());
+      this.decorMessage = updated > 0 ? 'ランキングの飾りを更新しました'
+        : '今日はまだランキングに名前を送っていません（送ると、この飾りで載ります）';
+      if (updated > 0) this.sound.chord(3);
+    } catch (err) {
+      this.decorMessage = err instanceof Error ? err.message : '今はランキングにつながりません';
+      this.sound.miss();
+    }
   }
 
   /** 飾りを付け替えて保存する（持っていないものは付かない） */
@@ -632,7 +678,18 @@ export class Game {
       return;
     }
     if (v.tab === 'decor') {
-      if (k === 'ArrowUp' || k === 'ArrowDown') { v.decorRow = (v.decorRow + (k === 'ArrowDown' ? 1 : DECOR_ROWS.length - 1)) % DECOR_ROWS.length; this.sound.key(1); return; }
+      if (v.picker) { this.pickerKey(k); return; }
+      const rows = DECOR_ROWS.length + 1; // 最後の欄は「ランキングに反映」
+      if (k === 'ArrowUp' || k === 'ArrowDown') { v.decorRow = (v.decorRow + (k === 'ArrowDown' ? 1 : rows - 1)) % rows; this.sound.key(1); return; }
+      if (k === 'Enter') {
+        if (v.decorRow === DECOR_ROWS.length) { void this.applyDecorationToRanking(); return; }
+        const opts = this.decorOptions(v.decorRow);
+        const cur = (this.collection ?? this.store.loadCollection()).equip[DECOR_KEYS[v.decorRow]];
+        v.picker = { row: v.decorRow, sel: Math.max(0, opts.indexOf(cur)) };
+        this.sound.select();
+        return;
+      }
+      if (v.decorRow >= DECOR_ROWS.length) return;
       if (k === 'ArrowLeft' || k === 'ArrowRight') {
         const opts = this.decorOptions(v.decorRow);
         const key = DECOR_KEYS[v.decorRow];
@@ -907,7 +964,7 @@ export class Game {
       this.settingsKey(k);
       return;
     }
-    if (this.mode === 'records' && this.recordsView && (k.startsWith('Arrow') || k === 'Enter' || k === 'Tab' || (k === 'Escape' && this.recordsView.reading !== null))) {
+    if (this.mode === 'records' && this.recordsView && (k.startsWith('Arrow') || k === 'Enter' || k === 'Tab' || (k === 'Escape' && (this.recordsView.reading !== null || this.recordsView.picker !== null)))) {
       e.preventDefault();
       this.recordsKey(k);
       return;

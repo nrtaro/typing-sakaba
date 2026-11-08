@@ -244,18 +244,58 @@ describe('3つの難易度の順位表をまとめて読む', () => {
 
 describe('ランキングの飾り（段階6）', () => {
   const deco = { titleFront: 'f-nonbiri', titleLink: 'no', titleBack: 'b-minarai', plate: 'p-kinari' };
-  it('自己ベストと一緒に飾りを残し、上位で返す。下がった再送信では変えない', async () => {
+  it('自己ベストと一緒に飾りを残し、上位で返す。下がった再送信でも飾りだけは最新にする', async () => {
     const { db } = database();
     await submitScore(db, { ...score(1, 1000), decoration: deco }, 'ip', 1000);
     expect((await readBoard(db, jstDate(), 'normal', null)).top[0]).toEqual({ rank: 1, name: '店主1', score: 1000, decoration: deco });
-    await submitScore(db, { ...score(1, 500), decoration: { ...deco, plate: 'p-sorairo' } }, 'ip', 1001);
-    expect((await readBoard(db, jstDate(), 'normal', null)).top[0].decoration).toEqual(deco);
-    await submitScore(db, { ...score(1, 1500), decoration: { ...deco, plate: 'p-sorairo' } }, 'ip', 1002);
-    expect((await readBoard(db, jstDate(), 'normal', null)).top[0].decoration?.plate).toBe('p-sorairo');
+    // 段階C：自己ベストを超えない送信でも、飾りは最新にする（点数と名前はそのまま）
+    await submitScore(db, { ...score(1, 500), name: '別名', decoration: { ...deco, plate: 'p-sorairo' } }, 'ip', 1001);
+    const after = (await readBoard(db, jstDate(), 'normal', null)).top[0];
+    expect(after).toMatchObject({ name: '店主1', score: 1000 });
+    expect(after.decoration?.plate).toBe('p-sorairo');
   });
   it('飾りのない行は decoration を付けない', async () => {
     const { db } = database();
     await submitScore(db, score(2, 800), 'ip', 1000);
     expect((await readBoard(db, jstDate(), 'normal', null)).top[0]).toEqual({ rank: 1, name: '店主2', score: 800 });
+  });
+});
+
+describe('飾りだけを更新する送り口（段階C）', () => {
+  const deco = { titleFront: 'f-nonbiri', titleLink: 'no', titleBack: 'b-minarai', plate: 'p-kinari' };
+  const send = (body: unknown, headers: Record<string, string> = {}) => new Request('https://game.example/api/daily/decoration', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '192.0.2.9', ...headers }, body: JSON.stringify(body),
+  });
+  it('今日の自分の記録（全難易度）の飾りだけを書き換え、点数は変えない', async () => {
+    const { db } = database();
+    const env = { DB: db, RANKING_IP_SALT: 'secret' };
+    await submitScore(db, score(1, 1000), 'ip', 1000);
+    await submitScore(db, { ...score(1, 700), difficulty: 'hard' }, 'ip', 1001);
+    await submitScore(db, score(2, 900), 'ip', 1002);
+    const res = await worker.fetch(send({ date: jstDate(), player: player(1), decoration: deco }), env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ updated: 2 });
+    const normal = (await readBoard(db, jstDate(), 'normal', null)).top;
+    expect(normal.find((r) => r.name === '店主1')).toEqual({ rank: 1, name: '店主1', score: 1000, decoration: deco });
+    expect(normal.find((r) => r.name === '店主2')!.decoration).toBeUndefined();
+  });
+  it('まだ送っていなければ 0 件。知らない飾りは捨てる', async () => {
+    const { db } = database();
+    const env = { DB: db, RANKING_IP_SALT: 'secret' };
+    expect(await (await worker.fetch(send({ date: jstDate(), player: player(3), decoration: deco }), env)).json()).toEqual({ updated: 0 });
+    await submitScore(db, score(3, 100), 'ip', 1000);
+    await worker.fetch(send({ date: jstDate(), player: player(3), decoration: { ...deco, plate: 'p-zzz', titleFront: 'f-zzz' } }), env);
+    expect((await readBoard(db, jstDate(), 'normal', null)).top[0].decoration).toBeUndefined();
+  });
+  it('日付・端末の情報・送り元を確かめ、回数を制限する', async () => {
+    const { db } = database();
+    const env = { DB: db, RANKING_IP_SALT: 'secret' };
+    expect((await worker.fetch(send({ date: '2020-01-01', player: player(1), decoration: deco }), env)).status).toBe(400);
+    expect((await worker.fetch(send({ date: jstDate(), player: 'x', decoration: deco }), env)).status).toBe(400);
+    expect((await worker.fetch(send({ date: jstDate(), player: player(1), decoration: deco }, { Origin: 'https://evil.example' }), env)).status).toBe(403);
+    expect((await worker.fetch(new Request('https://game.example/api/daily/decoration'), env)).status).toBe(405);
+    let last = 0;
+    for (let i = 0; i < 12; i++) last = (await worker.fetch(send({ date: jstDate(), player: player(4), decoration: deco }), env)).status;
+    expect(last).toBe(429);
   });
 });

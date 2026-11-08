@@ -1,5 +1,5 @@
 import { BANQUET_MULT, HIDEN_MULT, dailyConditions, jstDate, rulesFor } from '../src/core/daily';
-import { normalizeRankingName, PLAYER_ID, readDecoration, RECORD_FORMAT, RECORD_MAX, type ScoreSubmission } from '../src/core/ranking';
+import { normalizeRankingName, PLAYER_ID, readDecoration, type Decoration, RECORD_FORMAT, RECORD_MAX, type ScoreSubmission } from '../src/core/ranking';
 import { DISHES, INGREDIENT_ORDER, SHOP, type DifficultyId, type IngredientId } from '../src/core/shopConfig';
 
 const SCORE_LIMIT: Record<DifficultyId, number> = { easy: 60000, normal: 100000, hard: 120000 };
@@ -40,6 +40,16 @@ type Validation = { ok: true; value: ScoreSubmission } | { ok: false; error: str
 const invalid = (error: string): Validation => ({ ok: false, error });
 function numberIn(v: unknown, max: number, integer = true): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max && (!integer || Number.isInteger(v));
+}
+
+/** 段階C：飾りだけの更新の入力。日付は記録の送信と同じく今日（0時すぎの少しは前日も） */
+export function validateDecorationUpdate(input: unknown, now = new Date()):
+  { ok: true; value: { date: string; player: string; decoration: Decoration } } | { ok: false; error: string } {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, error: '飾りを読み取れませんでした' };
+  const v = input as Record<string, unknown>;
+  if (!isBoardDate(v.date) || !submissionDate(v.date, now)) return { ok: false, error: 'この日のランキングは終了しました' };
+  if (typeof v.player !== 'string' || !PLAYER_ID.test(v.player)) return { ok: false, error: '端末の情報を読み取れませんでした' };
+  return { ok: true, value: { date: v.date, player: v.player.toLowerCase(), decoration: readDecoration(v.decoration) } };
 }
 
 /** Worker の外でも同じ入力を確かめられる、保存や通信を行わない関数。 */
