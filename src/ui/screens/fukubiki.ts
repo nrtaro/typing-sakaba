@@ -31,7 +31,8 @@ export const FUKUBIKI_ART = ['bg', 'drum-0', 'drum-1', 'drum-2', 'drum-3', 'girl
   ...[1, 2, 3, 4, 5].flatMap((s) => [`ball-${s}`, `card-${s}`])].map(fukubikiUrl);
 
 /** 絵の置き場所（基準の 480×270 の座標）。背景の台・カウンターの位置に合わせる */
-const DRUM = { x: 76, y: 77, w: 85, h: 95 };
+// ガラガラの台の底を、背景の木の台の上面（基準の y 172〜184）の中ほどに載せる
+const DRUM = { x: 76, y: 85, w: 85, h: 95 };
 const GIRL = { x: 150, y: 99, w: 82, h: 85 };
 const COUNTER_Y = 184;
 const CARD_CENTER = { x: 362, y: 108 };
@@ -58,9 +59,8 @@ export function drawFukubiki(g: Game) {
   const spinning = pulling && a < SPIN_END;
   const girlFrame = spinning ? Math.floor(a * 7) % 2 : 0;
   const drumFrame = spinning ? Math.floor(a * 14) % 4 : 0;
-  const bob = spinning ? 0 : Math.sin(g.t * 2.2) * 0.8;
   const girl = art(`girl-${girlFrame}`);
-  if (girl) sc.blit(girl, 0, 0, girl.naturalWidth, girl.naturalHeight, GIRL.x, GIRL.y + bob, GIRL.w, GIRL.h);
+  if (girl) sc.blit(girl, 0, 0, girl.naturalWidth, girl.naturalHeight, GIRL.x, GIRL.y, GIRL.w, GIRL.h);
   const drum = art(`drum-${drumFrame}`);
   if (drum) sc.blit(drum, 0, 0, drum.naturalWidth, drum.naturalHeight, DRUM.x, DRUM.y, DRUM.w, DRUM.h);
   else sc.panel(DRUM.x + 10, DRUM.y, DRUM.w - 20, DRUM.h - 14, '#c0392b', '#e8b85a');
