@@ -6,7 +6,10 @@ import { readDecoration, type Decoration } from '../core/ranking';
 import { C } from './palette';
 import { Screen, LW } from './screen';
 import { Sound, VOLUME_NAMES } from './audio';
-import { FINAL_SECONDS, ShopView } from './shopView';
+import { FINAL_SECONDS, ShopView, type RunHud } from './shopView';
+import { RunUI } from './runMode';
+import { Hover } from './hover';
+import type { BuildMods } from '../core/build';
 import { MinigameView } from './minigameView';
 import { drawLights, drawRoomLive, roomLayer } from './room';
 import { Art } from './amber/art';
@@ -21,7 +24,8 @@ import { RankingClient } from './rankingClient';
 import { openRankingName } from './rankingName';
 import { shareUrl } from './share';
 import { dailyConditions, defaultPrep, jstDate, prepCap, rulesFor, NORMAL_RULES, type Condition, type DayRules } from '../core/daily';
-import { DIFFICULTIES, GAME_TITLE, INGREDIENT_ORDER, difficultyOf, rankFor, type DifficultyId, type IngredientId } from '../core/shopConfig';
+import { policyOf } from '../core/build';
+import { DIFFICULTIES, GAME_TITLE, INGREDIENT_ORDER, difficultyOf, rankFor, type Difficulty, type DifficultyId, type IngredientId } from '../core/shopConfig';
 import { drawVolume, drawMenu, drawMenuScreen, drawImeHint, drawClickHint } from './screens/common';
 import { demoStep, drawCheers, drawTitle } from './screens/title';
 import { drawDifficulty } from './screens/difficulty';
@@ -47,7 +51,7 @@ export const NAME_ROW = DECOR_ROWS.length;
 export const APPLY_ROW = DECOR_ROWS.length + 1;
 /** 飾りの一覧の列の数 */
 export const PICKER_COLS = 3;
-export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki' | 'settings';
+export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki' | 'settings' | 'run';
 export type PlayMode = 'normal' | 'daily';
 
 const TYPABLE = /^[a-z\-]$/;
@@ -88,6 +92,10 @@ export class Game {
   private acc = 0;
   view = new ShopView();
   tripView = new MinigameView();
+  /** マウスを乗せると出る説明（繁盛記の方針の判子など） */
+  readonly hover = new Hover();
+  /** 繁盛記（方針を選んで店を育てる四日間）の進行と画面 */
+  readonly runUI: RunUI = new RunUI(this);
   paused = false;
   result: (DayRecord & { best: boolean; rank: string; title: string; trips: number; difficulty: string; difficultyId: DifficultyId; daily: DailyPlay | null; play: PlayRecord; unlocked: string[]; credited?: number; coins?: number; canPull?: boolean }) | null = null;
   /** 記録・実績の画面で見ている記録と、選んでいる実績・読んでいる会話 */
@@ -183,6 +191,9 @@ export class Game {
       }
     });
     this.sound.play('title');
+    // マウスの位置（説明を出すためだけに使う。操作はキーボードのまま）
+    window.addEventListener('pointermove', (e) => { const d = window.devicePixelRatio || 1; this.hover.move(e.clientX * d, e.clientY * d); });
+    document.addEventListener('pointerleave', () => this.hover.move(null));
     window.addEventListener('blur', () => this.autoPause());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.autoPause(); });
     requestAnimationFrame((now) => this.frame(now));
@@ -202,9 +213,12 @@ export class Game {
       return [
         { text: 'さいかい', kana: 'さいかい', act: () => { this.paused = false; } },
         { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
-        { text: 'やめる', kana: 'やめる', act: () => this.toTitle() },
+        { text: `演出：${this.settings.fxLevel === 0 ? 'ひかえめ' : 'ふつう'}`, kana: 'えんしゅつ', act: () => this.toggleFx() },
+        { text: this.runUI?.inRun ? '中断する' : 'やめる', kana: 'やめる', act: () => this.toTitle() },
       ];
     }
+    // 繁盛記：入口・方針えらび・結果などは RunUI が受け持つ
+    if (this.mode === 'run' || (this.mode === 'play' && this.runUI?.pick)) return this.runUI.menuItems();
     switch (this.mode) {
       case 'title':
         return [
@@ -231,6 +245,7 @@ export class Game {
         return [
           { text: '通常営業', kana: 'つうじょう', act: () => this.pickMode('normal') },
           { text: 'ひがわり営業', kana: 'ひがわり', act: () => this.pickMode('daily') },
+          { text: '繁盛記', kana: 'はんじょうき', act: () => this.runUI?.open() },
           { text: 'れんしゅう', kana: 'れんしゅう', act: () => this.startTutorial() },
           { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
         ];
@@ -300,6 +315,16 @@ export class Game {
     this.store.saveSettings(this.settings);
     this.sound.apply(this.settings);
     if (this.settings.volume > 0) this.sound.select();
+  }
+
+  /** 演出の強さ：ふつう／ひかえめ（光・揺れ・粒を減らす） */
+  get fxScale() {
+    return this.settings.fxLevel === 0 ? 0.35 : 1;
+  }
+
+  toggleFx() {
+    this.settings.fxLevel = this.settings.fxLevel === 0 ? 1 : 0;
+    this.store.saveSettings(this.settings);
   }
 
   toTitle() {
@@ -936,8 +961,9 @@ export class Game {
 
   /** Enter で選ばれる項目：難易度の画面では前回の難易度、営業の画面では前回の営業、それ以外は先頭 */
   enterItem(): MenuItem | undefined {
+    if (this.mode === 'run' || (this.mode === 'play' && !this.paused && this.runUI?.pick)) return this.runUI.enterItem();
     const items = this.menuItems();
-    if (this.mode === 'modeSelect') return items[this.settings.playMode === 'daily' ? 1 : 0];
+    if (this.mode === 'modeSelect') return items[this.settings.playMode === 'daily' ? 1 : this.settings.playMode === 'run' ? 2 : 0];
     if (this.mode === 'difficulty') return items.find((it) => it.kana === difficultyOf(this.settings.difficulty).kana);
     if (this.mode === 'help') return items[items.length - 1];
     return items[0];
@@ -974,6 +1000,29 @@ export class Game {
     this.sound.count(3);
   }
 
+  /** 繁盛記の1日を開店する（難しさ・ルール・方針のはたらきは RunUI が決めて渡す） */
+  startRunDay(plan: { seed: number; difficulty: Difficulty; rules: DayRules; mods: BuildMods }, hud: RunHud) {
+    this.nameEntry?.close();
+    this.tutorial = null;
+    this.daily = null;
+    this.submission = { state: 'idle', receipt: null, message: '' };
+    this.session = new PlaySession(plan.seed, plan.difficulty, plan.rules, null, plan.mods);
+    this.playId = crypto.randomUUID();
+    this.openDate = jstDate();
+    this.view = new ShopView();
+    this.view.art = this.art;
+    this.view.run = hud;
+    this.paused = false;
+    this.mode = 'play';
+    this.result = null;
+    this.countdown = COUNTDOWN;
+    this.goShown = 0;
+    this.lastCall = 0;
+    this.menu.reset();
+    this.sound.stop();
+    this.sound.count(3);
+  }
+
   autoPause() {
     if (this.mode === 'play' && !this.paused) {
       this.paused = true;
@@ -996,6 +1045,8 @@ export class Game {
     }
     if (this.artState === 'loading') return;
     const k = e.key;
+    // 繁盛記：入れ替える方針を選んでいる最中の Esc は、一時停止ではなく「やめる」
+    if (k === 'Escape' && this.mode === 'play' && !this.paused && this.runUI?.cancelSwap()) { e.preventDefault(); this.sound.select(); return; }
     if (k === 'Escape' && this.mode === 'play') {
       e.preventDefault();
       if (this.tutorial?.step === 'done') { this.sound.select(); this.toTitle(); return; }
@@ -1003,7 +1054,7 @@ export class Game {
       else this.autoPause();
       return;
     }
-    const inMenu = this.mode !== 'play' || this.paused || this.tutorial?.step === 'done';
+    const inMenu = this.mode !== 'play' || this.paused || this.tutorial?.step === 'done' || !!this.runUI?.pick;
     // 結果の演出中：打ち続けたまま来ても飛ばされないよう、最初の少しはキーを受け付けない。
     // そのあとはキーで演出を飛ばして最後の状態にする
     if (this.mode === 'result' && this.t - this.resultAt < RESULT_READY) {
@@ -1022,6 +1073,7 @@ export class Game {
       this.fukubikiKey(k);
       return;
     }
+    if (this.mode === 'run' && (k.startsWith('Arrow') || k === 'Enter' || k === 'Tab') && this.runUI?.key(k)) { e.preventDefault(); return; }
     if (this.mode === 'settings' && this.settingsView && k.startsWith('Arrow')) {
       e.preventDefault();
       this.settingsKey(k);
@@ -1041,6 +1093,7 @@ export class Game {
       else if (this.mode === 'daily') this.mode = 'difficulty';
       else if (this.mode === 'prep') this.returnToDaily();
       else if (this.mode === 'ranking') this.closeRanking();
+      else if (this.mode === 'run') this.runUI?.escape();
       else this.mode = 'title';
       this.menu.reset();
       return;
@@ -1143,6 +1196,9 @@ export class Game {
     // タイトル画面では、今日のランキングの1位を見せるために順位表を読んでおく
     if (this.mode === 'title' && this.artState !== 'loading') void this.loadBoards(jstDate());
     if (this.mode === 'result') resultStep(this);
+    if (this.mode === 'run') this.runUI?.step(dt);
+    this.view.fxScale = this.fxScale;
+    this.view.hover = this.hover;
     if (this.mode === 'play' && this.shop) this.view.guide = this.settings.guided || this.tutorial ? null : guideFor(this, this.shop);
     if (this.mode !== 'play' || !this.shop || this.paused) return;
     if (this.countdown > 0) {
@@ -1161,10 +1217,13 @@ export class Game {
     // 背景の読み込み待ちで営業時間を消費しない（刻みも数えないので、記録の再現には影響しない）
     const session = this.session!;
     if (session.introDone && this.tripView.art && !this.tripView.art.hasTrip(session.trip!.game.kind)) return;
+    // 繁盛記：方針を選んでいるあいだは、営業の時計もお客も止まる（見た目の演出だけ進める）
+    if (this.runUI?.step(dt)) { this.view.update(dt); return; }
     session.tick();
     this.finalCall(session.shop.timeLeft);
     if (this.tutorial) tutorialStep(this.tutorial, session, dt);
     this.view.update(dt, session.shop);
+    if (this.view.goalHit) { this.view.goalHit = false; this.sound.goal(); }
     this.tripView.update(dt);
     this.drainEvents();
   }
@@ -1210,7 +1269,21 @@ export class Game {
       this.view.handle(ev, shop);
       switch (ev.type) {
         case 'key': if (ev.ok) this.sound.key(ev.count); else this.sound.miss(); break;
-        case 'serve': this.sound.serve(); if (ev.combo >= 1) this.sound.combo(ev.combo); break;
+        case 'serve':
+          // 繁盛記：ついでの皿は拍子木で順に鳴らし、打った皿だけがいつもの音。効いた方針は系統ごとの音で知らせる
+          if ((ev.chain ?? 0) > 0) this.sound.chainHit(ev.chain!);
+          else { this.sound.serve(); if (ev.combo >= 1) this.sound.combo(ev.combo); }
+          if (ev.tags) {
+            const lead = ev.tags.find((t) => t !== 'matome' && t !== 'mouippai');
+            if (lead) this.sound.policy(policyOf(lead).family);
+            if (ev.poured) this.sound.pour();
+            if (ev.pair) this.sound.discover();
+            else if (ev.pairs) this.sound.pairHit();
+          }
+          break;
+        case 'chain': this.sound.chainEnd(ev.count); break;
+        case 'fever': this.sound.fever(ev.on); if (session.shop.timeLeft > FINAL_SECONDS) this.sound.setRate(ev.on ? 1.2 : 1); break;
+        case 'fresh': this.sound.policy('trip'); break;
         case 'lack': this.sound.lack(); break;
         case 'angry': this.sound.angry(); break;
         case 'spill': this.sound.loss(); break;
@@ -1228,8 +1301,8 @@ export class Game {
           // 最初の調達に出たら、はじめての人向けの案内は終わり
           if (!this.settings.guided) { this.settings.guided = true; this.store.saveSettings(this.settings); }
           break;
-        case 'phase': this.sound.bell(); if (!session.trip) this.sound.play(PHASE_TRACK[ev.index]); break;
-        case 'end': this.finish(); break;
+        case 'phase': this.sound.bell(); if (!session.trip) this.sound.play(PHASE_TRACK[ev.index]); this.runUI?.onPhase(ev.index); break;
+        case 'end': if (this.runUI?.inRun) this.runUI?.finishDay(); else this.finish(); break;
         default: break;
       }
     }
@@ -1269,7 +1342,7 @@ export class Game {
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
   get overTavern() {
-    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'settings';
+    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'settings' || this.mode === 'run';
   }
 
   // ---------- 描画 ----------
@@ -1278,6 +1351,12 @@ export class Game {
   private legalLink: HTMLElement | null | undefined;
 
   draw() {
+    this.hover.begin();
+    this.drawScene();
+    this.hover.draw(this.sc);
+  }
+
+  private drawScene() {
     const sc = this.sc;
     // タイトル画面のときだけ見せる（遊んでいる間は画面に重ねない）
     if (this.legalLink === undefined) this.legalLink = typeof document !== 'undefined' ? document.getElementById('legal-link') : null;
@@ -1299,6 +1378,7 @@ export class Game {
         if (this.trip?.phase === 'intro') drawTripIntro(this);
         drawCountdown(this);
       }
+      this.runUI?.drawOverlay();
       drawTutorial(this);
       if (this.tutorial?.step === 'done' && !this.paused) drawMenuScreen(this, '練習はおしまい！', '本番は3分間。時間が進み、お客が次々に来ます');
       if (this.paused) drawMenuScreen(this, '一時停止中', '');
@@ -1344,6 +1424,7 @@ export class Game {
     else if (this.mode === 'records') drawRecords(this);
     else if (this.mode === 'fukubiki') drawFukubiki(this);
     else if (this.mode === 'settings') drawSettings(this);
+    else if (this.mode === 'run') this.runUI?.draw();
     else drawResult(this);
     if (this.mode === 'result') { if (this.t - this.resultAt > RESULT_READY - 0.3) drawResultMenu(this); }
     else drawMenu(this, this.mode === 'help' ? 210 : this.mode === 'difficulty' ? 170 : 172);

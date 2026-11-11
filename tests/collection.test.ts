@@ -23,17 +23,17 @@ describe('飾りの一覧', () => {
     expect(LINKS[0].id).toBe('na');
   });
 
-  it('156個の内訳と☆の配分', () => {
-    expect(ITEMS).toHaveLength(156);
-    expect([achCount('front'), gachaStars('front')]).toEqual([6, [12, 10, 6, 4, 2]]);
-    expect([achCount('back'), gachaStars('back')]).toEqual([6, [12, 10, 6, 4, 2]]);
-    expect([achCount('plate'), gachaStars('plate')]).toEqual([4, [6, 5, 4, 3, 2]]);
-    expect([achCount('sound'), gachaStars('sound')]).toEqual([2, [4, 4, 3, 2, 1]]);
+  it('170個の内訳と☆の配分（うち14個は繁盛記の限定）', () => {
+    expect(ITEMS).toHaveLength(170);
+    expect([achCount('front'), gachaStars('front')]).toEqual([10, [12, 10, 6, 4, 2]]);
+    expect([achCount('back'), gachaStars('back')]).toEqual([10, [12, 10, 6, 4, 2]]);
+    expect([achCount('plate'), gachaStars('plate')]).toEqual([7, [6, 5, 4, 3, 2]]);
+    expect([achCount('sound'), gachaStars('sound')]).toEqual([5, [4, 4, 3, 2, 1]]);
     expect([achCount('sticker'), gachaStars('sticker')]).toEqual([8, [8, 7, 5, 4, 4]]);
   });
 
   it('実績26件にちょうど1つずつ', () => {
-    const ach = ITEMS.filter((i) => i.source !== 'gacha');
+    const ach = ITEMS.filter((i) => typeof i.source === 'object' && !i.source.achievement.startsWith('run-'));
     expect(ach).toHaveLength(26);
     for (const a of ACHIEVEMENTS) {
       expect(ach.filter((i) => typeof i.source === 'object' && i.source.achievement === a.id)).toHaveLength(1);

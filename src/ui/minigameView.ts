@@ -415,16 +415,17 @@ export class MinigameView {
     const w = this.bigWord(sc, game.word.text, game.word.kana, game, y, reel ? C.blue : C.gold);
     const x0 = LW / 2 - w / 2;
     // 上の縁：今やること（短く）と大物の印、巻き上げの残り
-    this.tag(sc, reel ? '巻き上げ' : 'あわせ', x0 + 8, y - 7, reel ? C.blue : C.gold, reel ? C.w : C.ink);
+    // 札の上に乗せる（言葉やローマ字に重ねない）
+    this.tag(sc, reel ? '巻き上げ' : 'あわせ', x0 + 8, y - 13, reel ? C.blue : C.gold, reel ? C.w : C.ink);
     // 右上：大物の印。最後の巻き上げでは、釣り上げたときの数（長い言葉ほど多い）
     let tx = x0 + w - 8;
     if (reel && game.wordsLeft === 1) {
       const text = `魚×${procurementReward('fishing', game.catchKeys + rewardKeys(game.word.kana), game.big, game.difficulty.id)}`;
       tx -= sc.W(text, 8) + 8;
-      this.tag(sc, text, tx, y - 7, C.gold3, C.ink);
+      this.tag(sc, text, tx, y - 13, C.gold3, C.ink);
       tx -= 3;
     }
-    if (game.big) this.tag(sc, '大物', tx - sc.W('大物', 8) - 8, y - 7, C.gold3, C.ink);
+    if (game.big) this.tag(sc, '大物', tx - sc.W('大物', 8) - 8, y - 13, C.gold3, C.ink);
     if (reel && game.big) {
       const total = FISHING.bigWords;
       const done = total - game.wordsLeft;
@@ -632,7 +633,7 @@ export class MinigameView {
     sc.PR(bx, y + 62, bw, 3, C.ink);
     sc.PR(bx, y + 62, bw * lot.rival, 3, C.red);
     // 次の品物：品物の名前の右上（札の右上の縁）に小さく添える（目線を動かさずに見える）
-    this.drawNextLot(sc, game, x0 + w - 6, y - 9, 'right');
+    this.drawNextLot(sc, game, x0 + w - 6, y - 18, 'right');
   }
 
   /** 次の品物の小さな札。align は x を左端にするか中央にするか */

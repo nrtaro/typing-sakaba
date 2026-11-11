@@ -20,6 +20,8 @@ export const FX_GAIN: Record<string, number> = {
   miss: 2.0, select: 1.35, chord: 1.0, serve: 1.05, coin: 1.35, lack: 1.3, angry: 1.75, bell: 0.72,
   tripStart: 0.8, tripReturn: 1.0, gain: 1.15, shot: 1.05, kill: 0.73, poison: 1.23, bite: 1.33, loss: 1.7,
   count: 1.15, final: 1.35, tick: 2.3, stamp: 1.17, sparkle: 0.91, combo: 0.6,
+  // 繁盛記：連鎖や方針の合図は何度も重なるので控えめに、節目（発見・目標）は少し大きく
+  chain: 0.7, policy: 0.75, discover: 1.0, fever: 0.9, goal: 1.0, pick: 1.1,
 };
 
 /** 大きさをそろえる対象の効果音（測るときに使う） */
@@ -470,6 +472,146 @@ export class Sound {
     if (fx.level >= 4) [0, 2, 4].forEach((s) => this.tone(this.note(Math.min(fx.level, 6) + s), end, 0.4, 'sine', 0.022, this.fx('combo')));
     if (fx.level >= 7) for (let i = 0; i < 4; i++) this.tone(this.note(10 + i * 2), end + 0.04 + i * 0.03, 0.12, 'square', 0.018, this.fx('combo'));
     if (fx.max) [0, 2, 4, 5].forEach((s, i) => this.tone(this.note(8 + s), end + 0.12 + i * 0.02, 0.6, 'triangle', 0.028, this.fx('combo')));
+  }
+
+  // ---------- 繁盛記 ----------
+  // 小さな入力成功 → 連鎖 → かけ合わせ → 大入り → 目標突破 の順に、音が厚くなるように作る。
+  // 連打で重なる音は、同じ種類を短い間隔で鳴らさない（gate）ことで、にごりと音量の暴れを防ぐ。
+
+  private gates = new Map<string, number>();
+  /** 同じ種類の音を gap 秒以内に重ねない */
+  private gate(name: string, gap: number) {
+    const t = this.now;
+    if (t - (this.gates.get(name) ?? -1) < gap) return false;
+    this.gates.set(name, t);
+    return true;
+  }
+
+  /** まとめ出し：ついでの皿が順に出る拍子木と、上がっていく音（i は何皿目か） */
+  chainHit(i: number) {
+    if (!this.ok) return;
+    const t = this.now + i * 0.07;
+    const out = this.fx('chain');
+    this.tone(980 + i * 60, t, 0.035, 'square', 0.03, out);
+    this.noise(t, 0.025, 0.04, out, 'bandpass', 2600);
+    this.tone(this.note(4 + i * 2), t + 0.01, 0.16, 'triangle', 0.045, out);
+  }
+
+  /** まとめ出しの締め：皿の数が多いほど和音が厚い */
+  chainEnd(count: number) {
+    if (!this.ok) return;
+    const t = this.now + count * 0.07 + 0.03;
+    const out = this.fx('chain');
+    [0, 2, 4, 5].slice(0, Math.min(4, count)).forEach((s) => this.tone(this.note(7 + s), t, 0.32, 'triangle', 0.028, out));
+    if (count >= 4) this.tone(this.note(14), t + 0.08, 0.4, 'sine', 0.03, out);
+  }
+
+  /** 方針が効いた合図（系統ごとに音色を変えて、何が効いたかを耳でも分かるように） */
+  policy(family: string) {
+    if (!this.ok || !this.gate(`policy:${family}`, 0.09)) return;
+    const t = this.now + 0.03;
+    const out = this.fx('policy');
+    if (family === 'combo') { this.tone(this.semi(40), t, 0.07, 'square', 0.022, out); this.tone(this.semi(43), t + 0.04, 0.09, 'square', 0.02, out); }
+    else if (family === 'trip') { this.tone(520, t, 0.12, 'sine', 0.04, out, 1040); this.noise(t, 0.08, 0.02, out, 'bandpass', 1500); }
+    else if (family === 'stock') { this.tone(180, t, 0.1, 'triangle', 0.06, out, 120); this.tone(this.semi(26), t + 0.03, 0.1, 'triangle', 0.025, out); }
+    else if (family === 'guest') { this.tone(1244, t, 0.22, 'sine', 0.028, out); this.tone(1661, t + 0.05, 0.2, 'sine', 0.022, out); }
+  }
+
+  /** とりあえずもう一杯：注ぐ音とグラスの音 */
+  pour() {
+    if (!this.ok || !this.gate('pour', 0.11)) return;
+    const t = this.now + 0.05;
+    const out = this.fx('policy');
+    this.tone(420, t, 0.11, 'sine', 0.045, out, 760);
+    this.noise(t, 0.09, 0.02, out, 'bandpass', 4200);
+    this.tone(2637, t + 0.1, 0.12, 'sine', 0.02, out);
+  }
+
+  /** かけ合わせが効いた（何度も鳴るので控えめに） */
+  pairHit() {
+    if (!this.ok || !this.gate('pair', 0.16)) return;
+    const t = this.now + 0.04;
+    [33, 38].forEach((s, i) => this.tone(this.semi(s), t + i * 0.035, 0.16, 'sine', 0.022, this.fx('policy')));
+  }
+
+  /** かけ合わせをはじめて見つけた：ひらめきの音 */
+  discover() {
+    if (!this.ok) return;
+    const t = this.now;
+    const out = this.fx('discover');
+    [12, 19, 24, 28, 31, 36].forEach((s, i) => this.tone(this.semi(s), t + i * 0.05, 0.35, 'triangle', 0.045, out));
+    this.tone(this.semi(40), t + 0.32, 0.7, 'sine', 0.04, out);
+    this.noise(t + 0.3, 0.25, 0.02, out);
+  }
+
+  /** 大入りが始まった：太鼓と、駆け上がる音／終わった：小さく下がる */
+  fever(on: boolean) {
+    if (!this.ok) return;
+    const t = this.now;
+    const out = this.fx('fever');
+    if (!on) { this.tone(this.semi(24), t, 0.25, 'triangle', 0.03, out, this.semi(12)); return; }
+    for (const d of [0, 0.09, 0.18]) { this.tone(120, t + d, 0.14, 'sine', 0.11, out, 60); this.noise(t + d, 0.06, 0.05, out, 'lowpass', 500); }
+    [19, 24, 28, 31].forEach((s, i) => this.tone(this.semi(s), t + 0.24 + i * 0.045, 0.3, 'square', 0.03, out));
+  }
+
+  /** 目標を越えた：短いファンファーレ */
+  goal() {
+    if (!this.ok) return;
+    const t = this.now;
+    const out = this.fx('goal');
+    [[12, 0], [16, 0.09], [19, 0.18], [24, 0.3]].forEach(([s, d]) => {
+      this.tone(this.semi(s), t + d, 0.3, 'square', 0.04, out);
+      this.tone(this.semi(s + 12), t + d, 0.3, 'triangle', 0.025, out);
+    });
+    [24, 28, 31].forEach((s) => this.tone(this.semi(s), t + 0.42, 0.9, 'triangle', 0.035, out));
+    this.noise(t + 0.42, 0.3, 0.03, out);
+  }
+
+  /** 方針を選んだ：札を打ちつける音と、系統の音。段階が上がるほど高い */
+  pick(family: string, lv: number) {
+    if (!this.ok) return;
+    const t = this.now;
+    const out = this.fx('pick');
+    this.noise(t, 0.06, 0.1, out, 'lowpass', 900);
+    this.tone(150, t, 0.12, 'sine', 0.09, out, 80);
+    const root = { chain: 12, combo: 16, trip: 14, stock: 9, guest: 19 }[family] ?? 12;
+    for (let i = 0; i < lv + 1; i++) this.tone(this.semi(root + [0, 7, 12, 16][i]), t + 0.07 + i * 0.06, 0.3, 'triangle', 0.045, out);
+    if (lv >= 3) this.tone(this.semi(root + 24), t + 0.3, 0.6, 'sine', 0.04, out);
+  }
+
+  /** 1日の目標を越えて閉店／届かなかった／4日間を走りきった */
+  dayClear() {
+    if (!this.ok) return;
+    const t = this.now;
+    [12, 16, 19, 24, 28].forEach((s, i) => this.tone(this.semi(s), t + i * 0.08, 0.4, 'triangle', 0.045, this.fx('goal')));
+  }
+
+  dayFail() {
+    if (!this.ok) return;
+    const t = this.now;
+    [19, 15, 12, 7].forEach((s, i) => this.tone(this.semi(s), t + i * 0.16, 0.45, 'triangle', 0.05, this.fx('goal')));
+    this.tone(65, t + 0.64, 0.8, 'sine', 0.08, this.fx('goal'), 45);
+  }
+
+  runClear() {
+    if (!this.ok) return;
+    const t = this.now;
+    const out = this.fx('goal');
+    [[12, 0], [12, 0.12], [12, 0.24], [16, 0.36], [19, 0.6], [24, 0.84]].forEach(([s, d]) => {
+      this.tone(this.semi(s), t + d, 0.26, 'square', 0.04, out);
+      this.tone(this.semi(s + 7), t + d, 0.26, 'triangle', 0.025, out);
+    });
+    [24, 28, 31, 36].forEach((s) => this.tone(this.semi(s), t + 1.08, 1.4, 'triangle', 0.035, out));
+    for (let i = 0; i < 6; i++) this.tone(this.semi(36 + i * 2), t + 1.2 + i * 0.05, 0.2, 'sine', 0.02, out);
+  }
+
+  /** 限定の飾りを手に入れた */
+  reward() {
+    if (!this.ok) return;
+    const t = this.now;
+    const out = this.fx('discover');
+    this.noise(t, 0.08, 0.06, out, 'lowpass', 700);
+    [24, 31, 28, 36, 40].forEach((s, i) => this.tone(this.semi(s), t + 0.05 + i * 0.07, 0.4, 'sine', 0.04, out));
   }
 
   // ---------- BGM ----------

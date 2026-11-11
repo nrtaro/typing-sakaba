@@ -5,7 +5,7 @@
 // まとめて描いた画像から、透明でない部分のかたまりを見つけて1枚ずつ切り出す（上から下、左から右の順）。
 // 背景が半透明の白になっている画像は、縁からつながる半透明の部分を透明にする。
 import sharp from 'sharp';
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 
 const SRC = 'art-src/stage6';
 const OUT = 'public/collection';
@@ -18,6 +18,8 @@ const PLATES = {
   'plates-2': ['itabari', 'mizutama', 'shima', 'yuyake', 'aizome', 'kondatecho'],
   'plates-3': ['akagane', 'hoshizora', 'chochin', 'namishibuki', 'furunajimi', 'tairyobata'],
   'plates-4': ['ginzaiku', 'momijinishiki', 'yoiyami', 'yonkyaku', 'kinpaku', 'niji'],
+  // 繁盛記の限定（docs/hanjoki-plate-prompts.md）
+  'plates-run': ['hanjofuda', 'senryobako', 'hidencho'],
 };
 /** 家族の毎日の 7〜9 枚目は、描き直した別の画像を使う */
 /** [画像, 書き出すID, 列数, 段数]。シールは並びのマス目ごとに、そのマスに中心があるかけらをまとめて1枚にする */
@@ -31,7 +33,9 @@ const STICKERS = [
 const SHEETS = ['food', 'trip', 'guest', 'family'];
 
 async function load(name) {
-  const { data, info } = await sharp(`${SRC}/${name}.webp`).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  // 元画像は WebP が基本。ChatGPT から受け取ったままの PNG も読める
+  const file = existsSync(`${SRC}/${name}.webp`) ? `${SRC}/${name}.webp` : `${SRC}/${name}.png`;
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   return { data, w: info.width, h: info.height };
 }
 
@@ -116,10 +120,11 @@ function crop(img, b) {
     .extract({ left: b.x0, top: b.y0, width: b.x1 - b.x0 + 1, height: b.y1 - b.y0 + 1 });
 }
 
-rmSync(OUT, { recursive: true, force: true });
-mkdirSync(`${OUT}/plates`, { recursive: true });
-mkdirSync(`${OUT}/stickers`, { recursive: true });
-mkdirSync(`${OUT}/sheets`, { recursive: true });
+// 作り直すのは、このスクリプトが書き出す3つのフォルダだけ（README.md と fukubiki/ はほかで作るので消さない）
+for (const dir of ['plates', 'stickers', 'sheets']) {
+  rmSync(`${OUT}/${dir}`, { recursive: true, force: true });
+  mkdirSync(`${OUT}/${dir}`, { recursive: true });
+}
 
 const report = [];
 for (const [name, ids] of Object.entries(PLATES)) {

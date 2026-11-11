@@ -13,7 +13,9 @@ export interface Item {
   star: Star;
   source: Source;
   name: string;
-  plate?: { bg: string; border: string; text: string; pattern?: 'plain' | 'stripe' | 'dots' | 'wood' | 'gold' };
+  plate?: { bg: string; border: string; text: string; pattern?: 'plain' | 'stripe' | 'dots' | 'wood' | 'gold';
+    /** 繁盛記の限定プレート：絵が届くまでの、コードで描く仮の柄 */
+    art?: 'noren' | 'senryo' | 'hiden' };
   sound?: { wave: OscillatorType; base: number; decay: number; partial?: number; noise?: number };
   /** シール：シリーズと台紙の枠（0〜8） */
   sticker?: { series: string; slot: number };

@@ -7,6 +7,7 @@ import { createMinigame, type Minigame, type MinigameFeats } from './minigames';
 import { Rng } from './rng';
 import { DAY_LENGTH, INGREDIENT_ORDER, MINIGAME_SECONDS, SHOP, type Difficulty, type IngredientId, type TripId } from './shopConfig';
 import type { DayRules } from './daily';
+import type { BuildMods } from './build';
 
 /** 1刻みの長さ（秒） */
 export const TICK = 1 / 60;
@@ -43,8 +44,8 @@ export class PlaySession {
   private log: string[] = [];
   private lastLogged = 0;
 
-  constructor(readonly seed: number, difficulty: Difficulty, readonly rules: DayRules, prep: Record<IngredientId, number> | null = null) {
-    this.shop = new Shop(new Rng(seed), difficulty, rules);
+  constructor(readonly seed: number, difficulty: Difficulty, readonly rules: DayRules, prep: Record<IngredientId, number> | null = null, build: BuildMods | null = null) {
+    this.shop = new Shop(new Rng(seed), difficulty, rules, build);
     if (rules.prepBudget > 0 && prep) this.shop.applyPrep(prep);
   }
 

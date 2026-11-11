@@ -2,6 +2,7 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
+import { BIG_NEED, FEVER_EVERY, IDLE_MAX, IDLE_MIN, QUICK_RATIO, REFILL_EAT, pairBonus, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
 import {
@@ -34,6 +35,9 @@ export interface Guest {
   refill?: boolean;
   /** 予約の宴会のお客（売上が大きく、怒ると減点も大きい。品切れ札では断れない） */
   banquet?: boolean;
+  /** 繁盛記：大盛りの注文（素材2倍・売上アップ）／せっかちなお客（待ち時間が短い） */
+  big?: boolean;
+  hasty?: boolean;
 }
 
 /** お題で増える言葉：品切れ札（しなぎれ）とひでんの */
@@ -46,7 +50,17 @@ type Gains = Partial<Record<IngredientId, number>>;
 
 export type ShopEvent =
   | { type: 'key'; ok: boolean; count: number }
-  | { type: 'serve'; seat: number; gain: number; combo: number; hiden?: boolean; banquet?: boolean }
+  | { type: 'serve'; seat: number; gain: number; combo: number; hiden?: boolean; banquet?: boolean;
+      /** 繁盛記：この皿に効いた方針・まとめ出しの何皿目か（0 は打った皿）・酒を付けたか・この皿で初めて成立したかけ合わせ */
+      tags?: PolicyId[]; chain?: number; poured?: boolean; pair?: string; pairs?: number; pairMult?: number; dish?: Dish }
+  /** 繁盛記：1回の入力でいっしょに出た皿の数と合計 */
+  | { type: 'chain'; count: number; total: number; seats: number[] }
+  /** 繁盛記：大入りが始まった／終わった */
+  | { type: 'fever'; on: boolean; secs: number }
+  /** 繁盛記：とれたての皿が用意できた */
+  | { type: 'fresh'; n: number }
+  /** 繁盛記：こまめな仕込みで素材が増えた */
+  | { type: 'restock'; n: number }
   | { type: 'lack'; seat: number; missing: IngredientId[] }
   | { type: 'tripStart'; trip: Trip }
   | { type: 'tripEnd'; trip: Trip; gains: Gains; overflow: Gains; lucky: boolean; delayed?: boolean }
@@ -128,9 +142,24 @@ export class Shop {
   lots: { ing: IngredientId; n: number; at: number }[] = [];
   /** 予約の宴会：まだ来ていない分（来る順） */
   banquetsLeft: { at: number; dish: string }[];
+  /** 繁盛記：方針のはたらき（通常営業・ひがわりでは null のまま） */
+  build: BuildMods | null;
+  buildStats: BuildStats = emptyBuildStats();
+  /** とれたての残り皿数／大入りが終わる時刻 */
+  freshUntil = 0;
+  /** 最後に皿を出した時刻（おもてなしの「間」を数える） */
+  lastServeAt = 0;
+  feverUntil = 0;
+  /** 方針の抽選に使う乱数（お客の並びの乱数とは分ける） */
+  private brng: Rng | null = null;
 
-  constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1], readonly rules: DayRules = NORMAL_RULES) {
+  constructor(private readonly rng: Rng, readonly difficulty: Difficulty = DIFFICULTIES[1], readonly rules: DayRules = NORMAL_RULES, build: BuildMods | null = null) {
     this.stock = startingStock(this.rng);
+    this.build = build;
+    if (build) {
+      this.brng = new Rng(Math.floor(this.rng.next() * 4294967296));
+      for (const id of INGREDIENT_ORDER) this.stock[id] += build.startStock + build.phaseStock;
+    }
     if (rules.storageCap !== null) for (const id of INGREDIENT_ORDER) this.stock[id] = Math.min(this.stock[id], rules.storageCap);
     if (rules.spoilAfter !== null) for (const id of INGREDIENT_ORDER) if (this.stock[id] > 0) this.lots.push({ ing: id, n: this.stock[id], at: 0 });
     this.banquetsLeft = [...rules.banquets].sort((a, b) => a.at - b.at);
@@ -151,12 +180,12 @@ export class Shop {
   }
 
   get multiplier() {
-    return Math.min(SHOP.comboMaxMult, 1 + Math.floor(this.combo / SHOP.comboStep) * SHOP.comboBonus);
+    return Math.min(this.build?.comboCap ?? SHOP.comboMaxMult, 1 + Math.floor(this.combo / SHOP.comboStep) * SHOP.comboBonus);
   }
 
   /** ミスしてもコンボが続く回数（ひがわりのお題で変わる） */
   get comboMissAllowance() {
-    return this.rules.comboMissAllowance ?? this.difficulty.comboMissAllowance;
+    return (this.rules.comboMissAllowance ?? this.difficulty.comboMissAllowance) + (this.build?.missAllowance ?? 0);
   }
 
   get comboMissesLeft() {
@@ -319,6 +348,41 @@ export class Shop {
     return d.kind === 'order' ? this.seats[d.seat]?.wait ?? Infinity : Infinity;
   }
 
+  /** とれたての残り秒数（さっきのヌシ） */
+  get fresh() {
+    return Math.max(0, this.freshUntil - this.clock);
+  }
+
+  /** いま一番残りが少ない素材（同じ数なら全部）。おやじの見栄の対象 */
+  scarcest(): IngredientId[] {
+    const min = Math.min(...INGREDIENT_ORDER.map((id) => this.stock[id]));
+    return INGREDIENT_ORDER.filter((id) => this.stock[id] === min);
+  }
+
+  /** 大入りの最中か */
+  get fever() {
+    return this.clock < this.feverUntil;
+  }
+
+  /** 料理の主素材（札のいちばん左の素材）。まとめ出しはこれが同じ注文をいっしょに出す */
+  static mainOf(dish: Dish): IngredientId {
+    return Object.keys(dish.need)[0] as IngredientId;
+  }
+
+  /** まとめ出しでいっしょに出る席（急ぐ順） */
+  chainSeats(seat: number): number[] {
+    const b = this.build;
+    const g = this.seats[seat];
+    if (!b || b.chain <= 0 || !g) return [];
+    const main = Shop.mainOf(g.dish);
+    return this.seats
+      .map((x, i) => ({ x, i }))
+      .filter(({ x, i }) => i !== seat && x && x.state === 'wait' && Shop.mainOf(x.dish) === main)
+      .sort((p, q) => p.x!.wait - q.x!.wait)
+      .slice(0, b.chain)
+      .map(({ i }) => i);
+  }
+
   private serve(seat: number) {
     const g = this.seats[seat];
     if (!g || g.state !== 'wait') return;
@@ -328,25 +392,124 @@ export class Shop {
       this.events.push({ type: 'lack', seat, missing });
       return;
     }
-    for (const [id, n] of Object.entries(g.dish.need)) this.takeStock(id as IngredientId, n!);
-    this.combo++;
+    if (!this.build) { this.serveOne(seat, 0, false); return; }
+    // 繁盛記：先に相手を決めてから出す（打った皿が素材を使ったあと、足りる分だけ続く）
+    const others = this.chainSeats(seat);
+    const before = this.score;
+    const done = [seat];
+    this.serveOne(seat, 0, others.length > 0);
+    let idx = 1;
+    for (const o of others) {
+      const og = this.seats[o];
+      if (!og || og.state !== 'wait' || this.canMake(og.dish).length) continue;
+      this.serveOne(o, idx++, true);
+      done.push(o);
+    }
+    if (done.length > 1) {
+      this.buildStats.maxChain = Math.max(this.buildStats.maxChain, done.length);
+      this.buildStats.chainServes += done.length - 1;
+      this.events.push({ type: 'chain', count: done.length, total: this.score - before, seats: done });
+    }
+  }
+
+  /** 1皿を出す。chain はまとめ出しの何皿目か（0 は打った皿）、chained はまとめ出しが効いたか */
+  private serveOne(seat: number, chain: number, chained: boolean) {
+    const g = this.seats[seat]!;
+    const b = this.build;
+    const tags: PolicyId[] = [];
+    const saved = !!b && b.saveChance > 0 && this.brng!.next() < b.saveChance;
+    // おやじの見栄：素材を使う前の「一番少ない素材」で決める
+    const scarce = b && b.lowMult > 1 ? this.scarcest() : [];
+    const low = scarce.some((id) => g.dish.need[id]);
+    if (!saved) for (const [id, n] of Object.entries(g.dish.need)) this.takeStock(id as IngredientId, n!);
+    const comboBefore = this.combo;
+    this.combo += 1 + (b?.comboPlus ?? 0);
     this.comboMistakes = 0;
     this.stats.maxCombo = Math.max(this.stats.maxCombo, this.combo);
     const tip = Math.round((g.wait / g.maxWait) * SHOP.tipMax);
     const hiden = this.hidenArmed;
     this.hidenArmed = false;
-    const gain = Math.round((g.dish.price + tip) * this.multiplier * (hiden ? HIDEN_MULT : 1) * (g.banquet ? BANQUET_MULT : 1));
+    const special = (hiden ? HIDEN_MULT : 1) * (g.banquet ? BANQUET_MULT : 1);
+    let gain: number;
+    let poured = false;
+    let pair: string | undefined;
+    let pairCount = 0;
+    let pairMult = 1;
+    if (!b) gain = Math.round((g.dish.price + tip) * this.multiplier * special);
+    else {
+      let mult = 1;
+      let tipB = tip * b.tipMult;
+      if (chained) { tags.push('matome'); if (chain > 0) mult *= b.chainMult; }
+      if (g.refill && b.refillMult > 1) { tags.push('betsubara'); mult *= b.refillMult; this.buildStats.refills++; }
+      if (this.multiplier > SHOP.comboMaxMult) tags.push('ryoshusho');
+      if (this.fresh > 0 && b.freshMult > 1) { tags.push('nushi'); mult *= b.freshMult; }
+      if (low) { tags.push('mie'); mult *= b.lowMult; }
+      if (b.quickTip > 1 && g.wait / g.maxWait >= QUICK_RATIO) { tags.push('sekkachi'); tipB *= b.quickTip; }
+      let add = 0;
+      if (b.aleAdd > 0 && !g.dish.need.ale && this.stock.ale > 0) { this.takeStock('ale', 1); add = b.aleAdd; poured = true; tags.push('mouippai'); }
+      if (g.big) tags.push('oomori');
+      // おもてなし：前の皿からあいた秒数ぶん、チップが増える（まとめ出しのついでの皿には付かない）
+      const idle = Math.min(IDLE_MAX, this.clock - this.lastServeAt);
+      if (b.idleTip > 0 && chain === 0 && idle >= IDLE_MIN) { tags.push('omotenashi'); tipB += Math.round(idle * b.idleTip) * b.tipMult; }
+      if (saved) tags.push('makanai');
+      if (this.fever && b.feverMult > 1) { tags.push('ooiri'); mult *= b.feverMult; }
+      // かけ合わせ：名前付きの組が同じ皿に効いたら、1組につき売上が増える
+      // 店全体に効く方針（呼び込み・大漁旗など）は、持っているだけで相手になる
+      let pairs = 0;
+      let bonus = 0;
+      const found: string[] = [];
+      const hit = (x: PolicyId, y: PolicyId) => {
+        if (!pairOf(pairKey(x, y))) return;
+        pairs++;
+        bonus += pairBonus(b.levels[x] ?? 1, b.levels[y] ?? 1);
+        found.push(pairKey(x, y));
+      };
+      for (let i = 0; i < tags.length; i++) {
+        for (let j = i + 1; j < tags.length; j++) hit(tags[i], tags[j]);
+        for (const p of b.passive) hit(tags[i], p);
+      }
+      const stack = 1 + bonus;
+      pairCount = pairs;
+      pairMult = stack;
+      gain = Math.round(((g.dish.price + tipB) * mult + add) * this.multiplier * stack * special);
+      // 振り返り用：方針がなかった場合との差を、効いた方針に分ける
+      const plain = Math.round((g.dish.price + tip) * Math.min(this.multiplier, SHOP.comboMaxMult) * special);
+      const st = this.buildStats;
+      const whole: PolicyId | null = chain > 0 ? 'matome' : g.refill && b.refillMult > 1 ? 'betsubara' : null;
+      if (whole) st.yen[whole] = (st.yen[whole] ?? 0) + Math.min(plain, gain);
+      const extra = Math.max(0, gain - plain);
+      const share = tags.filter((t) => t !== 'makanai');
+      for (const t of tags) st.fired[t] = (st.fired[t] ?? 0) + 1;
+      for (const t of share) st.yen[t] = (st.yen[t] ?? 0) + extra / share.length;
+      st.bestServe = Math.max(st.bestServe, gain);
+      st.maxStack = Math.max(st.maxStack, pairs);
+      for (const key of found) if (!st.pairs.includes(key)) { st.pairs.push(key); pair ??= key; }
+    }
     this.score += gain;
     this.stats.served++;
     if (this.timeLeft <= LATE_SECONDS) this.stats.lateServes++;
     if (g.banquet) this.stats.banquetServed++;
     this.stats.sales += g.dish.price;
     this.stats.tips += tip;
+    const dish = g.dish;
     g.state = 'eat';
-    g.t = SHOP.eatTime;
+    // おかわりするお客は、1品目を早く食べ終える（席をふさいで店の回りを止めない）
+    g.t = b && g.extra ? REFILL_EAT : SHOP.eatTime;
+    this.lastServeAt = this.clock;
     this.crew.assign(seat, g, this.away?.who);
-    this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
+    if (!b) this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
+    else {
+      this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, pair, pairs: pairCount, pairMult, dish });
+      // 大入り袋：10コンボごとに大入り（最中に届いたら延ばす）
+      if (b.feverSecs > 0 && Math.floor(this.combo / FEVER_EVERY) > Math.floor(comboBefore / FEVER_EVERY)) {
+        this.feverUntil = this.clock + b.feverSecs;
+        this.feverOn = true;
+        this.buildStats.fevers++;
+        this.events.push({ type: 'fever', on: true, secs: b.feverSecs });
+      }
+    }
   }
+  private feverOn = false;
 
   /** ミスで素材をこぼす：打っている料理の素材から。打っていなければ一番多い素材から */
   private spill() {
@@ -380,7 +543,7 @@ export class Shop {
     const amounts: Gains = {};
     // 時間帯の当たり：出かけた時間帯の当たりなら多く、それ以外は少なく持ち帰る
     const lucky = this.luckyTrip(this.awayPhase) === trip.id;
-    const mult = this.rules.luckyTrips ? (lucky ? this.rules.luckyMult : this.rules.unluckyMult) : 1;
+    const mult = (this.rules.luckyTrips ? (lucky ? this.rules.luckyMult : this.rules.unluckyMult) : 1) * (this.build?.tripMult ?? 1);
     for (const id of trip.gives) {
       const got = Math.max(earlyReturn ? 0 : trip.minimum[id] ?? 0, Math.floor(gains[id] ?? 0));
       amounts[id] = mult === 1 ? got : Math.max(earlyReturn ? 0 : 1, Math.round(got * mult));
@@ -394,6 +557,11 @@ export class Shop {
     }
     const { final, overflow } = this.receive(trip, amounts);
     this.events.push({ type: 'tripEnd', trip, gains: final, overflow, lucky });
+    // さっきのヌシ：何か持ち帰ったら、次の数皿が「とれたて」
+    if (this.build && this.build.freshSecs > 0 && Object.values(final).some((n) => (n ?? 0) > 0)) {
+      this.freshUntil = this.clock + this.build.freshSecs;
+      this.events.push({ type: 'fresh', n: this.build.freshSecs });
+    }
   }
 
   /** 素材を倉庫に入れる。狭い倉庫の日は、置ききれない分は持ち帰れない */
@@ -434,6 +602,15 @@ export class Shop {
     if (ph !== this.lastPhase) {
       this.lastPhase = ph;
       this.events.push({ type: 'phase', index: ph });
+      // こまめな仕込み：時間帯が変わるたびに素材が増える
+      if (this.build && this.build.phaseStock > 0) {
+        for (const id of INGREDIENT_ORDER) this.addStock(id, this.build.phaseStock);
+        this.events.push({ type: 'restock', n: this.build.phaseStock });
+      }
+    }
+    if (this.feverOn && !this.fever) {
+      this.feverOn = false;
+      this.events.push({ type: 'fever', on: false, secs: 0 });
     }
     if (this.clock >= DAY_LENGTH) {
       this.ended = true;
@@ -469,14 +646,14 @@ export class Shop {
     while (this.banquetsLeft.length && this.banquetsLeft[0].at <= this.clock) {
       const b = this.banquetsLeft.shift()!;
       const dish = DISHES.find((d) => d.id === b.dish) ?? DISHES[DISHES.length - 1];
-      const maxWait = PHASES[ph].maxWait * this.difficulty.waitMult * BANQUET_WAIT_MULT;
+      const maxWait = PHASES[ph].maxWait * this.difficulty.waitMult * BANQUET_WAIT_MULT * (this.build?.waitMult ?? 1);
       this.queue.unshift({ id: this.nextId++, dish, look: this.nextId % LOOK_COUNT, wait: maxWait, maxWait, state: 'walk', t: 0, lack: 0, banquet: true });
       this.events.push({ type: 'banquet', dish });
     }
 
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      this.spawnTimer = PHASES[ph].every * this.difficulty.everyMult * this.rng.range(0.75, 1.25);
+      this.spawnTimer = PHASES[ph].every * this.difficulty.everyMult * (this.build?.everyMult ?? 1) * this.rng.range(0.75, 1.25);
       if (this.queue.length < SHOP.queueMax) this.queue.push(this.makeGuest());
     }
     // 同じ入口へ重ねて出さず、歩幅ぶんの間隔を空けて案内する。
@@ -486,11 +663,11 @@ export class Shop {
         if (this.seats[i]) continue;
         const g = this.queue.shift()!;
         g.state = 'walk';
-        g.walkDuration = entryDistance(TAVERN_SEATS[i]) / WALK_SPEED;
+        g.walkDuration = entryDistance(TAVERN_SEATS[i]) / (WALK_SPEED * (this.build?.walkMult ?? 1));
         g.t = g.walkDuration;
         this.seats[i] = g;
         this.events.push({ type: 'arrive', seat: i });
-        this.entryTimer = 0.45;
+        this.entryTimer = 0.45 / (this.build?.walkMult ?? 1);
         break;
       }
     }
@@ -512,9 +689,11 @@ export class Shop {
         } else if (g.wait <= 0) {
           this.seats[i] = null;
           this.stats.angry++;
-          this.combo = 0;
-          this.comboMistakes = 0;
-          this.score = Math.max(0, this.score - SHOP.angryPenalty * this.rules.angryPenaltyMult * (g.banquet ? BANQUET_PENALTY_MULT : 1));
+          if (!this.build?.keepCombo) {
+            this.combo = 0;
+            this.comboMistakes = 0;
+          }
+          if (!this.build?.noAngryPenalty) this.score = Math.max(0, this.score - SHOP.angryPenalty * (this.build?.angryMult ?? 1) * this.rules.angryPenaltyMult * (g.banquet ? BANQUET_PENALTY_MULT : 1));
           this.events.push({ type: 'angry', seat: i });
         }
       } else if (g.state === 'eat') {
@@ -541,18 +720,31 @@ export class Shop {
     const ph = this.phaseIndex;
     // 今テーブルにある注文・並んでいる客と同じ料理は出さない（全部出ている時だけ重複を許す）
     const taken = new Set([...this.seats, ...this.queue].filter((g): g is Guest => !!g).map((g) => g.dish.id));
-    const dish = this.pickDish(taken);
-    const maxWait = PHASES[ph].maxWait * this.difficulty.waitMult;
+    let dish = this.pickDish(taken);
+    let maxWait = PHASES[ph].maxWait * this.difficulty.waitMult * (this.build?.waitMult ?? 1);
+    const b = this.build;
+    // 繁盛記：大盛り（素材2倍・売上アップ）と、せっかちなお客（待ち時間が短い）。方針用の乱数で決める
+    const big = !!b && b.bigChance > 0 && this.brng!.next() < b.bigChance;
+    if (big) dish = { ...dish, group: dishGroup(dish), need: Object.fromEntries(Object.entries(dish.need).map(([k, n]) => [k, n! * BIG_NEED])), price: Math.round(dish.price * b!.bigMult) };
+    const hasty = !!b && b.impatient > 0 && this.brng!.next() < b.impatient;
+    if (hasty) maxWait *= 0.6;
     const guest: Guest = { id: this.nextId++, dish, look: this.rng.int(0, LOOK_COUNT - 1), wait: maxWait, maxWait, state: 'walk', t: 0, lack: 0 };
+    if (big) guest.big = true;
+    if (hasty) guest.hasty = true;
     // おかわり注文の日だけ乱数を使う（通常営業のお客の並びは変えない）
     if (this.rules.refillChance > 0 && this.rng.next() < this.rules.refillChance) guest.extra = this.pickDish(new Set([...taken, dish.id]));
+    // 繁盛記：〆は別腹（方針用の乱数で決める）
+    if (!guest.extra && this.build && this.build.refillChance > 0 && this.brng!.next() < this.build.refillChance) guest.extra = this.pickDish(new Set([...taken, dish.id]));
     return guest;
   }
 
   private pickDish(taken: Set<string>): Dish {
     const ph = this.phaseIndex;
-    const open = DISHES.filter((d) => d.from <= ph && !taken.has(d.id));
-    const menu = open.length ? open : DISHES.filter((d) => d.from <= ph);
+    // 繁盛記・のれんの試練：手のかかる料理が、早い時間帯から出る
+    const shift = this.build?.dishShift ?? 0;
+    const on = (d: Dish) => d.from - shift <= ph;
+    const open = DISHES.filter((d) => on(d) && !taken.has(d.id));
+    const menu = open.length ? open : DISHES.filter(on);
     // 新しく出る料理と、夜のエールを少し多めに
     // 出やすさはレシピ（仲間）ごとに決め、同じレシピの料理で等分する
     const size = new Map<string, number>();

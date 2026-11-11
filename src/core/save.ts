@@ -4,6 +4,7 @@ import { readCollection, type CollectionState } from './collection';
 import { PLAYER_ID } from './ranking';
 
 import { applyPlay, markRead, readRecords, type PlayFacts, type Records } from './achievements';
+import { readMeta, type RunMeta } from './run';
 
 export interface KeyValueStore {
   getItem(key: string): string | null;
@@ -26,14 +27,16 @@ export interface Settings {
   /** 最初の営業で、注文と調達の案内を見せ終えたか */
   guided: boolean;
   /** 前回選んだ営業（Enter で選ぶときに使う） */
-  playMode: 'normal' | 'daily';
+  playMode: 'normal' | 'daily' | 'run';
   /** れんしゅうを最後まで終えたか */
   tutorialDone: boolean;
   /** ランキングで前回使った名前 */
   rankingName: string;
+  /** 演出の強さ（0=ひかえめ、1=ふつう）。光・揺れ・紙吹雪の量を変える */
+  fxLevel: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '', tutorialDone: false, bgmLevel: 8, seLevel: 8, keyLevel: 8 };
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '', tutorialDone: false, bgmLevel: 8, seLevel: 8, keyLevel: 8, fxLevel: 1 };
 
 export interface DayRecord {
   score: number;
@@ -45,7 +48,7 @@ export interface DayRecord {
   finishedAt: string;
 }
 
-const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily', player: 'lastorder2.player', records: 'lastorder2.records.v1', collection: 'lastorder2.collection.v1' };
+const KEYS = { settings: 'lastorder2.settings', best: 'lastorder2.best', last: 'lastorder2.last', daily: 'lastorder2.daily', player: 'lastorder2.player', records: 'lastorder2.records.v1', collection: 'lastorder2.collection.v1', run: 'lastorder2.run.v1' };
 
 /** ひがわり営業の記録は、直近の何日分を残すか */
 export const DAILY_KEEP_DAYS = 30;
@@ -68,7 +71,7 @@ export class SaveStore {
   /** slot を指定すると別の保存枠を使う（動作確認用） */
   constructor(private store: KeyValueStore | null, slot = '') {
     const sfx = slot ? `.${slot.replace(/[^a-z0-9_-]/gi, '')}` : '';
-    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx, player: KEYS.player + sfx, records: KEYS.records + sfx, collection: KEYS.collection + sfx };
+    this.keys = { settings: KEYS.settings + sfx, best: KEYS.best + sfx, last: KEYS.last + sfx, daily: KEYS.daily + sfx, player: KEYS.player + sfx, records: KEYS.records + sfx, collection: KEYS.collection + sfx, run: KEYS.run + sfx };
   }
 
   /** 記録・実績（段階5）。保存がない・壊れているときは、空の記録から始める */
@@ -105,6 +108,40 @@ export class SaveStore {
     const after = fn(before);
     if (after !== before) this.write(this.keys.collection, after);
     return after;
+  }
+
+  /** 繁盛記の記録（進行中の挑戦を含む）。通常営業・ひがわりの記録とは別の場所に残す */
+  loadRun(): RunMeta {
+    return readMeta(this.read<unknown>(this.keys.run));
+  }
+
+  saveRun(m: RunMeta) {
+    this.write(this.keys.run, m);
+  }
+
+  /**
+   * 繁盛記の実績を解放する（段階5の実績と同じ場所に残すので、限定の飾りも同じ仕組みで「持っている」になる）。
+   * 直前に読み直し、新しく解放した分だけを返す。
+   */
+  unlockAchievements(ids: string[], now = new Date()): string[] {
+    const r = this.loadRecords();
+    const fresh = ids.filter((id) => !r.unlocked[id]);
+    if (!fresh.length) return [];
+    const unlocked = { ...r.unlocked };
+    for (const id of fresh) unlocked[id] = now.toISOString();
+    this.write(this.keys.records, { ...r, unlocked });
+    return fresh;
+  }
+
+  /** 繁盛記のごほうびを貯金箱へ（同じ挑戦のIDでは一度だけ） */
+  creditRun(id: string, amount: number): number {
+    let credited = 0;
+    this.updateCollection((s) => {
+      if (s.credited.includes(id)) return s;
+      credited = Math.max(0, Math.floor(amount));
+      return { ...s, coins: s.coins + credited, credited: [...s.credited, id].slice(-200) };
+    });
+    return credited;
   }
 
   /** 会話を開いたことを残す */

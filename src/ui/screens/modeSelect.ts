@@ -4,6 +4,7 @@ import { LW } from '../screen';
 import { RomajiMatcher } from '../../core/romaji';
 import { dailyConditions, dateLabel, jstDate } from '../../core/daily';
 import { difficultyOf } from '../../core/shopConfig';
+import { goalFor } from '../../core/run';
 import type { Game } from '../game';
 import { button, drawSignboard } from './common';
 import { drawCondChip } from './conditions';
@@ -11,7 +12,9 @@ import { drawCondChip } from './conditions';
 const MODES = [
   { kana: 'つうじょう', name: '通常営業', line: '3分間で、売上の自己ベストに挑戦' },
   { kana: 'ひがわり', name: 'ひがわり営業', line: '毎日変わるお題で、みんなと腕比べ' },
+  { kana: 'はんじょうき', name: '繁盛記', line: '方針を選んで店を育てる四日間' },
 ] as const;
+const MODE_ID = ['normal', 'daily', 'run'] as const;
 
 /** 鎖：上の端から札まで */
 function chain(g: Game, cx: number, from: number, to: number) {
@@ -36,20 +39,23 @@ export function drawModeSelect(g: Game) {
     sc.TB('営業をえらぶ', LW / 2, 13, 16, '#ffd98a', 'center', '#3a1408');
     MODES.forEach((md, i) => {
       const live = g.menu.active.find((l) => l.target.id === md.kana);
-      const last = (g.settings.playMode === 'daily') === (i === 1);
+      const last = g.settings.playMode === MODE_ID[i];
       const dim = typing && !live;
-      const w = 196;
+      const w = 148;
       const h = 150;
-      const x = i === 0 ? 34 : LW - 34 - w;
+      const x = 10 + i * 156;
       const y = (live ? 50 : 52) + Math.sin(g.t * 1.6 + i * 1.3) * (typing ? 0 : 0.8);
       // 外側の鎖は上の端から、内側の鎖は看板から下げる
-      chain(g, x + 28, i === 0 ? sc.ext.y0 - e.y0 / 2 : 40, y);
-      chain(g, x + w - 28, i === 0 ? 40 : sc.ext.y0 - e.y0 / 2, y);
+      const fromTop = sc.ext.y0 - e.y0 / 2;
+      chain(g, x + 28, i === 0 ? fromTop : i === 1 ? 40 : fromTop, y);
+      chain(g, x + w - 28, i === 2 ? fromTop : i === 1 ? 40 : fromTop, y);
       if (live) sc.glow(x, y, w, h, C.gold3);
       else if (last && !typing) sc.glow(x, y, w, h, C.gold3, 0.35 + 0.25 * Math.sin(g.t * 3));
       drawSignboard(g, x, y, w, h, y);
-      sc.TB(md.name, x + w / 2, y + 22, 20, '#ffe7b0', 'center', '#3a1408');
-      sc.T(md.line, x + w / 2, y + 50, 9, '#f3dcb0', 'center');
+      sc.TB(md.name, x + w / 2, y + 22, sc.fitSize(md.name, 20, w - 20), '#ffe7b0', 'center', '#3a1408');
+      sc.T(md.line, x + w / 2, y + 50, sc.fitSize(md.line, 9, w - 18, 6), '#f3dcb0', 'center');
+      // 右上は Enter の印の場所なので、左上に付ける
+      if (i === 2) { sc.panel(x + 8, y + 6, 36, 11, '#7a1f2a', '#ffd98a'); sc.T('上級向け', x + 26, y + 7.5, 7, '#fff0b0', 'center'); }
       // ローマ字の札：次に打つ文字が光り、キーが押される絵が動く
       const m = live?.matcher ?? new RomajiMatcher(md.kana);
       const rw = sc.W(m.typed + m.remaining, 11) + 14;
@@ -67,11 +73,17 @@ export function drawModeSelect(g: Game) {
       if (i === 0) {
         sc.T('営業時間 3:00', x + w / 2, y + 98, 9, '#f2efe2', 'center');
         const best = g.store.loadBest(diff.id);
-        sc.T(`${diff.name}のベスト ${best ? `${best.score.toLocaleString()}円` : '―'}`, x + w / 2, y + 118, 8, '#d9e4cf', 'center');
+        const line = `${diff.name}のベスト ${best ? `${best.score.toLocaleString()}円` : '―'}`;
+        sc.T(line, x + w / 2, y + 118, sc.fitSize(line, 8, w - 30, 6), '#d9e4cf', 'center');
+      } else if (i === 2) {
+        const m = g.runUI.meta;
+        sc.T(`のれん${m.loop}枚目${m.active ? '（途中）' : ''}`, x + w / 2, y + 96, 9, '#f2efe2', 'center');
+        sc.T(`3分×4日・目標 ${goalFor(0, m.loop, 'joren').toLocaleString()}円から`, x + w / 2, y + 111, sc.fitSize(`3分×4日・目標 ${goalFor(0, m.loop, 'joren').toLocaleString()}円から`, 7.5, w - 30, 5.5), '#d9e4cf', 'center');
+        sc.T(`クリア ${m.clears}回`, x + w / 2, y + 124, 7.5, '#d9e4cf', 'center');
       } else {
         const date = jstDate();
         sc.T(`${dateLabel(date)}のお題`, x + w / 2, y + 96, 9, '#f2efe2', 'center');
-        dailyConditions(date).forEach((c, k) => drawCondChip(sc, g.art, c, diff.id, x + 20, y + 108 + k * 15));
+        dailyConditions(date).forEach((c, k) => drawCondChip(sc, g.art, c, diff.id, x + 15, y + 108 + k * 15));
       }
       if (last && !typing) sc.keycap('Enter', x + w - 38, y + 10, 7);
       if (dim) sc.PR(x, y, w, h, '#0e0805', 0.6);

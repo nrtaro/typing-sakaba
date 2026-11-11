@@ -53,7 +53,8 @@ describe('シールの絵', () => {
     for (const it of ITEMS.filter((i) => i.kind === 'plate')) expect(existsSync(new URL(`plates/${it.id}.webp`, dir))).toBe(true);
     for (const s of SERIES) for (const done of [false, true]) expect(existsSync(new URL(sheetUrl(s.id, done).replace('/collection/', ''), dir))).toBe(true);
     expect(readdirSync(new URL('stickers/', dir))).toHaveLength(36);
-    expect(readdirSync(new URL('plates/', dir))).toHaveLength(24);
+    // 段階6の24枚と、繁盛記の限定3枚
+    expect(readdirSync(new URL('plates/', dir))).toHaveLength(27);
     expect(readdirSync(new URL('sheets/', dir))).toHaveLength(8);
     expect(readFileSync(new URL('README.md', dir), 'utf8')).toContain('stage6-art.mjs');
   });

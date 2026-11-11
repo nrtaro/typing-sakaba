@@ -103,6 +103,15 @@ export class Screen {
     return this.OY + (y + this.DY) * this.S;
   }
 
+  /** 基準の座標 ⇔ 実際の画面のピクセル（マウスの位置と比べるのに使う） */
+  toDevice(x: number, y: number) {
+    return { x: this.px(x), y: this.py(y) };
+  }
+
+  fromDevice(px: number, py: number) {
+    return { x: (px - this.OX) / this.S - this.DX, y: (py - this.OY) / this.S - this.DY };
+  }
+
   // ---------- 拡大後の画面に描く文字・枠（座標は基準の 480x270） ----------
 
   font(size: number) {

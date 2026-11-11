@@ -82,6 +82,12 @@ export const ITEM_LIST: Item[] = [
   word('front', 'shinsoku', 5, '神速'),
   word('front', 'nijiiro', 5, '虹色'),
 
+  // 繁盛記の限定（繁盛記の実績でだけ手に入る）
+  word('front', 'tomaranai', 3, '止まらない', ach('run-combo50')),
+  word('front', 'shobaihanjo', 4, '商売繁盛', ach('run-loop3')),
+  word('front', 'hengenjizai', 4, '変幻自在', ach('run-two-builds')),
+  word('front', 'daihanjo', 5, '大繁盛', ach('run-100k')),
+
   // ---------- 二つ名・後ろの言葉（人を表す） ----------
   word('back', 'joren', 2, '常連', ach('usual-seat')),
   word('back', 'karyudo', 3, '狩人', ach('tenth-deer')),
@@ -124,6 +130,12 @@ export const ITEM_LIST: Item[] = [
   word('back', 'sakabanohoshi', 5, '酒場の星'),
   word('back', 'ryorinokami', 5, '料理の神様'),
 
+  // 繁盛記の限定
+  word('back', 'norenmochi', 2, 'のれん持ち', ach('run-first-day')),
+  word('back', 'oobanburu', 3, '大盤振る舞い', ach('run-bigserve')),
+  word('back', 'shikakenin', 3, '仕掛け人', ach('run-discover5')),
+  word('back', 'motenashi', 3, 'もてなし上手', ach('run-no-angry')),
+
   // ---------- ネームプレート ----------
   plate('furunajimi', 3, '古なじみの木札', '#6b4a2a', '#c99a5a', '#fff6e0', 'wood', ach('long-friends')),
   plate('kondatecho', 2, '献立帳', '#efe2c0', '#8a6232', '#2a1a10', 'stripe', ach('five-menus')),
@@ -150,9 +162,18 @@ export const ITEM_LIST: Item[] = [
   plate('kinpaku', 5, '金箔', '#e8b830', '#fff4b0', '#2a1a10', 'gold'),
   plate('niji', 5, '虹の架け橋', '#ffffff', '#ff8ad8', '#2a1a10', 'gold'),
 
+  // 繁盛記の限定（絵のプロンプトは docs/hanjoki-plate-prompts.md。絵が届くまでは仮の札）
+  { id: 'p-hanjofuda', kind: 'plate', star: 4, source: ach('run-clear'), name: '繁盛のれん', plate: { bg: '#7a1f2a', border: '#ffd98a', text: '#fff6e0', art: 'noren' } },
+  { id: 'p-senryobako', kind: 'plate', star: 5, source: ach('run-loop5'), name: '千両箱', plate: { bg: '#2a1a10', border: '#ffd25c', text: '#fff6e0', art: 'senryo' } },
+  { id: 'p-hidencho', kind: 'plate', star: 4, source: ach('run-discover-all'), name: '秘伝の書', plate: { bg: '#efe2c0', border: '#8a3a2a', text: '#2a1a10', art: 'hiden' } },
+
   // ---------- 打鍵音 ----------
   sound('kifuda', 4, '魚の木札（カコン）', { wave: 'triangle', base: 520, decay: 0.07, partial: 3, noise: 0.03 }, ach('past-fish-tag')),
   sound('hocho', 4, '包丁（トントン）', { wave: 'square', base: 300, decay: 0.05, noise: 0.05 }, ach('dish-own-hand')),
+  // 繁盛記の限定
+  sound('hyoshigi', 4, '連鎖の拍子木（カカン）', { wave: 'square', base: 740, decay: 0.045, partial: 2.02, noise: 0.045 }, ach('run-chain')),
+  sound('koban', 4, '千両の小判（チャリン）', { wave: 'sine', base: 1560, decay: 0.16, partial: 1.5 }, ach('run-double')),
+  sound('ooiridaiko', 5, '大入り太鼓（ドドン）', { wave: 'sine', base: 196, decay: 0.11, partial: 0.5, noise: 0.07 }, ach('run-max3')),
   sound('kinomi', 1, '木の実', { wave: 'sine', base: 660, decay: 0.07 }),
   sound('pokopoko', 1, 'ぽこぽこ', { wave: 'triangle', base: 330, decay: 0.09 }),
   sound('koishi', 1, '小石', { wave: 'square', base: 880, decay: 0.03 }),

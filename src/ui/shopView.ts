@@ -12,6 +12,8 @@ import { animLength, walkFrame } from './amber/manifest';
 import { entryPose, WALK_SPEED } from '../core/tavernNavigation';
 import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/layout';
 import { RomajiMatcher } from '../core/romaji';
+import { policyTip, type Hover } from './hover';
+import { FAMILY_COLOR, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
 } from '../core/shopConfig';
@@ -30,6 +32,23 @@ interface Fx { anim: string; x: number; y: number; h: number; start: number }
 interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean; slot?: string; count?: number }
 interface FxBounds { x: number; y: number; w: number; h: number }
 interface Spark { bounds?: FxBounds; x: number; y: number; vx: number; vy: number; t: number; col: Color }
+
+/** 繁盛記：営業中に見せるもの（目標・方針の判子）。RunUI が毎日の開店時に渡す */
+export interface RunHud {
+  day: number;
+  loop: number;
+  goal: number;
+  owned: Owned[];
+  /** 方針が最後に効いた時刻と回数（判子を光らせる） */
+  fired: Partial<Record<PolicyId, number>>;
+  count: Partial<Record<PolicyId, number>>;
+  /** 目標を越えた時刻（まだなら -1） */
+  goalAt: number;
+}
+export function runHud(day: number, loop: number, goal: number, owned: Owned[]): RunHud {
+  return { day, loop, goal, owned, fired: {}, count: {}, goalAt: -1 };
+}
+const CHAIN_COL = FAMILY_COLOR.chain;
 
 /** 営業画面の見た目の状態（演出用。ゲームの計算には影響しない） */
 export class ShopView {
@@ -69,6 +88,18 @@ export class ShopView {
   gotTrip: { id: TripId; t: number; gains: Partial<Record<IngredientId, number>>; overflow: Partial<Record<IngredientId, number>>; lucky: boolean } | null = null;
   /** 出かけている／帰ってきた家族のひとこと */
   banner: { text: string; t: number; col: Color } | null = null;
+  /** 繁盛記の表示（通常営業・ひがわりでは null） */
+  run: RunHud | null = null;
+  /** マウスを乗せたときの説明の登録先 */
+  hover: Hover | null = null;
+  /** 演出の強さ（設定の「えんしゅつ」。ひかえめは光・揺れ・粒を減らす） */
+  fxScale = 1;
+  /** まとめ出しで皿が飛ぶ線・かけ合わせの知らせ・連鎖の掛け声 */
+  private links: { from: number; to: number; t: number; delay: number }[] = [];
+  private pairNote: { name: string; t: number } | null = null;
+  private chainNote: { count: number; total: number; t: number; x: number; y: number } | null = null;
+  /** 目標を越えた瞬間に鳴らす音などを、Game が一度だけ拾う */
+  goalHit = false;
 
   private pop(slot: string, p: Pop) {
     this.pops = this.pops.filter(old => old.slot !== slot);
@@ -83,19 +114,23 @@ export class ShopView {
         break;
       case 'serve': {
         const seat = SEATS[ev.seat];
+        // まとめ出しのついでの皿は、光・揺れ・掛け声を重ねない（打った皿の分だけにする）
+        const light = (ev.chain ?? 0) > 0;
         if (ev.combo >= 1) {
           const fx = comboFx(ev.combo);
-          this.flashPeak = fx.flash;
-          this.comboFlash = fx.flash ? 0.18 : 0;
-          if (fx.shake) { this.shakeT = 0.3; this.shakeAmp = fx.shake; }
-          for (let i = 0; i < fx.confetti; i++) {
+          if (!light) {
+            this.flashPeak = fx.flash * this.fxScale;
+            this.comboFlash = fx.flash ? 0.18 : 0;
+            if (fx.shake) { this.shakeT = 0.3; this.shakeAmp = fx.shake * this.fxScale; }
+          }
+          for (let i = 0; i < (light ? 0 : Math.round(fx.confetti * this.fxScale)); i++) {
             this.confetti.push({
               x: Math.random() * 480, y: -10 - Math.random() * 40, vx: (Math.random() - 0.5) * 30, vy: 40 + Math.random() * 50,
               t: 0, life: 1.6 + Math.random() * 0.8, col: CONFETTI[i % CONFETTI.length], spin: Math.random() * 6,
             });
           }
           if (this.confetti.length > 160) this.confetti.splice(0, this.confetti.length - 160);
-          if (fx.callout) this.callout = { text: fx.callout, t: 0, col: fx.color, level: fx.level };
+          if (fx.callout && !light) this.callout = { text: fx.callout, t: 0, col: fx.color, level: fx.level };
           const y = seat.ty - (this.art ? ORDER_CARD.offset : 70);
           this.comboCount = ev.combo;
           this.comboAnchor = { x: seat.x, y: y + 20 };
@@ -113,10 +148,55 @@ export class ShopView {
         }
         this.stirUntil = this.time + 2.4;
         this.fxs.push({ anim: 'きらめき', x: seat.x, y: seat.ty - 8, h: 22, start: this.time });
-        this.pop('income', { x: seat.x, y: seat.ty - 18, t: 0, text: `+${ev.gain}円`, col: C.gold, big: true });
-        this.sparkAt({ x: seat.x, y: seat.ty - 20 }, C.gold, 10, 80);
+        if (!this.run) {
+          this.pop('income', { x: seat.x, y: seat.ty - 18, t: 0, text: `+${ev.gain}円`, col: C.gold, big: true });
+          this.sparkAt({ x: seat.x, y: seat.ty - 20 }, C.gold, 10, 80);
+          break;
+        }
+        // 繁盛記：席ごとに売上を出し、効いた方針の判子を光らせる。ついでの皿は少し遅れて順に弾ける
+        const delay = (ev.chain ?? 0) * 0.07;
+        const tags = ev.tags ?? [];
+        const pairs = ev.pairs ?? 0;
+        const tint = pairs > 0 ? '#ffe27a' : tags.length ? FAMILY_COLOR[policyOf(tags[0]).family] : C.gold;
+        this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tint, big: true });
+        if (tags.length) this.pop(`tags${ev.seat}`, { x: seat.x, y: seat.ty - 6, t: -delay, text: pairs > 0 ? `かけ合わせ ×${(ev.pairMult ?? 1).toFixed(1)}` : tags.slice(0, 3).map((t) => POLICY_SEAL[t]).join('・'), col: tint });
+        this.sparkAt({ x: seat.x, y: seat.ty - 20 }, tint, Math.round((light ? 5 : 10) * this.fxScale), 80);
+        for (const t of tags) {
+          this.run.fired[t] = this.time + delay;
+          this.run.count[t] = (this.run.count[t] ?? 0) + 1;
+        }
+        if (ev.pair) {
+          this.pairNote = { name: pairOf(ev.pair)?.name ?? '', t: 0 };
+          this.sparkAt({ x: seat.x, y: seat.ty - 30 }, '#ffe27a', Math.round(24 * this.fxScale), 120);
+        }
         break;
       }
+      case 'chain': {
+        const from = ev.seats[0];
+        ev.seats.slice(1).forEach((to, i) => this.links.push({ from, to, t: 0, delay: i * 0.07 }));
+        const xs = ev.seats.map((s) => SEATS[s].x);
+        const ys = ev.seats.map((s) => SEATS[s].ty);
+        this.chainNote = { count: ev.count, total: ev.total, t: 0, x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+        if (ev.count >= 3) { this.shakeT = 0.3; this.shakeAmp = Math.max(this.shakeAmp, (ev.count - 2) * 0.6 * this.fxScale); }
+        break;
+      }
+      case 'fever':
+        if (ev.on) {
+          this.banner = { text: `大入り！ ${ev.secs}秒のあいだ売上アップ`, t: 1.6, col: '#ffe27a' };
+          if (this.run) this.run.fired.ooiri = this.time;
+          for (let i = 0; i < Math.round(30 * this.fxScale); i++) {
+            this.confetti.push({ x: Math.random() * 480, y: -10 - Math.random() * 40, vx: (Math.random() - 0.5) * 30, vy: 50 + Math.random() * 50, t: 0, life: 1.6 + Math.random() * 0.8, col: i % 2 ? '#ffd25c' : '#fff0a8', spin: Math.random() * 6 });
+          }
+        }
+        break;
+      case 'fresh':
+        this.banner = { text: `とれたて！ ${ev.n}秒のあいだ売上アップ`, t: 1.8, col: FAMILY_COLOR.trip };
+        if (this.run) this.run.fired.nushi = this.time;
+        break;
+      case 'restock':
+        this.banner = { text: `仕込みが上がった！ 全部の素材+${ev.n}`, t: 1.8, col: FAMILY_COLOR.stock };
+        if (this.run) this.run.fired.shikomi = this.time;
+        break;
       case 'lack': {
         const ls = SEATS[ev.seat];
         this.pop('warning', { x: ls.x, y: ls.ty - (this.art ? ORDER_CARD.offset : 70) - 6, t: 0, text: '素材が足りない！', col: '#ff6a5a', big: true });
@@ -220,6 +300,22 @@ export class ShopView {
     if (this.callout && (this.callout.t += dt) > 1.1) this.callout = null;
     for (const p of this.pops) p.t += dt;
     this.pops = this.pops.filter((p) => p.t < 1.3);
+    for (const l of this.links) l.t += dt;
+    this.links = this.links.filter((l) => l.t - l.delay < 0.45);
+    if (this.pairNote && (this.pairNote.t += dt) > 2.2) this.pairNote = null;
+    if (this.chainNote && (this.chainNote.t += dt) > 1.0) this.chainNote = null;
+    if (this.sparks.length > 420) this.sparks.splice(0, this.sparks.length - 420);
+    // 繁盛記：目標を越えた瞬間
+    if (this.run && shop && this.run.goalAt < 0 && shop.score >= this.run.goal) {
+      this.run.goalAt = this.time;
+      this.goalHit = true;
+      this.callout = { text: '目標突破！', t: 0, col: '#ffe27a', level: 8 };
+      this.flashPeak = 0.22 * this.fxScale;
+      this.comboFlash = 0.18;
+      for (let i = 0; i < Math.round(70 * this.fxScale); i++) {
+        this.confetti.push({ x: Math.random() * 480, y: -10 - Math.random() * 60, vx: (Math.random() - 0.5) * 40, vy: 45 + Math.random() * 60, t: 0, life: 1.8 + Math.random(), col: CONFETTI[i % CONFETTI.length], spin: Math.random() * 6 });
+      }
+    }
     for (const p of this.sparks) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 140 * dt; }
     this.sparks = this.sparks.filter((p) => p.t < 0.7);
     if (this.lackTrip && (this.lackTrip.t -= dt) <= 0) this.lackTrip = null;
@@ -353,6 +449,7 @@ export class ShopView {
     sc.shifted(0, e.y0, () => {
       this.drawHud(sc, shop);
       this.drawRules(sc, shop);
+      if (this.run) this.drawRunHud(sc, shop, this.run);
     });
     sc.shifted(0, e.y1 - 270, () => this.drawSupply(sc, shop, t));
   }
@@ -483,8 +580,8 @@ export class ShopView {
   private drawRules(sc: Screen, shop: Shop) {
     const e = sc.ext;
     const r = shop.rules;
-    const x0 = e.x0 + 6;
-    let y = 28;
+    const x0 = e.x0 + (this.run ? 32 : 6);
+    let y = this.run ? 43 : 28;
     const chip = (text: string, col: Color, edge: Color = C.wood3, extra = 0, dx = 0, fill: Color = 'rgba(42,27,38,0.94)') => {
       const w = sc.W(text, 8) + 12 + extra;
       sc.panel(x0 + dx, y, w, 13, fill, edge);
@@ -561,20 +658,22 @@ export class ShopView {
     const active = shop.input.active;
     // 1つに絞り込めた札には、コンボを付ける（大きさは変えず、隣の注文を隠さない）
     const focus = typing && active.length === 1 && active[0].target.data.kind === 'order' ? active[0].target.id : null;
+    // 繁盛記「まとめ出し」：打っている皿といっしょに出る注文を、打つ前から見せる
+    const also = focus ? new Set(shop.chainSeats(Number(focus.slice(5))).filter((s) => !shop.canMake(shop.seats[s]!.dish).length)) : null;
     shop.seats.forEach((gst, i) => {
       if (!gst || gst.state !== 'wait') return;
-      this.drawOrderCard(sc, shop, i, `seat:${i}` === focus);
+      this.drawOrderCard(sc, shop, i, `seat:${i}` === focus, !!also?.has(i));
     });
   }
 
   /** 注文の札。big は打っている札を大きく描く（コンボもこの札に付ける） */
-  private drawOrderCard(sc: Screen, shop: Shop, i: number, big: boolean) {
+  private drawOrderCard(sc: Screen, shop: Shop, i: number, big: boolean, also = false) {
     const gst = shop.seats[i]!;
     const typing = shop.input.typed.length > 0;
     const active = shop.input.active;
     const seat = SEATS[i];
     const live = active.find((l) => l.target.id === `seat:${i}`);
-    const dim = typing && !live;
+    const dim = typing && !live && !also;
     // 同じ料理の候補のうち、先に出す客だけを金色に
     const twins = active
       .filter((l) => l.target.data.kind === 'order' && l.target.kana === gst.dish.kana)
@@ -590,10 +689,11 @@ export class ShopView {
     const y = bottom - bh - (live ? 2 : 0);
     const cx = x + bw / 2;
     const short = Object.entries(gst.dish.need).some(([id, n]) => shop.stock[id as IngredientId] < n!);
-    const edge = second ? C.cream2 : live ? C.gold : short ? (Math.sin(this.time * 8) > 0 ? '#ff5a4a' : C.red2) : C.wood4;
+    const edge = also ? CHAIN_COL : second ? C.cream2 : live ? C.gold : short ? (Math.sin(this.time * 8) > 0 ? '#ff5a4a' : C.red2) : C.wood4;
     const a = dim ? 0.5 : 1;
     if (live) sc.PR(x + 1, y + 3, bw, bh, '#0c0604', 0.45);
     if (live) sc.glow(x, y, bw, bh, second ? C.cream2 : C.gold);
+    if (also) sc.glow(x, y, bw, bh, CHAIN_COL, 0.55 + 0.3 * Math.sin(this.time * 10));
     sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
     sc.PR(seat.x - 2, bottom, 4, 2, edge, a);
     sc.PR(seat.x - 1, bottom + 2, 2, 1, edge, a);
@@ -636,6 +736,7 @@ export class ShopView {
       if (!first) sc.TB('いそいで！', x + 2, y - 10, 8, blink > 0.5 ? '#ffd0c8' : '#ff6a5a', 'left', C.ink, dim ? 0.6 : 1);
     }
     if (first) sc.TB('▼先に出す', cx, y - 10, 8, C.gold3, 'center');
+    if (also) sc.TB('＋いっしょに', cx, y - 10, 8, CHAIN_COL, 'center');
     if (gst.banquet) {
       // 宴会の札：金の縁と「予約の宴会」の帯
       sc.glow(x, y, bw, bh, '#ffe27a', 0.35 + 0.2 * Math.sin(this.time * 4));
@@ -649,6 +750,15 @@ export class ShopView {
     }
     if (gst.extra) this.drawExtraTag(sc, gst.extra, x + bw, first || urgent || (big && shop.combo >= 2) ? y - 22 : y - 9, dim);
     if (gst.refill && !typing && !first) sc.TB('おかわり', x + 2, y - 9, 8, C.gold3, 'left', C.ink);
+    // 繁盛記：大盛り（素材2倍・売上アップ）と、せっかちなお客の印。札の右上の角に付ける
+    if (gst.big) {
+      sc.panel(x + bw - 27, y - 6, 28, 10, '#7a4a10', FAMILY_COLOR.stock, a);
+      sc.T('大盛り', x + bw - 13, y - 4.5, 7, '#fff0b0', 'center', a);
+    }
+    if (gst.hasty) {
+      sc.panel(x + bw - (gst.big ? 39 : 11), y - 6, 11, 10, '#5a1018', '#ff6a5a', a);
+      sc.T('急', x + bw - (gst.big ? 33.5 : 5.5), y - 4.5, 7, '#ffd0c8', 'center', a);
+    }
     // 打っている札の上にコンボを付ける（目線を動かさずに見えるように）
     if (big && shop.combo >= 2) {
       const fx = comboFx(shop.combo);
@@ -764,6 +874,8 @@ export class ShopView {
           sc.panel(ex - 3, ey - 2, 50, 24, 'rgba(90,16,24,0.55)', n === 0 ? '#ff5a4a' : C.red2, dim ? 0.5 : 0.6 + 0.4 * pulse);
         }
         this.icon(sc, ing, ex - 1 + shake, ey - 1, 24, dim ? 0.5 : n === 0 ? 0.55 : 1);
+        // 繁盛記「おやじの見栄」：いま一番少ない素材（これを使う皿は売上アップ）
+        if (shop.build && shop.build.lowMult > 1 && shop.scarcest().includes(ing)) sc.TB(`見栄×${shop.build.lowMult}`, ex + 34, ey - 6, 8, FAMILY_COLOR.stock, 'center', C.ink, dim ? 0.5 : 1);
         sc.TB(`×${n}`, ex + 24, ey + 4, 13, low ? '#ff7a6a' : C.w, 'left', C.ink, dim ? 0.5 : 1);
         // 届くまで時間がかかる：届く途中の量。素材が傷む：一番古い分が傷むまでの秒数
         const coming = shop.pendingFor(ing);
@@ -802,6 +914,97 @@ export class ShopView {
         sc.TB(`${tr.act}中…`, x + w / 2, y + 20, 11, C.gold3, 'center');
       }
     });
+  }
+
+  /** 繁盛記：目標の帯（上の帯のすぐ下・左）と、方針の判子（左端に縦に並べる） */
+  private drawRunHud(sc: Screen, shop: Shop, run: RunHud) {
+    const x0 = sc.ext.x0 + 6;
+    const w = 150;
+    const p = Math.min(1, shop.score / Math.max(1, run.goal));
+    const done = run.goalAt >= 0;
+    const since = done ? this.time - run.goalAt : 99;
+    const bump = done && since < 0.4 ? Math.sin((since / 0.4) * Math.PI) * 2 : 0;
+    sc.panel(x0, 28 - bump, w, 13, 'rgba(42,27,38,0.94)', done ? C.gold3 : C.wood3);
+    sc.PR(x0 + 1, 29 - bump, (w - 2) * p, 11, done ? '#b8862a' : '#6a3a52', 0.9);
+    if (done) sc.glow(x0, 28 - bump, w, 13, C.gold3, Math.max(0.25, 1 - since) * (0.7 + 0.3 * Math.sin(this.time * 6)));
+    const head = `${run.day + 1}日目`;
+    sc.T(head, x0 + 4, 30 - bump, 8, C.cream);
+    const over = shop.score - run.goal;
+    const text = done ? `目標突破！ +${over.toLocaleString()}円` : `目標 ${run.goal.toLocaleString()}円（あと${(-over).toLocaleString()}）`;
+    sc.T(text, x0 + w - 4, 30 - bump, sc.fitSize(text, 8, w - sc.W(head, 8) - 12, 5), done ? '#fff0b0' : C.w, 'right');
+    // とれたて・大入りの残り
+    let nx = x0 + w + 4;
+    const note = (label: string, col: Color) => {
+      const tw = sc.W(label, 8) + 10;
+      sc.panel(nx, 28, tw, 13, 'rgba(42,27,38,0.94)', col);
+      sc.glow(nx, 28, tw, 13, col, 0.35 + 0.25 * Math.sin(this.time * 8));
+      sc.T(label, nx + 5, 30, 8, col);
+      nx += tw + 3;
+    };
+    if (shop.fever) note(`大入り ${Math.ceil(shop.feverUntil - shop.clock)}秒`, '#ffe27a');
+    if (shop.fresh > 0) note(`とれたて あと${Math.ceil(shop.fresh)}秒`, FAMILY_COLOR.trip);
+    // 方針の判子：効いた瞬間に弾んで光る
+    run.owned.forEach((o, i) => {
+      const pol = policyOf(o.id);
+      const col = FAMILY_COLOR[pol.family];
+      const y = 45 + i * 25;
+      const age = this.time - (run.fired[o.id] ?? -10);
+      const hot = age >= 0 && age < 0.5;
+      const k = hot ? 1 - age / 0.5 : 0;
+      const dx = k * 3;
+      if (hot) sc.radialGlow(x0 + 11 + dx, y + 10, 16 + k * 8, col, 0.75 * k);
+      sc.panel(x0 + dx, y, 22, 21, hot ? '#3a2430' : 'rgba(34,22,30,0.9)', col, pol.fires ? 1 : 0.8);
+      sc.T(POLICY_SEAL[o.id], x0 + 11 + dx, y + 2 - k * 1.5, 8 + k * 2, hot ? C.w : col, 'center');
+      for (let n = 0; n < MAX_LEVEL; n++) sc.PR(x0 + 3 + n * 6 + dx, y + 15, 4, 3, n < o.lv ? col : '#4a3a44');
+      // マウスを乗せると効果（営業中も、一時停止中も）
+      this.hover?.add(sc, x0, y, 22, 21, policyTip(o.id, o.lv, run.owned));
+    });
+  }
+
+  /** 繁盛記：まとめ出しで皿が飛ぶ線、連鎖の掛け声、かけ合わせの知らせ、大入りの縁の光 */
+  private drawRunFx(sc: Screen, shop: Shop) {
+    if (!this.run) return;
+    const e = sc.ext;
+    if (shop.fever) {
+      const a = (0.2 + 0.12 * Math.sin(this.time * 9)) * (0.5 + 0.5 * this.fxScale);
+      sc.fade(e.x0, e.y0, e.w, 14, '#ffd25c', a, 0, 'y');
+      sc.fade(e.x0, e.y1, e.w, -14, '#ffd25c', a * 0.7, 0, 'y');
+      sc.fade(e.x0, e.y0, 10, e.h, '#ffd25c', a, 0, 'x');
+      sc.fade(e.x1, e.y0, -10, e.h, '#ffd25c', a, 0, 'x');
+    }
+    for (const l of this.links) {
+      const t = (l.t - l.delay) / 0.3;
+      if (t < 0) continue;
+      const a = SEATS[l.from];
+      const b = SEATS[l.to];
+      // 打った卓から、ついでの卓へ光の粒が弧を描いて飛ぶ
+      for (let n = 0; n < 9; n++) {
+        const u = Math.min(1, t) - n * 0.05;
+        if (u < 0) continue;
+        const x = a.x + (b.x - a.x) * u;
+        const y = a.ty - 30 + (b.ty - a.ty) * u - Math.sin(u * Math.PI) * 22;
+        sc.PR(x - 1, y - 1, n === 0 ? 3 : 2, n === 0 ? 3 : 2, n === 0 ? C.w : CHAIN_COL, Math.max(0, (1 - n / 9) * (t > 1 ? 1 - (t - 1) * 2 : 1)));
+      }
+    }
+    if (this.chainNote) {
+      const c = this.chainNote;
+      const grow = c.t < 0.1 ? 0.7 + c.t * 5 : 1.2 - Math.min(0.2, (c.t - 0.1) * 0.6);
+      const a = Math.min(1, (1 - c.t) * 3);
+      const size = (11 + Math.min(4, c.count) * 1.5) * grow;
+      sc.TB(`${c.count}皿いっぺん！`, c.x, c.y - 44 - c.t * 8, size, CHAIN_COL, 'center', C.ink, a);
+      sc.TB(`+${c.total.toLocaleString()}円`, c.x, c.y - 44 + size - c.t * 8, 9, C.gold3, 'center', C.ink, a);
+    }
+    if (this.pairNote) {
+      const n = this.pairNote;
+      const a = Math.min(1, n.t * 6, (2.2 - n.t) * 2);
+      const text = `かけ合わせ『${n.name}』`;
+      const tw = sc.W(text, 11) + 24;
+      const x = LW / 2 + 40 - tw / 2;
+      const y = 92 - Math.max(0, 0.15 - n.t) * 40;
+      sc.glow(x, y, tw, 20, '#ffe27a', a * (0.6 + 0.3 * Math.sin(this.time * 10)));
+      sc.panel(x, y, tw, 20, '#3a2410', '#ffe27a', a);
+      sc.TB(text, x + tw / 2, y + 4.5, 11, '#fff0b0', 'center', C.ink, a);
+    }
   }
 
   /** 食材アイコン：素材があれば画像、なければコードで描いた絵 */
@@ -993,7 +1196,7 @@ export class ShopView {
         const col = fx.max ? CONFETTI[Math.floor((this.time + p.t) * 12) % CONFETTI.length] : p.col;
         sc.TB(String(p.count), p.x, p.y + 1 - (punch - 1) * 6, sc.fitSize(String(p.count), fx.numberSize * punch, 58), col, 'center', C.ink, a);
         sc.TB(fx.max ? 'FEVER' : 'COMBO' + (fx.level >= 6 ? '!!' : fx.level ? '!' : ''), p.x, p.y + 31, 8, col, 'center', C.ink, a);
-      } else sc.TB(p.text, p.x, p.y - p.t * 16, p.big ? 12 : 11, p.col, 'center', C.ink, a);
+      } else if (p.t >= 0) sc.TB(p.text, p.x, p.y - p.t * 16, p.slot?.startsWith('tags') ? 8 : (p.big ? 12 : 11) * (1 + Math.max(0, 0.12 - p.t) * 2.5), p.col, 'center', C.ink, a);
     }
     if (this.callout) {
       // 節目の掛け声：客席の列の間（注文の札を隠さない位置）に大きく弾ませる
@@ -1005,10 +1208,11 @@ export class ShopView {
       sc.TB(c.text, LW / 2 + 41.5, 151.5 - size / 2, size, C.ink, 'center', col, a * 0.8);
       sc.TB(c.text, LW / 2 + 40, 150 - size / 2, size, col, 'center', C.ink, a);
     }
+    this.drawRunFx(sc, shop);
     if (this.banner) {
       // 家族のひとことは、注文の札がない厨房の上に出す
       const tw = sc.W(this.banner.text, 10) + 20;
-      const bx = Math.max(4, 82 - tw / 2);
+      const bx = Math.max(this.run ? 34 : 4, 82 - tw / 2);
       sc.panel(bx, 64, tw, 18, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));
       sc.TB(this.banner.text, bx + tw / 2, 68, 10, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
     }
