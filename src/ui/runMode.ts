@@ -593,7 +593,7 @@ export class RunUI {
         lrows.forEach((t, k) => sc.T(t, x + 8, ly + 3 + k * 9.5, 7.5, o.hot ? '#ffe9b4' : '#bfe6d2', 'left', a));
       }
       this.roma(sc, pol.kana, x + w / 2, y + 150, dim, sc.fitSize(new RomajiMatcher(pol.kana).remaining, 10, w - 22, 6.5));
-      if (!p.chosen) this.tip(sc, x, y, w, h, policyTip(o.id, o.lv, run.owned));
+      // 候補には効果と相性を直接表示する。札全体のホバーは隣の候補を覆うため付けない。
       if (chosen) {
         const k = (g.t - p.chosen!.at) / 0.85;
         sc.radialGlow(x + w / 2, y + h / 2, 60 + k * 80, col, 0.5 * (1 - k));

@@ -15,7 +15,7 @@ import { SaveStore, type KeyValueStore } from '../src/core/save';
 import { readDecoration } from '../src/core/ranking';
 import { PlaySession, replay } from '../src/core/session';
 import { RomajiMatcher } from '../src/core/romaji';
-import { botRun, prefer, NONE } from './runBot';
+import { botRun, prefer, NONE, RANDOM } from './runBot';
 
 const dish = (id: string) => DISHES.find((d) => d.id === id)!;
 const guest = (id: string, wait = 20): Guest => ({ id: Math.random(), dish: dish(id), look: 0, wait, maxWait: 30, state: 'wait', t: 0, lack: 0 });
@@ -194,7 +194,7 @@ describe('作り直した方針', () => {
 
   it('強化の説明は、変わる数字を「前→後」で見せる', () => {
     const parts = descDiff('betsubara', 1, 2);
-    expect(parts.filter((x) => x.hot).map((x) => x.t)).toEqual(['35%→50%', '1.8→2.4']);
+    expect(parts.filter((x) => x.hot).map((x) => x.t)).toEqual(['35%→50%', '2→2.8']);
     expect(descDiff('ryoshusho', 2, 3).filter((x) => x.hot).map((x) => x.t)).toEqual(['3→3.5']);
   });
 });
@@ -330,11 +330,28 @@ describe('進行', () => {
     expect(replay(1, DIFFICULTIES[1], NORMAL_RULES, null, '').ok).toBe(true);
   });
 
+  it('ボット：翌日の営業は表示された候補から選ぶ', () => {
+    const result = botRun(11, prefer('調達', ['nushi', 'tairyo', 'oomori']), 6.5, 0.04, 1, emptyMeta(), true);
+    expect(result.run.days).toHaveLength(4);
+    for (let day = 1; day < 4; day++) {
+      const offered = roadOffers(result.run.seed, day - 1).map((road) => road.id);
+      expect(offered).toContain(result.run.days[day].road);
+    }
+  });
+
+  it('ボット：好みの方針が候補にないとき、残り回数の範囲で引き直す', () => {
+    const result = botRun(11, prefer('連鎖', ['matome', 'mouippai', 'betsubara']), 6.5, 0.04, 1, emptyMeta(), true);
+    expect(result.rerollsUsed).toBeGreaterThan(0);
+    expect(result.rerollsUsed).toBeLessThanOrEqual(5);
+  });
+
   it('ボット：方針なしは4日もたない。考えた構成は、でたらめより先まで進む', () => {
     const none = [11, 23, 37].map((s) => botRun(s, NONE, 4.5, 0.06, 1, undefined, false, 0.5));
     expect(none.every((r) => !r.cleared)).toBe(true);
     const built = [11, 23, 37].map((s) => botRun(s, prefer('調達', ['nushi', 'tairyo', 'mie', 'makanai', 'shikomi', 'mouippai']), 6.5, 0.04, 1, undefined, false, 0.35));
     expect(built.filter((r) => r.cleared).length).toBeGreaterThanOrEqual(2);
+    const random = [11, 23, 37].map((s) => botRun(s, RANDOM, 6.5, 0.04, 1, undefined, false, 0.35));
+    expect(built.filter((r) => r.cleared).length).toBeGreaterThan(random.filter((r) => r.cleared).length);
   }, 120000);
 });
 

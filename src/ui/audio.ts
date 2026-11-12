@@ -528,10 +528,13 @@ export class Sound {
   }
 
   /** かけ合わせが効いた（何度も鳴るので控えめに） */
-  pairHit() {
+  pairHit(family = 'combo', count = 1) {
     if (!this.ok || !this.gate('pair', 0.16)) return;
     const t = this.now + 0.04;
-    [33, 38].forEach((s, i) => this.tone(this.semi(s), t + i * 0.035, 0.16, 'sine', 0.022, this.fx('policy')));
+    const root = { chain: 31, combo: 33, trip: 26, stock: 21, guest: 38 }[family] ?? 33;
+    const wave: OscillatorType = family === 'stock' ? 'triangle' : family === 'combo' ? 'square' : 'sine';
+    const notes = count >= 3 ? [0, 7, 12] : [0, 7];
+    notes.forEach((step, i) => this.tone(this.semi(root + step), t + i * 0.035, 0.16, wave, 0.022, this.fx('policy')));
   }
 
   /** かけ合わせをはじめて見つけた：ひらめきの音 */

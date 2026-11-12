@@ -97,7 +97,7 @@ export class ShopView {
   /** まとめ出しで皿が飛ぶ線・かけ合わせの知らせ・連鎖の掛け声 */
   private links: { from: number; to: number; t: number; delay: number }[] = [];
   private pairNote: { name: string; t: number } | null = null;
-  private chainNote: { count: number; total: number; t: number; x: number; y: number } | null = null;
+  private chainNote: { count: number; total: number; t: number } | null = null;
   /** 目標を越えた瞬間に鳴らす音などを、Game が一度だけ拾う */
   goalHit = false;
 
@@ -174,9 +174,7 @@ export class ShopView {
       case 'chain': {
         const from = ev.seats[0];
         ev.seats.slice(1).forEach((to, i) => this.links.push({ from, to, t: 0, delay: i * 0.07 }));
-        const xs = ev.seats.map((s) => SEATS[s].x);
-        const ys = ev.seats.map((s) => SEATS[s].ty);
-        this.chainNote = { count: ev.count, total: ev.total, t: 0, x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+        this.chainNote = { count: ev.count, total: ev.total, t: 0 };
         if (ev.count >= 3) { this.shakeT = 0.3; this.shakeAmp = Math.max(this.shakeAmp, (ev.count - 2) * 0.6 * this.fxScale); }
         break;
       }
@@ -369,6 +367,7 @@ export class ShopView {
   private drawScene(sc: Screen, shop: Shop, t: number, reduce: boolean) {
     if (this.art) {
       this.drawAmber(sc, shop, this.art);
+      this.drawRunFx(sc, shop);
       this.drawOrders(sc, shop);
       this.drawEdges(sc, shop, t);
       this.drawFx(sc, shop);
@@ -384,6 +383,7 @@ export class ShopView {
     this.drawActors(sc, shop, t);
     drawLights(g, ph, sc);
     sc.present();
+    this.drawRunFx(sc, shop);
     this.drawOrders(sc, shop);
     this.drawEdges(sc, shop, t);
     this.drawFx(sc, shop);
@@ -991,19 +991,21 @@ export class ShopView {
       const grow = c.t < 0.1 ? 0.7 + c.t * 5 : 1.2 - Math.min(0.2, (c.t - 0.1) * 0.6);
       const a = Math.min(1, (1 - c.t) * 3);
       const size = (11 + Math.min(4, c.count) * 1.5) * grow;
-      sc.TB(`${c.count}皿いっぺん！`, c.x, c.y - 44 - c.t * 8, size, CHAIN_COL, 'center', C.ink, a);
-      sc.TB(`+${c.total.toLocaleString()}円`, c.x, c.y - 44 + size - c.t * 8, 9, C.gold3, 'center', C.ink, a);
+      // 左の厨房側にまとめ、注文札の言葉と重ならないようにする。
+      sc.TB(`${c.count}皿いっぺん！`, 105, 145 - c.t * 8, size, CHAIN_COL, 'center', C.ink, a);
+      sc.TB(`+${c.total.toLocaleString()}円`, 105, 145 + size - c.t * 8, 9, C.gold3, 'center', C.ink, a);
     }
     if (this.pairNote) {
       const n = this.pairNote;
       const a = Math.min(1, n.t * 6, (2.2 - n.t) * 2);
       const text = `かけ合わせ『${n.name}』`;
-      const tw = sc.W(text, 11) + 24;
-      const x = LW / 2 + 40 - tw / 2;
+      const size = sc.fitSize(text, 10, 154, 7);
+      const tw = sc.W(text, size) + 14;
+      const x = 105 - tw / 2;
       const y = 92 - Math.max(0, 0.15 - n.t) * 40;
       sc.glow(x, y, tw, 20, '#ffe27a', a * (0.6 + 0.3 * Math.sin(this.time * 10)));
       sc.panel(x, y, tw, 20, '#3a2410', '#ffe27a', a);
-      sc.TB(text, x + tw / 2, y + 4.5, 11, '#fff0b0', 'center', C.ink, a);
+      sc.TB(text, x + tw / 2, y + 4.5, size, '#fff0b0', 'center', C.ink, a);
     }
   }
 
@@ -1204,17 +1206,20 @@ export class ShopView {
       const grow = c.t < 0.12 ? 0.6 + c.t / 0.12 * 0.6 : 1.2 - Math.min(0.2, (c.t - 0.12) * 0.8);
       const a = Math.min(1, (1.1 - c.t) * 3);
       const size = (14 + c.level * 1.2) * grow;
+      const drawSize = this.run ? sc.fitSize(c.text, size, 150) : size;
+      const cx = this.run ? 105 : LW / 2 + 40;
+      const cy = this.run ? 123 : 150;
       const col = c.level >= 10 ? CONFETTI[Math.floor(this.time * 12) % CONFETTI.length] : c.col;
-      sc.TB(c.text, LW / 2 + 41.5, 151.5 - size / 2, size, C.ink, 'center', col, a * 0.8);
-      sc.TB(c.text, LW / 2 + 40, 150 - size / 2, size, col, 'center', C.ink, a);
+      sc.TB(c.text, cx + 1.5, cy + 1.5 - drawSize / 2, drawSize, C.ink, 'center', col, a * 0.8);
+      sc.TB(c.text, cx, cy - drawSize / 2, drawSize, col, 'center', C.ink, a);
     }
-    this.drawRunFx(sc, shop);
     if (this.banner) {
       // 家族のひとことは、注文の札がない厨房の上に出す
-      const tw = sc.W(this.banner.text, 10) + 20;
-      const bx = Math.max(this.run ? 34 : 4, 82 - tw / 2);
+      const size = this.run ? sc.fitSize(this.banner.text, 10, 154, 7) : 10;
+      const tw = sc.W(this.banner.text, size) + 20;
+      const bx = this.run ? 105 - tw / 2 : Math.max(4, 82 - tw / 2);
       sc.panel(bx, 64, tw, 18, 'rgba(42,27,38,0.95)', C.gold, Math.min(1, this.banner.t * 3));
-      sc.TB(this.banner.text, bx + tw / 2, 68, 10, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
+      sc.TB(this.banner.text, bx + tw / 2, 68, size, this.banner.col, 'center', C.ink, Math.min(1, this.banner.t * 3));
     }
     // 絞り込み中だけ、打った途中のローマ字を薄く出す
     if (this.missFlash > 0) {

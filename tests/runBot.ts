@@ -5,14 +5,15 @@ import { RomajiMatcher } from '../src/core/romaji';
 import { GatheringGame } from '../src/core/minigames';
 import { SOURCE, TRIPS, type IngredientId } from '../src/core/shopConfig';
 import { modsFor, type PolicyId } from '../src/core/build';
-import { applyOffer, closeDay, dayPlan, emptyMeta, newRun, offersFor, roadOffers, takeRoad, PICKS_PER_DAY, RUN_DAYS, type Offer, type RoadId, type RunMeta, type RunState } from '../src/core/run';
+import { applyOffer, closeDay, dayPlan, emptyMeta, newRun, offersFor, roadOffers, roadOf, takeRoad, PICKS_PER_DAY, RUN_DAYS, type Offer, type RoadId, type RunMeta, type RunState } from '../src/core/run';
 
-export type Strategy = { name: string; pick: (offers: Offer[], run: RunState, rng: Rng) => { offer: Offer; drop: PolicyId | null } | null; road?: (ids: RoadId[], run: RunState) => RoadId };
+export type Strategy = { name: string; pick: (offers: Offer[], run: RunState, rng: Rng) => { offer: Offer; drop: PolicyId | null } | null; reroll?: (offers: Offer[], run: RunState) => boolean; road?: (ids: RoadId[], run: RunState, rng: Rng) => RoadId };
 
 /** 好きな順に選ぶ作戦（上にあるものほど優先。持っていれば強化も取る） */
 export function prefer(name: string, order: PolicyId[], road?: Strategy['road']): Strategy {
   return {
     name, road,
+    reroll: (offers) => !offers.some((o) => order.slice(0, 3).includes(o.id) || o.kind === 'up' && order.includes(o.id)),
     pick: (offers, run) => {
       const score = (o: Offer) => { const i = order.indexOf(o.id); return i < 0 ? -1 : (order.length - i) * 10 + (o.kind === 'up' ? 3 : 0); };
       const best = [...offers].sort((a, b) => score(b) - score(a))[0];
@@ -20,13 +21,16 @@ export function prefer(name: string, order: PolicyId[], road?: Strategy['road'])
       if (best.kind !== 'swap') return { offer: best, drop: null };
       if (score(best) < 0) return null;
       // 入れ替え：好みにない方針（なければいちばん下の好み）を外す
-      const drop = [...run.owned].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)).find((o) => !order.includes(o.id)) ?? null;
+      const rank = (id: PolicyId) => order.includes(id) ? order.indexOf(id) : order.length;
+      const worst = [...run.owned].sort((a, b) => rank(b.id) - rank(a.id))[0];
+      const drop = worst && rank(best.id) < rank(worst.id) ? worst : null;
       return drop ? { offer: best, drop: drop.id } : (offers.find((o) => o.kind === 'up') ? { offer: offers.find((o) => o.kind === 'up')!, drop: null } : null);
     },
   };
 }
 export const RANDOM: Strategy = {
   name: 'でたらめ',
+  road: (ids, _run, rng) => ids[Math.floor(rng.next() * ids.length)],
   pick: (offers, run, rng) => {
     const o = offers[Math.floor(rng.next() * offers.length)];
     return o ? { offer: o, drop: o.kind === 'swap' ? run.owned[Math.floor(rng.next() * run.owned.length)].id : null } : null;
@@ -34,7 +38,17 @@ export const RANDOM: Strategy = {
 };
 export const NONE: Strategy = { name: '方針なし', pick: () => null };
 
-export interface BotRun { cleared: boolean; day: number; days: { sales: number; goal: number; served: number; angry: number; maxCombo: number; maxChain: number; trips: number; lack: number }[]; meta: RunMeta; run: RunState; keys: number }
+export interface BotRun { cleared: boolean; day: number; days: { sales: number; goal: number; served: number; angry: number; maxCombo: number; maxChain: number; trips: number; lack: number; seconds: number }[]; meta: RunMeta; run: RunState; keys: number; rerollsUsed: number; picks: number }
+
+/** 所持方針との相性と目標の軽さで、実際に提示された営業から選ぶ。 */
+function suitableRoad(ids: RoadId[], run: RunState): RoadId {
+  const score = (id: RoadId) => {
+    const road = roadOf(id);
+    const levels = run.owned.filter((o) => road.good.includes(o.id)).reduce((sum, o) => sum + o.lv, 0);
+    return (1 + levels * 0.12) / road.goalMult;
+  };
+  return [...ids].sort((a, b) => score(b) - score(a))[0];
+}
 
 /** 1回の挑戦を最後まで（目標に届かなくても forceAll なら4日間続けて、日ごとの売上を見る） */
 export function botRun(seed: number, strat: Strategy, kps: number, missRate: number, loop = 1, meta: RunMeta = emptyMeta(), forceAll = false, think = 0.4): BotRun {
@@ -43,12 +57,21 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
   const rng = new Rng(seed * 13 + 5);
   const days: BotRun['days'] = [];
   let keys = 0;
+  let rerollsUsed = 0;
+  let picks = 0;
   let cleared = false;
   const doPick = (slot: number, session: PlaySession | null) => {
-    const offers = offersFor(run, meta, slot, 0);
+    let rerolled = 0;
+    let offers = offersFor(run, meta, slot, rerolled);
+    while (run.rerolls > 0 && strat.reroll?.(offers, run)) {
+      run.rerolls--;
+      rerollsUsed++;
+      offers = offersFor(run, meta, slot, ++rerolled);
+    }
     const c = strat.pick(offers, run, rng);
     if (!c) return;
     const r = applyOffer(run, c.offer, c.drop);
+    if (r) picks++;
     if (r && session) {
       for (const id of Object.keys(session.shop.stock) as IngredientId[]) session.shop.stock[id] += r.stock;
       session.shop.build = modsFor(run.owned, dayPlan(run, meta).base);
@@ -62,6 +85,7 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
     let acc = 0;
     let lack = 0;
     let slot = 1;
+    let pendingSlot: number | null = null;
     let aim: string | null = null;
     let lastDone = 0;
     let pause = 0;
@@ -69,7 +93,11 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
       s.tick();
       for (const e of s.drain()) {
         if (e.src === 'shop' && e.ev.type === 'lack') lack++;
-        if (e.src === 'shop' && e.ev.type === 'phase' && slot < PICKS_PER_DAY) doPick(slot++, s);
+        if (e.src === 'shop' && e.ev.type === 'phase' && slot < PICKS_PER_DAY) pendingSlot = slot++;
+      }
+      if (pendingSlot !== null && !s.trip && !s.finished) {
+        if (s.shop.timeLeft >= 8) doPick(pendingSlot, s);
+        pendingSlot = null;
       }
       // 言葉を打ち終えたあと、次の言葉を読む間は手が止まる
       const served = s.shop.stats.served + s.shop.stats.trips;
@@ -108,7 +136,7 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
     }
     const st = s.shop.stats;
     const b = s.shop.buildStats;
-    days.push({ sales: s.shop.score, goal: plan.goal, served: st.served, angry: st.angry, maxCombo: st.maxCombo, maxChain: b.maxChain, trips: st.trips, lack });
+    days.push({ sales: s.shop.score, goal: plan.goal, served: st.served, angry: st.angry, maxCombo: st.maxCombo, maxChain: b.maxChain, trips: st.trips, lack, seconds: s.elapsed });
     const day = run.day;
     const copy = forceAll ? { ...run, days: [...run.days], owned: run.owned.map((o) => ({ ...o })), yen: { ...run.yen }, pairs: [...run.pairs] } : run;
     const out = closeDay(copy, meta, { sales: s.shop.score, served: st.served, maxCombo: st.maxCombo, angry: st.angry, build: b });
@@ -116,7 +144,9 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
     if (out.cleared) cleared = true;
     if (day >= RUN_DAYS - 1 || (!out.passed && !forceAll)) break;
     const roads = roadOffers(run.seed, run.day).map((r) => r.id);
-    takeRoad(run, meta, strat.road ? strat.road(roads, run) : 'joren');
+    const road = strat.road ? strat.road(roads, run, rng) : suitableRoad(roads, run);
+    if (!roads.includes(road)) throw new Error(`候補にない営業を選びました: ${road}`);
+    takeRoad(run, meta, road);
   }
-  return { cleared, day: run.day, days, meta, run, keys };
+  return { cleared, day: run.day, days, meta, run, keys, rerollsUsed, picks };
 }

@@ -18,7 +18,7 @@ export const PICKS_PER_DAY = 3;
 // ---------- 難しさ（日ごと・のれんごと） ----------
 
 /** 日ごとの売上目標（のれん1枚目・常連の日） */
-export const GOAL_BASE = [6000, 12000, 24000, 42000];
+export const GOAL_BASE = [9000, 21000, 42000, 76000];
 /** 日ごとのお客の来る間隔・待ってくれる時間（通常営業の「ふつう」が 1.2／1.2、「むずかしい」が 0.9／0.9） */
 const DAY_EVERY = [0.95, 0.8, 0.66, 0.56];
 /** 繁盛記はお客が多いので、調達の持ち帰りも通常より多い */
@@ -28,7 +28,7 @@ const DAY_WAIT = [1.15, 1.05, 0.95, 0.9];
 /** のれん n 枚目の目標の倍率（上限なし。枚数が増えるほど、1枚ごとの伸びも少しずつ大きくなる） */
 export function loopGoalMult(loop: number) {
   const k = Math.max(1, loop) - 1;
-  return 1 + 0.3 * k + 0.02 * k * k;
+  return 1 + 0.12 * k + 0.008 * k * k;
 }
 /** のれんが増えるとお客も増え、せっかちになる（入力が追いつく範囲で止め、その先は目標だけが伸びる） */
 export function loopEveryMult(loop: number) {

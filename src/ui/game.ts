@@ -37,7 +37,7 @@ import { ACHIEVEMENTS, type PlayFacts, type Records } from '../core/achievements
 import { drawTutorial } from './screens/tutorial';
 import { setupTutorial, tutorialEvent, tutorialStep, type TutorialState } from './tutorial';
 import { drawPrep, PREP_WORDS } from './screens/prep';
-import { helpPlay, drawHelp, openTripHelp, drawTripHelp, drawModeHelp } from './screens/help';
+import { helpPlay, drawHelp, openTripHelp, drawTripHelp, drawModeHelp, drawRunHelp } from './screens/help';
 import { resultStep, drawResult, drawResultMenu } from './screens/result';
 import { guideFor, drawCountdown, drawTripIntro, drawTripOutro } from './screens/play';
 import { PHASE_TRACK, RESULT_READY, COUNTDOWN, RESULT_LOCK, MenuItem } from './screens/shared';
@@ -238,7 +238,8 @@ export class Game {
           { text: 'つり', kana: 'つり', act: () => helpPlay(this, 'fishing') },
           { text: 'かり', kana: 'かり', act: () => helpPlay(this, 'hunting') },
           { text: 'ひがわり営業', kana: 'ひがわり', act: () => { this.helpPage = 2; } },
-          { text: '調達のしかた ▶', kana: 'ちょうたつ', act: () => openTripHelp(this) },
+          { text: '繁盛記', kana: 'はんじょうき', act: () => { this.helpPage = 3; } },
+          { text: '調達のしかた', kana: 'ちょうたつ', act: () => openTripHelp(this) },
           { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
         ];
       case 'modeSelect':
@@ -1216,7 +1217,7 @@ export class Game {
     this.goShown = Math.max(0, this.goShown - dt);
     // 背景の読み込み待ちで営業時間を消費しない（刻みも数えないので、記録の再現には影響しない）
     const session = this.session!;
-    if (session.introDone && this.tripView.art && !this.tripView.art.hasTrip(session.trip!.game.kind)) return;
+    if (session.trip?.phase === 'intro' && session.trip.t <= TICK && this.tripView.art && !this.tripView.art.hasTrip(session.trip.game.kind)) return;
     // 繁盛記：方針を選んでいるあいだは、営業の時計もお客も止まる（見た目の演出だけ進める）
     if (this.runUI?.step(dt)) { this.view.update(dt); return; }
     session.tick();
@@ -1278,7 +1279,7 @@ export class Game {
             if (lead) this.sound.policy(policyOf(lead).family);
             if (ev.poured) this.sound.pour();
             if (ev.pair) this.sound.discover();
-            else if (ev.pairs) this.sound.pairHit();
+            else if (ev.pairs) this.sound.pairHit(lead ? policyOf(lead).family : 'chain', ev.pairs);
           }
           break;
         case 'chain': this.sound.chainEnd(ev.count); break;
@@ -1381,7 +1382,7 @@ export class Game {
       this.runUI?.drawOverlay();
       drawTutorial(this);
       if (this.tutorial?.step === 'done' && !this.paused) drawMenuScreen(this, '練習はおしまい！', '本番は3分間。時間が進み、お客が次々に来ます');
-      if (this.paused) drawMenuScreen(this, '一時停止中', '');
+      if (this.paused) drawMenuScreen(this, '一時停止中', this.runUI?.inRun ? `中断すると${(this.runUI.run?.day ?? 0) + 1}日目の開店から。今日の途中の売上・方針は戻ります` : '');
       if (this.paused || this.tutorial?.step === 'done') drawClickHint(this);
       drawImeHint(this);
       drawVolume(this);
@@ -1415,7 +1416,7 @@ export class Game {
       sc.cover(C.bg, 0.4);
     } else sc.cover(C.bg, 0.7);
     if (this.mode === 'title') drawTitle(this);
-    else if (this.mode === 'help') { if (this.helpPage === 1) drawTripHelp(this); else if (this.helpPage === 2) drawModeHelp(this); else drawHelp(this); }
+    else if (this.mode === 'help') { if (this.helpPage === 1) drawTripHelp(this); else if (this.helpPage === 2) drawModeHelp(this); else if (this.helpPage === 3) drawRunHelp(this); else drawHelp(this); }
     else if (this.mode === 'modeSelect') drawModeSelect(this);
     else if (this.mode === 'difficulty') drawDifficulty(this);
     else if (this.mode === 'daily') drawDaily(this);

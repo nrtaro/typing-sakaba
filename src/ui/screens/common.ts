@@ -25,11 +25,12 @@ export function drawMenu(g: Game, y: number) {
   if (g.mode === 'title') return;
   if (g.mode === 'difficulty' || g.mode === 'modeSelect' || g.mode === 'daily' || g.mode === 'prep' || g.mode === 'ranking' || g.mode === 'records' || g.mode === 'fukubiki' || g.mode === 'settings' || g.mode === 'run') return;
   if (g.mode === 'help') {
-    button(g, items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
     if (g.helpPage === 0) {
-      button(g, items[items.length - 2], 300, 222, 158, 38, 'primary');
-      button(g, items[items.length - 3], 152, 226, 136, 30, 'plain', undefined, '▶');
-    }
+      ['もどる', 'ひがわり', 'はんじょうき', 'ちょうたつ'].forEach((kana, i) => {
+        const item = items.find((entry) => entry.kana === kana);
+        if (item) button(g, item, 22 + i * 111, 226, 103, 30, 'plain', kana === 'もどる' ? 'Esc' : undefined);
+      });
+    } else button(g, items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
     return;
   }
   const iw = items.length >= 4 ? 108 : 124;

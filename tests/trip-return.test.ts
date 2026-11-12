@@ -34,6 +34,24 @@ function advance(session: PlaySession, seconds: number) {
 }
 
 describe('Enterで調達を切り上げる', () => {
+  it('出発演出の最後の刻みでも、画像が届くまで調達画面へ移らない', () => {
+    const { game, session, shop } = setup();
+    game.settings.guided = true;
+    game.countdown = 0;
+    session.trip!.phase = 'intro';
+    session.trip!.t = TICK / 2;
+    const hasTrip = vi.fn(() => false);
+    game.tripView = { art: { hasTrip }, update: vi.fn(), handle: vi.fn() } as unknown as Game['tripView'];
+    game.step(TICK);
+    expect(game.trip!.phase).toBe('intro');
+    expect(session.ticks).toBe(0);
+    expect(shop.clock).toBe(0);
+    hasTrip.mockReturnValue(true);
+    game.step(TICK);
+    expect(game.trip!.phase).toBe('game');
+    expect(session.ticks).toBe(1);
+  });
+
   it('背景が届いても専用画像が揃うまでは営業時計を止め、出発演出から先へ進めない', () => {
     const { game, shop, session } = setup();
     game.settings.guided = true;

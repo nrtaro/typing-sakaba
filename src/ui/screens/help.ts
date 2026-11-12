@@ -4,6 +4,7 @@ import { AMBER } from '../amber/layout';
 import { RomajiMatcher } from '../../core/romaji';
 import { FAMILY_NAME, INGREDIENT_NAME, TRIPS } from '../../core/shopConfig';
 import { dailyConditions, jstDate } from '../../core/daily';
+import { RUN_DAYS, RUN_NAME } from '../../core/run';
 import type { Game } from '../game';
 import { drawCondChip } from './conditions';
 
@@ -279,8 +280,8 @@ export function drawHelpFx(g: Game) {
  */
 export function drawModeHelp(g: Game) {
   const sc = g.sc;
-  sc.TB('2つの営業', 24, 16, 22, C.gold3, 'left');
-  sc.T('「はじめる」のあとで、どちらの営業にするかを選べます', 142, 24, 10, C.cream);
+  sc.TB('通常・ひがわり営業', 24, 16, 20, C.gold3, 'left');
+  sc.T('「はじめる」から選べます', 300, 24, 9, C.cream);
   const cols = [
     { name: '通常営業', kana: 'つうじょう', lines: ['3分間で、売上の自己ベストに挑戦', 'お客の来かたは、遊ぶたびに変わる', '自己ベストは難易度ごとに残る'] },
     { name: 'ひがわり営業', kana: 'ひがわり', lines: ['毎日変わる「お題」つきの営業', 'お題は毎日0時（日本時間）に変わる', '難易度でお題の強さが変わる', '何度でも挑戦でき、その日のベストが残る', '記録は通常営業とは別'] },
@@ -302,5 +303,48 @@ export function drawModeHelp(g: Game) {
       sc.T('今日のお題', x + 10, y + 112, 9, C.gold3);
       dailyConditions(jstDate()).forEach((c, k) => drawCondChip(sc, g.art, c, d, x + 10 + k * 116, y + 128));
     }
+  });
+}
+
+/** 方針・道中・のれん・中断の扱いを、挑戦前に読めるようにする。 */
+export function drawRunHelp(g: Game) {
+  const sc = g.sc;
+  sc.TB(`${RUN_NAME}の遊び方`, 24, 16, 21, C.gold3, 'left');
+  sc.T(`中〜上級者向け・${RUN_DAYS}日間の挑戦・1周15〜20分が目安`, 24, 43, 9, C.cream);
+  const cards = [
+    {
+      title: '方針を育てて、目標を突破', color: '#ffe27a',
+      lines: [
+        '朝・昼・夜に方針の名前を打って選ぶ。',
+        '選んでいる間、営業の時計は止まる。',
+        '最大5枠。強化か入れ替えで育てよう。',
+        '相性のよい方針が皿に効くと、',
+        '「かけ合わせ」で売上が大きく増える。',
+        '閉店時に目標未達なら、そこで終了。',
+        '翌日の営業は、今の構成と相談して選ぶ。',
+        `${RUN_DAYS}日目を突破すると、次ののれんへ。`,
+        '日ごと・のれんごとに難しくなる。',
+      ],
+    },
+    {
+      title: '周回と、中断のしかた', color: '#a9f0e4',
+      lines: [
+        'のれんはクリアするたびに1枚増える。',
+        '方針は毎回、新しく組み直す。',
+        '見つけた組・実績・常連のおまけは残る。',
+        '限定の飾りは、普段の営業でも使える。',
+        'Escで一時停止、再開か中断を選べる。',
+        '営業中に中断すると、その日の開店から。',
+        '昼・夜の方針と途中の売上も戻る。',
+        '閉店後と翌日の選択では、区切りを保存。',
+        '「ずかん」で効果・進捗・報酬を見よう。',
+      ],
+    },
+  ];
+  cards.forEach((card, i) => {
+    const x = 22 + i * 222;
+    sc.panel(x, 64, 214, 145, 'rgba(36,23,14,0.95)', card.color);
+    sc.TB(card.title, x + 10, 73, 11, card.color, 'left');
+    card.lines.forEach((line, k) => sc.T(line, x + 10, 94 + k * 12, sc.fitSize(line, 8.5, 194, 7), C.cream));
   });
 }
