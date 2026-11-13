@@ -8,12 +8,12 @@ import { button, drawSignboard } from './screens/common';
 import { wrapText } from './screens/records';
 import { runHud } from './shopView';
 import { drawNameplate } from './nameplate';
-import { pairTip, policyTip, type Tip } from './hover';
+import { pairTip, policyTip, setTip, type Tip } from './hover';
 import { RomajiMatcher } from '../core/romaji';
 import { INGREDIENT_ORDER } from '../core/shopConfig';
 import { achievementItem, itemById, type Item } from '../core/collection';
 import {
-  FAMILY_COLOR, FAMILY_NAME, MAX_LEVEL, MAX_SLOTS, PAIRS, PAIR_MAX, POLICIES, POLICY_SEAL, descAll, descDiff, descOf, modsFor, pairKey, pairOf, pairText, policyOf,
+  FAMILY_COLOR, FAMILY_NAME, MAX_LEVEL, MAX_SLOTS, PAIRS, PAIR_MAX, POLICIES, POLICY_SEAL, SETS, SET_BONUS, setKey, setOf, setText, descAll, descDiff, descOf, modsFor, pairKey, pairOf, pairText, policyOf,
   type BuildStats, type Owned, type PolicyId,
 } from '../core/build';
 import {
@@ -25,7 +25,7 @@ import {
 export type RunScreen = 'hub' | 'book' | 'pick' | 'day' | 'road' | 'end';
 const SLOT_NAME = ['朝', '昼', '夜'];
 const KIND_NAME: Record<Item['kind'], string> = { front: '二つ名（前）', back: '二つ名（後ろ）', plate: 'プレート', sound: '打鍵音', sticker: 'シール' };
-const BOOK_TABS = ['実績とごほうび', 'かけ合わせ', '方針', 'おまけと試練'] as const;
+const BOOK_TABS = ['実績とごほうび', '型とかけ合わせ', '方針', 'おまけと試練'] as const;
 const ease = (v: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
 const yen = (n: number) => `${Math.round(n).toLocaleString()}円`;
 
@@ -108,7 +108,7 @@ export class RunUI {
     else if (run.stage === 'closed') {
       // 閉店の結果を見ている途中でやめた：結果をもう一度見せる
       const result = run.days[run.days.length - 1];
-      this.outcome = { passed: true, cleared: false, result, newPairs: [], newPolicies: [], summary: null, achievements: [], coins: 0, yen: {}, resumed: true };
+      this.outcome = { passed: true, cleared: false, result, newPairs: [], newSets: [], newPolicies: [], summary: null, achievements: [], coins: 0, yen: {}, resumed: true };
       this.fxDone = { stamp: true, tick: 9, reward: true };
       this.go('day');
     } else this.go('road');
@@ -325,7 +325,7 @@ export class RunUI {
 
   private bookCount() {
     const b = this.book;
-    return b.tab === 0 ? RUN_ACHIEVEMENTS.length : b.tab === 1 ? PAIRS.length : b.tab === 2 ? POLICIES.length : PERKS.length + TRIALS.length;
+    return b.tab === 0 ? RUN_ACHIEVEMENTS.length : b.tab === 1 ? PAIRS.length + SETS.length : b.tab === 2 ? POLICIES.length : PERKS.length + TRIALS.length;
   }
 
   /** ずかんのキー：←→でページ、↑↓でえらぶ、Enter でごほうびを付ける／打鍵音を試す */
@@ -497,7 +497,7 @@ export class RunUI {
     const rows: [string, string][] = [
       ['クリア', `${m.clears}回`], ['挑戦', `${m.runs}回`], ['最高の合計', m.best.total ? yen(m.best.total) : '―'], ['1日の最高', m.best.day ? yen(m.best.day) : '―'],
       ['一皿の最高', m.best.serve ? yen(m.best.serve) : '―'], ['最大コンボ', m.best.combo ? `${m.best.combo}` : '―'], ['同時に出した皿', m.best.chain > 1 ? `${m.best.chain}皿` : '―'],
-      ['かけ合わせ', `${m.discovered.length}/${PAIRS.length}`],
+      ['かけ合わせ・型', `${m.discovered.length}/${PAIRS.length}・${m.sets.length}/${SETS.length}`],
     ];
     rows.forEach(([k, v], i) => {
       sc.T(k, 306, 68 + i * 16, 8, '#d9e4cf');
@@ -671,7 +671,7 @@ export class RunUI {
     // 音：売上を数える音 → 判子 → ごほうび
     if (!this.fxDone.stamp && age > 1.5) { this.fxDone.stamp = true; g.sound.stamp(); g.sound.dayClear(); }
     if (age > 0.25 && age < 1.4 && age - this.fxDone.tick > 0.06) { this.fxDone.tick = age; g.sound.tick(); }
-    if (!this.fxDone.reward && age > 2.1 && (o.achievements.length || o.newPairs.length)) { this.fxDone.reward = true; g.sound.reward(); }
+    if (!this.fxDone.reward && age > 2.1 && (o.achievements.length || o.newPairs.length || o.newSets.length)) { this.fxDone.reward = true; g.sound.reward(); }
     sc.radialGlow(LW / 2, 60, 150, '#ffb45a', 0.22 * ease(age / 0.6), 0.45);
     sc.TB(`のれん${run.loop}枚目　${run.day + 1}日目の閉店`, LW / 2, 8, 13, C.gold3, 'center', C.ink, ease(age / 0.3));
     const shown = Math.round(r.sales * ease((age - 0.25) / 1.15));
@@ -701,6 +701,17 @@ export class RunUI {
     // 右：見つけたかけ合わせ・解放・ごほうび
     sc.panel(244, 82, 218, 124, 'rgba(36,23,14,0.95)', '#8a6232', a2);
     let y = 88;
+    if (o.newSets.length) {
+      sc.T('型を見つけた！', 254, y, 8, '#ffb0e0', 'left', a2);
+      let cx = 258;
+      for (const k of o.newSets) {
+        const name = `『${setOf(k)?.name ?? ''}』`;
+        sc.T(name, cx, y + 12, 8, C.w, 'left', a2);
+        this.tip(sc, cx, y + 11, sc.W(name, 8), 10, setTip(k));
+        cx += sc.W(name, 8) + 2;
+      }
+      y += 25;
+    }
     if (o.newPairs.length) {
       sc.T('かけ合わせを見つけた！', 254, y, 8, '#ffe27a', 'left', a2);
       y += 12 + this.pairList(sc, o.newPairs, 258, y + 12, 196, C.w, a2);
@@ -717,7 +728,7 @@ export class RunUI {
       y += 24;
     }
     if (o.achievements.length) this.drawRewards(sc, 252, y, 202, o.achievements, ease((age - 2.1) / 0.3));
-    else if (!o.newPairs.length && !o.newPolicies.length) {
+    else if (!o.newPairs.length && !o.newSets.length && !o.newPolicies.length) {
       sc.T('明日は、もっとお客が来る。', 254, y, 8.5, C.cream, 'left', a2);
       sc.T('このあと、明日の営業を3つから選ぶ', 254, y + 14, 8, C.w, 'left', a2);
       this.build(sc, 254, y + 34, run.owned, false);
@@ -905,18 +916,34 @@ export class RunUI {
         this.para(sc, got ? (worn ? '付けています（ふだんの営業やランキングでも使われます）' : 'Enter で付ける（「きろく」のプロフィールでも選べます）') : 'まだ手に入れていません', X, 167, 8, W, got ? '#a9f0e4' : C.gray, 1, 9.5);
       }
     } else if (b.tab === 1) {
-      PAIRS.forEach((p, i) => row(i, (y) => {
+      // 3つ組の「型」を先に、2つ組のかけ合わせをそのあとに並べる
+      SETS.forEach((x, i) => row(i, (y) => {
+        const found = m.sets.includes(setKey(x));
+        sc.T(found ? `型『${x.name}』` : '型『？？？』', 36, y, 8.5, found ? '#ffb0e0' : C.gray);
+        sc.T(found ? x.ids.map((q) => POLICY_SEAL[q]).join('＋') : `${POLICY_SEAL[x.ids[0]]}＋？＋？`, 234, y, 8, found ? C.cream : C.gray, 'right');
+      }));
+      PAIRS.forEach((p, i) => row(SETS.length + i, (y) => {
         const found = m.discovered.includes(pairKey(p.a, p.b));
         sc.T(found ? `『${p.name}』` : '『？？？』', 36, y, 8.5, found ? '#ffe9b4' : C.gray);
         sc.T(found ? `${POLICY_SEAL[p.a]}＋${POLICY_SEAL[p.b]}` : `${POLICY_SEAL[p.a]}＋？`, 234, y, 8, found ? C.cream : C.gray, 'right');
       }));
-      const p = PAIRS[b.sel];
+      if (b.sel < SETS.length) {
+        const x = SETS[b.sel];
+        const found = m.sets.includes(setKey(x));
+        sc.T(found ? `型『${x.name}』` : '型『？？？』', X, 60, 11, '#ffb0e0');
+        let yy = 80;
+        yy += this.para(sc, found ? setText(x) : `「${policyOf(x.ids[0]).name}」と、まだ見つけていない2つの方針の型`, X, yy, 8.5, W, found ? C.w : C.gray) * 11 + 6;
+        this.para(sc, `型は打った皿だけに効き、+${Math.round(SET_BONUS * 100)}%。まとめ出しは入らない。`, X, yy, 8, W, C.cream);
+        sc.T(`見つけた型 ${m.sets.length}/${SETS.length}・かけ合わせ ${m.discovered.length}/${PAIRS.length}`, X, 180, 8, '#a9f0e4');
+      } else {
+      const p = PAIRS[b.sel - SETS.length];
       const found = m.discovered.includes(pairKey(p.a, p.b));
       sc.T(found ? `『${p.name}』` : '『？？？』', X, 60, 11, C.gold3);
       let y = 80;
       y += this.para(sc, found ? pairText(p) : `「${policyOf(p.a).name}」と、まだ見つけていない方針の組`, X, y, 8.5, W, found ? C.w : C.gray) * 11 + 6;
       this.para(sc, `増える割合は、2つの段階の合計×10%（Lv1同士で+20%、最大+${Math.round(PAIR_MAX * 100)}%）。いくつも重なると、そのぶん足される。`, X, y, 8, W, C.cream);
-      sc.T(`見つけた数 ${m.discovered.length}/${PAIRS.length}`, X, 180, 8, '#a9f0e4');
+      sc.T(`見つけた型 ${m.sets.length}/${SETS.length}・かけ合わせ ${m.discovered.length}/${PAIRS.length}`, X, 180, 8, '#a9f0e4');
+      }
     } else if (b.tab === 2) {
       const avail = availablePolicies(m);
       POLICIES.forEach((p, i) => row(i, (y) => {

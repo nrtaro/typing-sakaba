@@ -2,7 +2,7 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
-import { BIG_NEED, FEVER_EVERY, IDLE_MAX, IDLE_MIN, QUICK_RATIO, REFILL_EAT, pairBonus, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_STEP, IDLE_MAX, IDLE_MIN, IPPATSU_MISS, SET_BONUS, SETS, setKey, QUICK_RATIO, REFILL_EAT, pairBonus, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
 import {
@@ -52,7 +52,11 @@ export type ShopEvent =
   | { type: 'key'; ok: boolean; count: number }
   | { type: 'serve'; seat: number; gain: number; combo: number; hiden?: boolean; banquet?: boolean;
       /** 繁盛記：この皿に効いた方針・まとめ出しの何皿目か（0 は打った皿）・酒を付けたか・この皿で初めて成立したかけ合わせ */
-      tags?: PolicyId[]; chain?: number; poured?: boolean; pair?: string; pairs?: number; pairMult?: number; dish?: Dish }
+      tags?: PolicyId[]; chain?: number; poured?: boolean; pair?: string; pairs?: number; pairMult?: number; dish?: Dish;
+      /** 型：この皿で初めて成立した型／この皿に効いた型の数／一発勝負の結果（true＝ミスなし、false＝ミスあり）／連打の熱の倍率 */
+      set?: string; sets?: number; clean?: boolean; heat?: number }
+  /** 繁盛記：延長営業で閉店が延びた */
+  | { type: 'extend'; secs: number }
   /** 繁盛記：1回の入力でいっしょに出た皿の数と合計 */
   | { type: 'chain'; count: number; total: number; seats: number[] }
   /** 繁盛記：大入りが始まった／終わった */
@@ -149,6 +153,16 @@ export class Shop {
   freshUntil = 0;
   /** 最後に皿を出した時刻（おもてなしの「間」を数える） */
   lastServeAt = 0;
+  /** 一発勝負：今打っている言葉でのミスの数 */
+  wordMisses = 0;
+  /** 連打の熱：今の熱（倍率は 1 + heat）と、前に打って皿を出した時刻 */
+  heat = 0;
+  private lastTypedAt = -99;
+  get lastTyped() {
+    return this.lastTypedAt;
+  }
+  /** 延長営業で延びた秒数 */
+  extra = 0;
   feverUntil = 0;
   /** 方針の抽選に使う乱数（お客の並びの乱数とは分ける） */
   private brng: Rng | null = null;
@@ -176,7 +190,12 @@ export class Shop {
   }
 
   get timeLeft() {
-    return Math.max(0, DAY_LENGTH - this.clock);
+    return Math.max(0, this.dayLength - this.clock);
+  }
+
+  /** 今日の営業時間（延長営業で延びることがある） */
+  get dayLength() {
+    return DAY_LENGTH + this.extra;
   }
 
   get multiplier() {
@@ -296,6 +315,7 @@ export class Shop {
     const r = this.input.key(ch);
     if (r.kind === 'miss') {
       this.stats.missKeys++;
+      this.wordMisses++;
       if (this.rules.spillEvery !== null && ++this.missSinceSpill >= this.rules.spillEvery) {
         this.missSinceSpill = 0;
         this.spill();
@@ -310,7 +330,10 @@ export class Shop {
     }
     this.stats.correctKeys++;
     this.events.push({ type: 'key', ok: true, count: this.input.typed.length || 1 });
-    if (r.done.length) this.complete(r.done);
+    if (r.done.length) {
+      this.complete(r.done);
+      this.wordMisses = 0;
+    }
   }
 
   backspace() {
@@ -319,6 +342,7 @@ export class Shop {
 
   clearInput() {
     this.input.reset();
+    this.wordMisses = 0;
   }
 
   /** 同じ言葉の候補が複数あれば、待ち時間の残りが少ない客を選ぶ */
@@ -435,6 +459,10 @@ export class Shop {
     let pair: string | undefined;
     let pairCount = 0;
     let pairMult = 1;
+    let setCount = 0;
+    let set: string | undefined;
+    let clean: boolean | undefined;
+    let heatNow: number | undefined;
     if (!b) gain = Math.round((g.dish.price + tip) * this.multiplier * special);
     else {
       let mult = 1;
@@ -453,6 +481,18 @@ export class Shop {
       if (b.idleTip > 0 && chain === 0 && idle >= IDLE_MIN) { tags.push('omotenashi'); tipB += Math.round(idle * b.idleTip) * b.tipMult; }
       if (saved) tags.push('makanai');
       if (this.fever && b.feverMult > 1) { tags.push('ooiri'); mult *= b.feverMult; }
+      // 一発勝負・連打の熱：打った皿だけ（まとめ出しのついでの皿には付かない）
+      if (chain === 0 && b.ippatsuMult > 1) {
+        clean = this.wordMisses === 0;
+        if (clean) { tags.push('ippatsu'); mult *= b.ippatsuMult; } else mult *= IPPATSU_MISS;
+      }
+      if (chain === 0 && b.heatCap > 1) {
+        this.heat = this.clock - this.lastTypedAt <= HEAT_GAP ? Math.min(b.heatCap - 1, this.heat + HEAT_STEP) : 0;
+        this.lastTypedAt = this.clock;
+        heatNow = 1 + this.heat;
+        if (this.heat > 0) { tags.push('netsu'); mult *= heatNow; }
+        this.buildStats.maxHeat = Math.max(this.buildStats.maxHeat, heatNow);
+      }
       // かけ合わせ：名前付きの組が同じ皿に効いたら、1組につき売上が増える
       // 店全体に効く方針（呼び込み・大漁旗など）は、持っているだけで相手になる
       let pairs = 0;
@@ -468,6 +508,11 @@ export class Shop {
         for (let j = i + 1; j < tags.length; j++) hit(tags[i], tags[j]);
         for (const p of b.passive) hit(tags[i], p);
       }
+      // 型：3つがそろって打った皿に効いたら、さらに足す
+      const on = (id: PolicyId) => tags.includes(id) || b.passive.includes(id);
+      const setsHit = chain === 0 ? SETS.filter((x) => x.ids.every(on)) : [];
+      bonus += SET_BONUS * setsHit.length;
+      setCount = setsHit.length;
       const stack = 1 + bonus;
       pairCount = pairs;
       pairMult = stack;
@@ -484,6 +529,7 @@ export class Shop {
       st.bestServe = Math.max(st.bestServe, gain);
       st.maxStack = Math.max(st.maxStack, pairs);
       for (const key of found) if (!st.pairs.includes(key)) { st.pairs.push(key); pair ??= key; }
+      for (const x of setsHit) if (!st.sets.includes(setKey(x))) { st.sets.push(setKey(x)); set ??= setKey(x); }
     }
     this.score += gain;
     this.stats.served++;
@@ -499,7 +545,7 @@ export class Shop {
     this.crew.assign(seat, g, this.away?.who);
     if (!b) this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
     else {
-      this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, pair, pairs: pairCount, pairMult, dish });
+      this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, pair, pairs: pairCount, pairMult, dish, set, sets: setCount, clean, heat: heatNow });
       // 大入り袋：10コンボごとに大入り（最中に届いたら延ばす）
       if (b.feverSecs > 0 && Math.floor(this.combo / FEVER_EVERY) > Math.floor(comboBefore / FEVER_EVERY)) {
         this.feverUntil = this.clock + b.feverSecs;
@@ -543,7 +589,9 @@ export class Shop {
     const amounts: Gains = {};
     // 時間帯の当たり：出かけた時間帯の当たりなら多く、それ以外は少なく持ち帰る
     const lucky = this.luckyTrip(this.awayPhase) === trip.id;
-    const mult = (this.rules.luckyTrips ? (lucky ? this.rules.luckyMult : this.rules.unluckyMult) : 1) * (this.build?.tripMult ?? 1);
+    // 朝市：朝に出かけた調達は多く、昼と夜は少なく持ち帰る
+    const market = this.build ? (this.awayPhase === 0 ? this.build.morningTrip : this.build.laterTrip) : 1;
+    const mult = (this.rules.luckyTrips ? (lucky ? this.rules.luckyMult : this.rules.unluckyMult) : 1) * (this.build?.tripMult ?? 1) * market;
     for (const id of trip.gives) {
       const got = Math.max(earlyReturn ? 0 : trip.minimum[id] ?? 0, Math.floor(gains[id] ?? 0));
       amounts[id] = mult === 1 ? got : Math.max(earlyReturn ? 0 : 1, Math.round(got * mult));
@@ -612,7 +660,13 @@ export class Shop {
       this.feverOn = false;
       this.events.push({ type: 'fever', on: false, secs: 0 });
     }
-    if (this.clock >= DAY_LENGTH) {
+    // 延長営業：閉店の時点で勢いがあれば、1日1回だけ営業を延ばす
+    if (this.clock >= this.dayLength && this.build && this.build.extendSecs > 0 && this.extra === 0 && this.combo >= ENCHO_COMBO) {
+      this.extra = this.build.extendSecs;
+      this.buildStats.extended = this.extra;
+      this.events.push({ type: 'extend', secs: this.extra });
+    }
+    if (this.clock >= this.dayLength) {
       this.ended = true;
       this.input.reset();
       this.events.push({ type: 'end' });

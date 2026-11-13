@@ -7,7 +7,8 @@
 
 export type PolicyId =
   | 'matome' | 'betsubara' | 'ryoshusho' | 'nushi' | 'tairyo' | 'mie' | 'sekkachi' | 'mouippai'
-  | 'oomori' | 'yobikomi' | 'makanai' | 'ooiri' | 'aiso' | 'shikomi' | 'yoyaku' | 'omotenashi';
+  | 'oomori' | 'yobikomi' | 'makanai' | 'ooiri' | 'aiso' | 'shikomi' | 'yoyaku' | 'omotenashi'
+  | 'ippatsu' | 'netsu' | 'asaichi' | 'encho';
 
 /** 方針の系統（色と音の個性に使う） */
 export type Family = 'chain' | 'combo' | 'trip' | 'stock' | 'guest';
@@ -52,6 +53,17 @@ export const BIG_NEED = 2;
 export const BIG_BASE_MULT = 2;
 /** おかわりのお客は、1品目をこの秒数で食べ終える（ふつうは 2.4 秒。店の回りを止めない） */
 export const REFILL_EAT = 0.9;
+/** 一発勝負：ミスした言葉で出した皿の倍率 */
+export const IPPATSU_MISS = 0.8;
+/** 連打の熱：前に打って出した皿から、何秒以内なら熱が上がるか／1皿で上がる量 */
+export const HEAT_GAP = 3;
+export const HEAT_STEP = 0.1;
+/** 延長営業：閉店の時点で、このコンボ以上なら延長する */
+export const ENCHO_COMBO = 30;
+/** 朝市：昼と夜の調達で持ち帰る素材の倍率 */
+export const LATE_TRIP = 0.85;
+/** 型：決まった3つの方針がそろって、打った皿に効いたときに増える割合（その中のかけ合わせとは別に足す） */
+export const SET_BONUS = 0.6;
 
 const L = <T>(a: T, b: T, c: T) => [a, b, c] as [T, T, T];
 const CHAIN = L(1, 2, 3);
@@ -59,8 +71,8 @@ const CHAIN_MULT = L(0.6, 0.7, 0.8);
 const REFILL_CHANCE = L(0.35, 0.5, 0.65);
 const REFILL_MULT = L(2.0, 2.8, 4.0);
 const COMBO_CAP = L(2.5, 3, 3.5);
-const FRESH_SECS = L(12, 16, 20);
-const FRESH_MULT = L(1.5, 1.9, 2.4);
+const FRESH_SECS = L(14, 18, 24);
+const FRESH_MULT = L(1.6, 2.1, 2.7);
 const TRIP_MULT = L(1.4, 1.7, 2.0);
 const LOW_MULT = L(1.6, 2.1, 2.8);
 const QUICK_TIP = L(3, 5, 8);
@@ -76,6 +88,10 @@ const STOCK = L(2, 3, 5);
 const FEWER = L(0.3, 0.4, 0.5);
 const COMBO_PLUS = L(1, 2, 3);
 const IDLE_TIP = L(30, 45, 65);
+const IPPATSU = L(1.4, 1.7, 2.0);
+const HEAT_CAP = L(1.5, 1.8, 2.1);
+const MORNING_TRIP = L(2.5, 3.0, 3.5);
+const EXTEND = L(10, 15, 20);
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const v2 = <A, B>(a: [A, A, A], b: [B, B, B], f: (x: A) => string, g: (x: B) => string) => L([f(a[0]), g(b[0])], [f(a[1]), g(b[1])], [f(a[2]), g(b[2])]);
 const v1 = <A>(a: [A, A, A], f: (x: A) => string) => L([f(a[0])], [f(a[1])], [f(a[2])]);
@@ -178,6 +194,30 @@ export const POLICIES: Policy[] = [
     text: `前の皿から間があくほどチップが増える。1秒につき+{0}円（${IDLE_MAX}秒ぶんまで）`,
     vals: v1(IDLE_TIP, s),
   },
+  {
+    id: 'ippatsu', name: '一発勝負', kana: 'いっぱつ', family: 'combo', fires: true, starter: true,
+    quip: '「打ち直した皿は、出せん」',
+    text: `ミスなしで打ち切った皿は売上×{0}。ミスした言葉で出した皿は×${IPPATSU_MISS}（打った皿だけ）`,
+    vals: v1(IPPATSU, s),
+  },
+  {
+    id: 'netsu', name: '連打の熱', kana: 'ねつ', family: 'combo', fires: true, starter: true,
+    quip: '「手が止まったら、熱が逃げる」',
+    text: `前に打って出した皿から${HEAT_GAP}秒以内に出すと、売上の倍率が+${HEAT_STEP}ずつ上がる（上限×{0}。${HEAT_GAP}秒あくと元に戻る。打った皿だけ）`,
+    vals: v1(HEAT_CAP, s),
+  },
+  {
+    id: 'asaichi', name: '朝市', kana: 'あさいち', family: 'trip', fires: false, starter: true,
+    quip: '「いいものは、日の出と一緒に売り切れる」',
+    text: `朝に出かけた調達は持ち帰りが×{0}。昼と夜の調達は×${LATE_TRIP}`,
+    vals: v1(MORNING_TRIP, s),
+  },
+  {
+    id: 'encho', name: '延長営業', kana: 'えんちょう', family: 'combo', fires: false, starter: true,
+    quip: '「のれんは、勢いが止まるまで下ろさない」',
+    text: `閉店の時点でコンボが${ENCHO_COMBO}以上なら、営業が{0}秒延びる（1日1回）`,
+    vals: v1(EXTEND, s),
+  },
 ];
 
 const BY_ID = new Map(POLICIES.map((p) => [p.id, p]));
@@ -222,6 +262,7 @@ export const FAMILY_COLOR: Record<Family, string> = {
 export const POLICY_SEAL: Record<PolicyId, string> = {
   matome: 'まと', betsubara: '別腹', ryoshusho: '領収', nushi: 'ヌシ', tairyo: '大漁', mie: '見栄', sekkachi: '即出', mouippai: '一杯',
   oomori: '大盛', yobikomi: '呼込', makanai: '賄い', ooiri: '大入', aiso: '愛想', shikomi: '仕込', yoyaku: '予約', omotenashi: 'もて',
+  ippatsu: '一発', netsu: '熱', asaichi: '朝市', encho: '延長',
 };
 export const FAMILY_NAME: Record<Family, string> = { chain: '連鎖', combo: '勢い', trip: '調達', stock: '台所', guest: '客あしらい' };
 
@@ -254,7 +295,41 @@ export const PAIRS: Pair[] = [
   { a: 'nushi', b: 'tairyo', name: '大漁祭り' },
   { a: 'mie', b: 'mouippai', name: '最後の一杯' },
   { a: 'sekkachi', b: 'shikomi', name: '作り置きの早業' },
+  { a: 'ippatsu', b: 'omotenashi', name: '丁寧な仕事' },
+  { a: 'ippatsu', b: 'mie', name: '一点集中' },
+  { a: 'ippatsu', b: 'yoyaku', name: '針の穴を通す' },
+  { a: 'netsu', b: 'sekkachi', name: '目にも止まらぬ' },
+  { a: 'netsu', b: 'ooiri', name: '祭り囃子' },
+  { a: 'netsu', b: 'yobikomi', name: '行列さばき' },
+  { a: 'asaichi', b: 'nushi', name: '朝獲れ' },
+  { a: 'asaichi', b: 'oomori', name: '朝市の山盛り' },
+  { a: 'asaichi', b: 'mouippai', name: '朝酒' },
+  { a: 'encho', b: 'ooiri', name: '大入りの延長戦' },
+  { a: 'encho', b: 'netsu', name: '閉店まぎわの追い込み' },
+  { a: 'encho', b: 'ryoshusho', name: '伝票が終わらない' },
 ];
+
+/**
+ * 型：決まった3つの方針がそろって、打った皿に効いたときの大きな見返り（まとめ出しは入らない）。
+ * 皿ごとに効く方針はその皿に効いたこと、店全体に効く方針は持っていることが条件。ついでの皿には付かない。
+ */
+export interface FormSet { ids: [PolicyId, PolicyId, PolicyId]; name: string }
+export const SETS: FormSet[] = [
+  { ids: ['netsu', 'sekkachi', 'ooiri'], name: '疾風の型' },
+  { ids: ['ippatsu', 'ryoshusho', 'yoyaku'], name: '職人の型' },
+  { ids: ['encho', 'netsu', 'yobikomi'], name: '大詰めの型' },
+  { ids: ['asaichi', 'nushi', 'tairyo'], name: '朝駆けの型' },
+  { ids: ['mie', 'makanai', 'shikomi'], name: '始末の型' },
+  { ids: ['omotenashi', 'aiso', 'betsubara'], name: 'もてなしの型' },
+  { ids: ['oomori', 'tairyo', 'makanai'], name: '大食いの型' },
+];
+export const setKey = (s: FormSet) => `set:${[...s.ids].sort().join('+')}`;
+const SET_BY_KEY = new Map(SETS.map((s) => [setKey(s), s]));
+export const setOf = (key: string) => SET_BY_KEY.get(key);
+/** 型の説明 */
+export function setText(s: FormSet): string {
+  return `「${s.ids.map((id) => policyOf(id).name).join('」「')}」の3つがそろって打った皿に効くと、その皿の売上+${Math.round(SET_BONUS * 100)}%（中のかけ合わせとは別に足す。ついでの皿には付かない）`;
+}
 export const pairKey = (a: PolicyId, b: PolicyId) => (a < b ? `${a}+${b}` : `${b}+${a}`);
 const PAIR_BY_KEY = new Map(PAIRS.map((p) => [pairKey(p.a, p.b), p]));
 export const pairOf = (key: string) => PAIR_BY_KEY.get(key);
@@ -320,6 +395,15 @@ export interface BuildMods {
   passive: PolicyId[];
   /** 持っている方針の段階（かけ合わせの増え方に使う） */
   levels: Partial<Record<PolicyId, number>>;
+  /** 一発勝負：ミスなしの皿の倍率（1 は持っていない） */
+  ippatsuMult: number;
+  /** 連打の熱：倍率の上限（1 は持っていない） */
+  heatCap: number;
+  /** 朝市：朝の調達の倍率／昼夜の調達の倍率 */
+  morningTrip: number;
+  laterTrip: number;
+  /** 延長営業：延びる秒数（0 は持っていない） */
+  extendSecs: number;
 }
 
 export function emptyMods(): BuildMods {
@@ -328,6 +412,7 @@ export function emptyMods(): BuildMods {
     tripMult: 1, lowMult: 1, quickTip: 1, aleAdd: 0, bigChance: 0, bigMult: BIG_BASE_MULT, everyMult: 1, saveChance: 0,
     feverSecs: 0, feverMult: 1, waitMult: 1, noAngryPenalty: false, keepCombo: false, startStock: 0, phaseStock: 0,
     comboPlus: 0, idleTip: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, passive: [], levels: {},
+    ippatsuMult: 1, heatCap: 1, morningTrip: 1, laterTrip: 1, extendSecs: 0,
   };
 }
 
@@ -355,6 +440,10 @@ export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMod
       case 'shikomi': m.phaseStock += STOCK[i]; break;
       case 'yoyaku': m.everyMult /= 1 - FEWER[i]; m.comboPlus = COMBO_PLUS[i]; break;
       case 'omotenashi': m.idleTip = IDLE_TIP[i]; break;
+      case 'ippatsu': m.ippatsuMult = IPPATSU[i]; break;
+      case 'netsu': m.heatCap = HEAT_CAP[i]; break;
+      case 'asaichi': m.morningTrip = MORNING_TRIP[i]; m.laterTrip = LATE_TRIP; break;
+      case 'encho': m.extendSecs = EXTEND[i]; break;
     }
   }
   return m;
@@ -381,9 +470,14 @@ export interface BuildStats {
   bestServe: number;
   /** 成立した、名前付きのかけ合わせ */
   pairs: string[];
+  /** 成立した型 */
+  sets: string[];
+  /** 連打の熱の最高倍率／延長営業で延びた秒数 */
+  maxHeat: number;
+  extended: number;
   /** 1皿に重なったかけ合わせの最大数 */
   maxStack: number;
 }
 export function emptyBuildStats(): BuildStats {
-  return { yen: {}, fired: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], maxStack: 0 };
+  return { yen: {}, fired: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0 };
 }

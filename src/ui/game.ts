@@ -1278,13 +1278,16 @@ export class Game {
             const lead = ev.tags.find((t) => t !== 'matome' && t !== 'mouippai');
             if (lead) this.sound.policy(policyOf(lead).family);
             if (ev.poured) this.sound.pour();
-            if (ev.pair) this.sound.discover();
+            if (ev.set) { this.sound.discover(); this.sound.fever(true); }
+            else if (ev.pair) this.sound.discover();
+            else if (ev.sets) this.sound.pairHit('combo', 3);
             else if (ev.pairs) this.sound.pairHit(lead ? policyOf(lead).family : 'chain', ev.pairs);
           }
           break;
         case 'chain': this.sound.chainEnd(ev.count); break;
         case 'fever': this.sound.fever(ev.on); if (session.shop.timeLeft > FINAL_SECONDS) this.sound.setRate(ev.on ? 1.2 : 1); break;
         case 'fresh': this.sound.policy('trip'); break;
+        case 'extend': this.sound.fever(true); this.sound.bell(); break;
         case 'lack': this.sound.lack(); break;
         case 'angry': this.sound.angry(); break;
         case 'spill': this.sound.loss(); break;

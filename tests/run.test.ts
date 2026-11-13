@@ -4,7 +4,7 @@ import { Shop, type Guest } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
 import { DISHES, DIFFICULTIES } from '../src/core/shopConfig';
 import { NORMAL_RULES } from '../src/core/daily';
-import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, REFILL_EAT, descDiff, descOf, emptyMods, modsFor, pairBonus, pairKey, partnersOf, policyOf } from '../src/core/build';
+import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, REFILL_EAT, SETS, SET_BONUS, setKey, descDiff, descOf, emptyMods, modsFor, pairBonus, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
   GOAL_BASE, RUN_ACHIEVEMENTS, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
   loopEveryMult, loopGoalMult, loopWaitMult, newRun, offersFor, readMeta, roadOffers, takeRoad, trialMods, trialsFor, walkMult,
@@ -94,10 +94,10 @@ describe('方針のはたらき', () => {
     const s = shopWith([{ id: 'nushi', lv: 1 }], ['grilledFish']);
     s.away = { id: 'fishing', text: '', kana: 'つり', who: 'wife', act: '', place: '', gives: ['fish'], minimum: { fish: 4 } };
     s.returnFromTrip({ fish: 5 });
-    expect(s.fresh).toBe(12);
+    expect(s.fresh).toBe(14);
     const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
     expect(ev.type === 'serve' && ev.tags).toContain('nushi');
-    s.update(13);
+    s.update(15);
     expect(s.fresh).toBe(0);
   });
 
@@ -112,8 +112,8 @@ describe('方針のはたらき', () => {
     expect(s.combo).toBe(5);
   });
 
-  it('方針は16種類。段階ごとの値があり、打つ言葉は互いの頭にならない。どの方針にも、かけ合わせの相手が2つ以上ある', () => {
-    expect(POLICIES).toHaveLength(16);
+  it('方針は20種類。段階ごとの値があり、打つ言葉は互いの頭にならない。どの方針にも、かけ合わせの相手が2つ以上ある', () => {
+    expect(POLICIES).toHaveLength(20);
     for (const p of POLICIES) {
       expect(p.vals).toHaveLength(MAX_LEVEL);
       expect(descOf(p.id, 1)).not.toContain('{');
@@ -196,6 +196,131 @@ describe('作り直した方針', () => {
     const parts = descDiff('betsubara', 1, 2);
     expect(parts.filter((x) => x.hot).map((x) => x.t)).toEqual(['35%→50%', '2→2.8']);
     expect(descDiff('ryoshusho', 2, 3).filter((x) => x.hot).map((x) => x.t)).toEqual(['3→3.5']);
+  });
+});
+
+describe('一発勝負・連打の熱・朝市・延長営業と、型', () => {
+  it('一発勝負：ミスなしの皿は売上が上がり、ミスした言葉の皿は下がる（打った皿だけ）', () => {
+    const plain = shopWith([], ['grilledFish', 'vegSoup']);
+    const base = type(plain, 'やきざかな').find((e) => e.type === 'serve')!;
+    const s = shopWith([{ id: 'ippatsu', lv: 1 }], ['grilledFish', 'vegSoup']);
+    const a = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (a.type !== 'serve' || base.type !== 'serve') throw new Error('serve');
+    expect(a.clean).toBe(true);
+    expect(a.tags).toContain('ippatsu');
+    expect(a.gain).toBe(Math.round(base.gain * 1.4));
+    s.key('q');
+    const b = type(s, 'おんやさいもり').find((e) => e.type === 'serve')!;
+    if (b.type !== 'serve') throw new Error('serve');
+    expect(b.clean).toBe(false);
+    expect(b.tags).not.toContain('ippatsu');
+    expect(s.wordMisses).toBe(0);
+  });
+
+  it('連打の熱：3秒以内に続けて打って出すと倍率が上がり、間があくと冷める', () => {
+    const s = shopWith([{ id: 'netsu', lv: 1 }], []);
+    const D = (id: string) => dish(id);
+    const order = ['grilledFish', 'vegSoup', 'ale', 'mushSaute', 'jerky'];
+    const heats: number[] = [];
+    for (const id of order) {
+      s.seats[0] = guest(id);
+      const ev = type(s, D(id).kana).find((e) => e.type === 'serve')!;
+      if (ev.type !== 'serve') throw new Error('serve');
+      heats.push(ev.heat!);
+      s.clock += 1;
+    }
+    expect(heats.map((h) => Math.round(h * 10) / 10)).toEqual([1, 1.1, 1.2, 1.3, 1.4]);
+    s.clock += 5;
+    s.seats[0] = guest('grilledFish');
+    const cold = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    expect(cold.type === 'serve' && cold.heat).toBe(1);
+  });
+
+  it('連打の熱は、まとめ出しのついでの皿には付かない', () => {
+    const s = shopWith([{ id: 'netsu', lv: 3 }, { id: 'matome', lv: 1 }], ['grilledFish', 'driedFish']);
+    s.heat = 1;
+    (s as unknown as { lastTypedAt: number }).lastTypedAt = s.clock;
+    const [a, b] = type(s, 'やきざかな').filter((e) => e.type === 'serve');
+    if (a.type !== 'serve' || b.type !== 'serve') throw new Error('serve');
+    expect(a.tags).toContain('netsu');
+    expect(b.tags).not.toContain('netsu');
+  });
+
+  it('朝市：朝の調達は多く、昼と夜の調達は少なく持ち帰る', () => {
+    const trip = { id: 'fishing' as const, text: '', kana: 'つり', who: 'wife' as const, act: '', place: '', gives: ['fish' as const], minimum: { fish: 4 } };
+    const go = (clock: number) => {
+      const s = shopWith([{ id: 'asaichi', lv: 1 }], []);
+      s.stock.fish = 0;
+      s.clock = clock;
+      (s as unknown as { awayPhase: number }).awayPhase = s.phaseIndex;
+      s.away = trip;
+      s.returnFromTrip({ fish: 10 });
+      return s.stock.fish;
+    };
+    expect(go(10)).toBe(25);
+    expect(go(70)).toBe(9);
+  });
+
+  it('延長営業：閉店の時点でコンボが30以上なら、1回だけ営業が延びる', () => {
+    const s = shopWith([{ id: 'encho', lv: 2 }], []);
+    s.clock = 179.99;
+    s.combo = 30;
+    s.update(0.05);
+    expect(s.ended).toBe(false);
+    expect(s.extra).toBe(15);
+    expect(s.drainEvents().some((e) => e.type === 'extend')).toBe(true);
+    s.update(15.1);
+    expect(s.ended).toBe(true);
+    const low = shopWith([{ id: 'encho', lv: 3 }], []);
+    low.clock = 179.99;
+    low.combo = 29;
+    low.update(0.05);
+    expect(low.ended).toBe(true);
+  });
+
+  it('型：3つがそろって打った皿に効くと、売上が大きく増え、初めてなら記録される', () => {
+    const owned = [{ id: 'netsu' as const, lv: 1 }, { id: 'sekkachi' as const, lv: 1 }, { id: 'ooiri' as const, lv: 1 }];
+    const s = shopWith(owned, []);
+    s.heat = 0.5;
+    (s as unknown as { lastTypedAt: number }).lastTypedAt = s.clock;
+    s.feverUntil = s.clock + 5;
+    s.seats[0] = guest('grilledFish', 30);
+    const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.sets).toBe(1);
+    expect(ev.set).toBe(setKey(SETS[0]));
+    // 中のかけ合わせ（熱×即出・熱×大入り）に、型の分が足される
+    expect(ev.pairMult).toBeCloseTo(1 + pairBonus(1, 1) * 2 + SET_BONUS);
+    expect(s.buildStats.sets).toEqual([setKey(SETS[0])]);
+  });
+
+  it('型は7つ。どれも3つの方針で、まとめ出しは入らず、皿に効く方針を1つ以上含む。新しい4つにも相手が2つ以上ある', () => {
+    expect(SETS).toHaveLength(7);
+    for (const x of SETS) {
+      expect(new Set(x.ids).size).toBe(3);
+      expect(x.ids).not.toContain('matome');
+      expect(x.ids.some((id) => policyOf(id).fires)).toBe(true);
+    }
+    for (const id of ['ippatsu', 'netsu', 'asaichi', 'encho'] as const) expect(partnersOf(id).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('残りの2つを持っていれば、候補に「これで型がそろう」と出る', () => {
+    const meta = emptyMeta();
+    const run = newRun(meta, 1, 'set');
+    run.owned = [{ id: 'netsu', lv: 1 }, { id: 'sekkachi', lv: 1 }];
+    meta.policies = ['ooiri'];
+    let seen = false;
+    for (let r = 0; r < 60 && !seen; r++) {
+      const o = offersFor(run, meta, 1, r).find((x) => x.id === 'ooiri');
+      if (o) { expect(o.link).toContain('疾風の型'); expect(o.hot).toBe(true); seen = true; }
+    }
+    expect(seen).toBe(true);
+  });
+
+  it('見つけた型は保存され、壊れた値は捨てる', () => {
+    const meta = emptyMeta();
+    meta.sets = [setKey(SETS[1]), 'set:nope'];
+    expect(readMeta(JSON.parse(JSON.stringify(meta))).sets).toEqual([setKey(SETS[1])]);
   });
 });
 

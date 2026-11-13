@@ -13,6 +13,7 @@ import { entryPose, WALK_SPEED } from '../core/tavernNavigation';
 import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/layout';
 import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
+import { setOf } from '../core/build';
 import { FAMILY_COLOR, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
@@ -96,7 +97,7 @@ export class ShopView {
   fxScale = 1;
   /** まとめ出しで皿が飛ぶ線・かけ合わせの知らせ・連鎖の掛け声 */
   private links: { from: number; to: number; t: number; delay: number }[] = [];
-  private pairNote: { name: string; t: number } | null = null;
+  private pairNote: { name: string; t: number; set?: boolean } | null = null;
   private chainNote: { count: number; total: number; t: number } | null = null;
   /** 目標を越えた瞬間に鳴らす音などを、Game が一度だけ拾う */
   goalHit = false;
@@ -159,13 +160,17 @@ export class ShopView {
         const pairs = ev.pairs ?? 0;
         const tint = pairs > 0 ? '#ffe27a' : tags.length ? FAMILY_COLOR[policyOf(tags[0]).family] : C.gold;
         this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tint, big: true });
-        if (tags.length) this.pop(`tags${ev.seat}`, { x: seat.x, y: seat.ty - 6, t: -delay, text: pairs > 0 ? `かけ合わせ ×${(ev.pairMult ?? 1).toFixed(1)}` : tags.slice(0, 3).map((t) => POLICY_SEAL[t]).join('・'), col: tint });
+        if (tags.length) this.pop(`tags${ev.seat}`, { x: seat.x, y: seat.ty - 6, t: -delay, text: (ev.sets ?? 0) > 0 ? `型！ ×${(ev.pairMult ?? 1).toFixed(1)}` : pairs > 0 ? `かけ合わせ ×${(ev.pairMult ?? 1).toFixed(1)}` : tags.slice(0, 3).map((t) => POLICY_SEAL[t]).join('・'), col: (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint });
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, tint, Math.round((light ? 5 : 10) * this.fxScale), 80);
         for (const t of tags) {
           this.run.fired[t] = this.time + delay;
           this.run.count[t] = (this.run.count[t] ?? 0) + 1;
         }
-        if (ev.pair) {
+        // 型を初めて見つけたら、かけ合わせより大きく知らせる
+        if (ev.set) {
+          this.pairNote = { name: setOf(ev.set)?.name ?? '', t: 0, set: true };
+          this.sparkAt({ x: seat.x, y: seat.ty - 30 }, '#ffb0e0', Math.round(36 * this.fxScale), 140);
+        } else if (ev.pair) {
           this.pairNote = { name: pairOf(ev.pair)?.name ?? '', t: 0 };
           this.sparkAt({ x: seat.x, y: seat.ty - 30 }, '#ffe27a', Math.round(24 * this.fxScale), 120);
         }
@@ -186,6 +191,11 @@ export class ShopView {
             this.confetti.push({ x: Math.random() * 480, y: -10 - Math.random() * 40, vx: (Math.random() - 0.5) * 30, vy: 50 + Math.random() * 50, t: 0, life: 1.6 + Math.random() * 0.8, col: i % 2 ? '#ffd25c' : '#fff0a8', spin: Math.random() * 6 });
           }
         }
+        break;
+      case 'extend':
+        this.banner = { text: `延長営業！ 閉店まで+${ev.secs}秒`, t: 2.2, col: '#ffe27a' };
+        this.callout = { text: '延長！', t: 0, col: '#ffe27a', level: 8 };
+        if (this.run) this.run.fired.encho = this.time;
         break;
       case 'fresh':
         this.banner = { text: `とれたて！ ${ev.n}秒のあいだ売上アップ`, t: 1.8, col: FAMILY_COLOR.trip };
@@ -532,7 +542,7 @@ export class ShopView {
       sc.T((i === 2 ? '☾ ' : '☀ ') + p.name, bx + acc + w / 2, 4, 10, i === ph ? C.gold3 : C.cream, 'center', i === ph ? 1 : 0.5);
       acc += w;
     });
-    sc.PR(bx + (shop.clock / DAY_LENGTH) * bw - 0.5, 16, 1.5, 9, C.w);
+    sc.PR(bx + Math.min(1, shop.clock / DAY_LENGTH) * bw - 0.5, 16, 1.5, 9, shop.extra > 0 && shop.clock > DAY_LENGTH ? '#ffe27a' : C.w);
     const left = shop.timeLeft;
     // 残り10秒：1秒ごとに時計が大きく弾み、画面の上下の縁が赤く脈打つ
     const last = left <= FINAL_SECONDS && left > 0;
@@ -943,6 +953,11 @@ export class ShopView {
     };
     if (shop.fever) note(`大入り ${Math.ceil(shop.feverUntil - shop.clock)}秒`, '#ffe27a');
     if (shop.fresh > 0) note(`とれたて あと${Math.ceil(shop.fresh)}秒`, FAMILY_COLOR.trip);
+    const b = shop.build;
+    // 連打の熱：今の倍率（3秒あくと冷める）。一発勝負：今の言葉にミスがあるか
+    if (b && b.heatCap > 1 && shop.heat > 0 && shop.clock - shop.lastTyped <= 3) note(`熱 ×${(1 + shop.heat).toFixed(1)}`, '#ff9a5a');
+    if (b && b.ippatsuMult > 1 && shop.input.typed.length > 0) note(shop.wordMisses ? '一発 ×0.8' : `一発 ×${b.ippatsuMult}`, shop.wordMisses ? '#ff7a6a' : FAMILY_COLOR.combo);
+    if (shop.extra > 0 && shop.clock > 180) note('延長営業中', '#ffe27a');
     // 方針の判子：効いた瞬間に弾んで光る
     run.owned.forEach((o, i) => {
       const pol = policyOf(o.id);
@@ -998,13 +1013,14 @@ export class ShopView {
     if (this.pairNote) {
       const n = this.pairNote;
       const a = Math.min(1, n.t * 6, (2.2 - n.t) * 2);
-      const text = `かけ合わせ『${n.name}』`;
+      const text = n.set ? `型『${n.name}』` : `かけ合わせ『${n.name}』`;
       const size = sc.fitSize(text, 10, 154, 7);
       const tw = sc.W(text, size) + 14;
       const x = 105 - tw / 2;
       const y = 92 - Math.max(0, 0.15 - n.t) * 40;
-      sc.glow(x, y, tw, 20, '#ffe27a', a * (0.6 + 0.3 * Math.sin(this.time * 10)));
-      sc.panel(x, y, tw, 20, '#3a2410', '#ffe27a', a);
+      const col = n.set ? '#ffb0e0' : '#ffe27a';
+      sc.glow(x, y, tw, 20, col, a * (0.6 + 0.3 * Math.sin(this.time * 10)));
+      sc.panel(x, y, tw, 20, n.set ? '#3a1030' : '#3a2410', col, a);
       sc.TB(text, x + tw / 2, y + 4.5, size, '#fff0b0', 'center', C.ink, a);
     }
   }

@@ -2,7 +2,7 @@
 // 描くたびに場所を登録し直し、最後にマウスの下にある説明を1つだけ描く。打って遊ぶ操作には影響しない。
 import { C, type Color } from './palette';
 import { LW, type Screen } from './screen';
-import { FAMILY_COLOR, FAMILY_NAME, MAX_LEVEL, PAIR_MAX, descOf, pairKey, pairOf, pairText, partnersOf, policyOf, type Owned, type PolicyId } from '../core/build';
+import { FAMILY_COLOR, FAMILY_NAME, MAX_LEVEL, PAIR_MAX, SETS, descOf, pairKey, pairOf, pairText, partnersOf, policyOf, setOf, setText, type Owned, type PolicyId } from '../core/build';
 
 export interface Tip { title: string; col: Color; lines: { t: string; col?: Color }[] }
 
@@ -70,6 +70,8 @@ export function policyTip(id: PolicyId, lv: number, owned: Owned[] = []): Tip {
   lines.push({ t: p.fires ? '皿ごとに効く方針' : '店全体に、いつも効く方針', col: '#8fb8a8' });
   const partners = partnersOf(id);
   if (partners.length) lines.push({ t: `かけ合わせの相手：${partners.map((q) => `${has(q) ? '◆' : '◇'}${policyOf(q).name}`).join(' ')}`, col: '#ffe9b4' });
+  const sets = SETS.filter((x) => x.ids.includes(id));
+  if (sets.length) lines.push({ t: `型：${sets.map((x) => `『${x.name}』（${x.ids.filter((q) => q !== id).map((q) => `${has(q) ? '◆' : '◇'}${policyOf(q).name}`).join('・')}）`).join(' ')}`, col: '#ffb0e0' });
   return { title: `${p.name}　Lv${lv}（${FAMILY_NAME[p.family]}）`, col: FAMILY_COLOR[p.family], lines };
 }
 
@@ -85,6 +87,13 @@ export function pairTip(key: string): Tip | null {
       { t: 'いくつも重なると、そのぶん足される', col: '#8fb8a8' },
     ],
   };
+}
+
+/** 型の説明：どの3つで、いつ効くか */
+export function setTip(key: string): Tip | null {
+  const x = setOf(key);
+  if (!x) return null;
+  return { title: `型『${x.name}』`, col: '#ffb0e0', lines: [{ t: setText(x), col: C.w }, { t: '3つ目の方針を選ぶ候補には「これで型がそろう」と出る', col: '#8fb8a8' }] };
 }
 
 export const pairTipOf = (a: PolicyId, b: PolicyId) => pairTip(pairKey(a, b));

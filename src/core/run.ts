@@ -3,7 +3,7 @@
 //   朝・昼・夜の方針えらび（1日3回×4日）→ 閉店で売上目標の判定 → 明日の営業えらび（道中）→ …
 //   4日目の目標を越えるとクリアで、次は「のれん」が1枚増えて難しくなる（上限なし）。
 import {
-  MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, isPolicy, modsFor, pairKey, pairOf, partnersOf, policyOf, stockGainOnPick,
+  MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, SETS, isPolicy, modsFor, pairKey, pairOf, partnersOf, policyOf, setOf, stockGainOnPick,
   type BuildMods, type BuildStats, type Owned, type PolicyId,
 } from './build';
 import { NORMAL_RULES, type DayRules } from './daily';
@@ -171,6 +171,8 @@ export interface RunMeta {
   best: { total: number; day: number; combo: number; chain: number; serve: number; ratio: number; stack: number };
   /** 見つけたかけ合わせ */
   discovered: string[];
+  /** 見つけた型 */
+  sets: string[];
   /** クリアしたときの主力（いちばん稼いだ方針） */
   sigs: PolicyId[];
   /** 解放した方針 */
@@ -186,7 +188,7 @@ export function emptyMeta(): RunMeta {
   return {
     v: 1, loop: 1, clears: 0, runs: 0, daysCleared: 0,
     best: { total: 0, day: 0, combo: 0, chain: 0, serve: 0, ratio: 0, stack: 0 },
-    discovered: [], sigs: [], policies: [], flags: { noAngry: false, max3: false }, active: null, last: null, paid: [],
+    discovered: [], sets: [], sigs: [], policies: [], flags: { noAngry: false, max3: false }, active: null, last: null, paid: [],
   };
 }
 
@@ -238,6 +240,7 @@ export function readMeta(raw: unknown): RunMeta {
   const b = obj(o.best);
   for (const k of Object.keys(m.best) as (keyof RunMeta['best'])[]) m.best[k] = num(b[k]);
   m.discovered = readPairs(o.discovered);
+  m.sets = [...new Set(arr(o.sets).filter((x): x is string => typeof x === 'string' && !!setOf(x)))];
   m.sigs = [...new Set(arr(o.sigs).filter(isPolicy))];
   m.policies = [...new Set(arr(o.policies).filter(isPolicy))];
   const f = obj(o.flags);
@@ -313,6 +316,9 @@ const SUPPORT: Partial<Record<PolicyId, { with: PolicyId[]; text: string }>> = {
 
 function linkFor(id: PolicyId, owned: Owned[]): { link: string | null; hot: boolean } {
   const has = (p: PolicyId) => owned.some((o) => o.id === p);
+  // 型：残りの2つを持っていれば、これでそろう
+  const set = SETS.find((x) => x.ids.includes(id) && x.ids.every((q) => q === id || has(q)));
+  if (set) return { link: `これで『${set.name}』がそろう`, hot: true };
   const partner = partnersOf(id).find(has);
   if (partner) return { link: `「${policyOf(partner).name}」と重なる →『${pairOf(pairKey(id, partner))!.name}』`, hot: true };
   const sup = SUPPORT[id];
@@ -397,6 +403,8 @@ export interface DayOutcome {
   result: DayResult;
   /** 今回はじめて見つけたかけ合わせ */
   newPairs: string[];
+  /** 今回はじめて見つけた型 */
+  newSets: string[];
   /** 今回解放された方針 */
   newPolicies: PolicyId[];
   /** ランが終わったときのまとめ（続くなら null） */
@@ -421,6 +429,8 @@ export function closeDay(run: RunState, meta: RunMeta, f: DayFacts, now = new Da
   const newPairs = f.build.pairs.filter((p) => pairOf(p) && !meta.discovered.includes(p));
   for (const p of f.build.pairs) if (pairOf(p) && !run.pairs.includes(p)) run.pairs.push(p);
   meta.discovered.push(...newPairs);
+  const newSets = f.build.sets.filter((k) => setOf(k) && !meta.sets.includes(k));
+  meta.sets.push(...newSets);
   const passed = result.sales >= goal;
   const cleared = passed && run.day >= RUN_DAYS - 1;
   const b = meta.best;
@@ -459,7 +469,7 @@ export function closeDay(run: RunState, meta: RunMeta, f: DayFacts, now = new Da
     run.stage = 'closed';
     meta.active = run;
   }
-  return { passed, cleared, result, newPairs, newPolicies, summary };
+  return { passed, cleared, result, newPairs, newSets, newPolicies, summary };
 }
 
 /** 明日の営業を選んで、次の日の朝へ */
