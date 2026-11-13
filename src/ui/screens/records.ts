@@ -18,15 +18,22 @@ const FACE_W = 22;
 /** 一覧に一度に見せる行数 */
 export const LIST_ROWS = 8;
 
-/** 文を、決まった幅に収まるように折り返す（日本語は1文字ずつ、ことばの区切りは気にしない） */
+/**
+ * 文を、決まった幅に収まるように折り返す。日本語は1文字ずつ。
+ * 数字・倍率・英字のひと続き（x1.4、+150、Lv2 など）は途中で切らない（幅より長いときだけ1文字ずつに戻す）
+ */
 export function wrapText(sc: Pick<Screen, 'W'>, text: string, size: number, width: number): string[] {
   const out: string[] = [];
   let line = '';
-  for (const ch of text) {
-    if (line && sc.W(line + ch, size) > width && !/^[、。」』）！？…]$/.test(ch)) {
-      out.push(line);
-      line = ch;
-    } else line += ch;
+  const units = text.match(/[A-Za-z0-9.+\-×%]+|[\s\S]/gu) ?? [];
+  for (const unit of units) {
+    const parts = unit.length > 1 && sc.W(unit, size) > width ? [...unit] : [unit];
+    for (const u of parts) {
+      if (line && sc.W(line + u, size) > width && !/^[、。」』）！？…]$/.test(u)) {
+        out.push(line);
+        line = u;
+      } else line += u;
+    }
   }
   if (line) out.push(line);
   return out;

@@ -61,7 +61,7 @@ export function drawHelp(g: Game) {
   sc.T('注文の料理を出して、３分間でたくさん売り上げよう', 112, 24, 10, C.cream);
   const steps = [
     { title: '料理を出す', lines: ['お客の頭上の料理名を', '打つと、料理を出せる'] },
-    { title: '素材を調達', lines: ['素材が足りなくなったら', '下の言葉で集めに行く'] },
+    { title: '素材を調達', lines: ['素材が尽きる前に、下の', '言葉で集めに行く', '（その間も時計は進む）'] },
     { title: '3分で売上勝負', lines: ['閉店までにたくさん出して', '売上を伸ばそう'] },
   ];
   steps.forEach((st, i) => {
@@ -101,7 +101,9 @@ export function drawHelp(g: Game) {
       }
       sc.T('売上', x + 22, y + 74, 8, C.cream, 'center');
     }
-    st.lines.forEach((line, k) => sc.T(line, x + 10, y + 96 + k * 14, 9, C.cream2));
+    // 3行の札は行の間を詰めて、札の中に収める
+    const lh = st.lines.length > 2 ? 11 : 14;
+    st.lines.forEach((line, k) => sc.T(line, x + 10, y + (st.lines.length > 2 ? 90 : 96) + k * lh, sc.fitSize(line, 9, w - 18, 7), k === 2 ? C.gold3 : C.cream2));
     // 次の手順への矢印
     if (i < 2) {
       const ax = x + w + 4;
@@ -329,13 +331,13 @@ export function drawRunHelp(g: Game) {
     {
       title: '周回と、中断のしかた', color: '#a9f0e4',
       lines: [
-        'のれんはクリアするたびに1枚増える。',
-        '方針は毎回、新しく組み直す。',
+        'のれんはクリアで1枚増え、方針は毎回組み直す。',
+        '続けて店じまいすると、常連が差し入れてくれる。',
         '見つけた組・実績・常連のおまけは残る。',
         '限定の飾りは、普段の営業でも使える。',
         'Escで一時停止、再開か中断を選べる。',
         '営業中に中断すると、その日の開店から。',
-        '昼・夜の方針と途中の売上も戻る。',
+        '途中の売上と昼・夜の方針は消える。',
         '閉店後と翌日の選択では、区切りを保存。',
         '「ずかん」で効果・進捗・報酬を見よう。',
       ],

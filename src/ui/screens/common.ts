@@ -58,7 +58,7 @@ export function drawMenuScreen(g: Game, title: string, sub: string) {
   const sc = g.sc;
   sc.cover(C.bg, 0.6);
   sc.TB(title, LW / 2, 92, 20, C.gold3, 'center');
-  if (sub) sc.TB(sub, LW / 2, 122, 10, C.cream, 'center');
+  if (sub) sc.TB(sub, LW / 2, 122, sc.fitSize(sub, 10, LW - 24, 7), C.cream, 'center');
   drawMenu(g, 146);
 }
 

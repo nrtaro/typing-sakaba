@@ -85,7 +85,7 @@ export function tutorialText(state: TutorialState): { title: string; lines: stri
     case 'trip':
       return state.gained
         ? { title: '③ 店に戻る', lines: ['魚が取れました！', '調達はいつでも Enter で', '切り上げて、店に戻れます。', 'さあ、Enter で戻ろう！'] }
-        : { title: '③ 調達（つり）', lines: ['練習なので時間は止まっていて、', '魚は逃げません。ゆっくりどうぞ。', '浮きが沈んだら、出た言葉を打って', '合わせ、次の言葉で巻き上げよう。', '本番では時間内に戻ってきます。'] };
+        : { title: '③ 調達（つり）', lines: ['練習なので時間は止まっていて、', '魚は逃げません。ゆっくりどうぞ。', '浮きが沈んだら、出た言葉を打って', '合わせ、次の言葉で巻き上げよう。', '本番は出かけている間も時計が進む。'] };
     case 'serve2':
       return { title: '④ もう一度、料理を出す', lines: ['持ち帰った魚で、', '「焼き魚」を出そう。'] };
     default:

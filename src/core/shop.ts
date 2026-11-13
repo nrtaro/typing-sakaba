@@ -2,7 +2,7 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
-import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_STEP, IDLE_MAX, IDLE_MIN, IPPATSU_MISS, SET_BONUS, SETS, setKey, QUICK_RATIO, REFILL_EAT, pairBonus, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MAX, IDLE_MIN, IPPATSU_MISS, SET_BONUS, SETS, setKey, QUICK_RATIO, REFILL_EAT, pairBonus, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
 import {
@@ -316,6 +316,7 @@ export class Shop {
     if (r.kind === 'miss') {
       this.stats.missKeys++;
       this.wordMisses++;
+      if (this.build && this.build.heatCap > 1) this.heat *= HEAT_MISS_KEEP;
       if (this.rules.spillEvery !== null && ++this.missSinceSpill >= this.rules.spillEvery) {
         this.missSinceSpill = 0;
         this.spill();

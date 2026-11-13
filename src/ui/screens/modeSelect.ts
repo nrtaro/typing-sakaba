@@ -37,6 +37,17 @@ export function drawModeSelect(g: Game) {
   sc.shifted(0, e.y0 / 2, () => {
     drawSignboard(g, 160, 6, 160, 34);
     sc.TB('営業をえらぶ', LW / 2, 13, 16, '#ffd98a', 'center', '#3a1408');
+    // キーの絵に出す文字：ほかの札と同じ文字で始まるときは、見分けがつくところまで出す（ひがわり HI／繁盛記 HA）
+    const rems = MODES.map((md) => {
+      const live = g.menu.active.find((l) => l.target.id === md.kana);
+      return typing && !live ? null : (live?.matcher ?? new RomajiMatcher(md.kana)).remaining;
+    });
+    const keyLabel = (i: number) => {
+      const r = rems[i] ?? '';
+      let n = 1;
+      while (n < r.length && rems.some((o, j) => j !== i && o !== null && o.startsWith(r.slice(0, n)))) n++;
+      return r.slice(0, n).toUpperCase();
+    };
     MODES.forEach((md, i) => {
       const live = g.menu.active.find((l) => l.target.id === md.kana);
       const last = g.settings.playMode === MODE_ID[i];
@@ -65,8 +76,10 @@ export function drawModeSelect(g: Game) {
         const down = Math.floor(g.t * 2.5 + i) % 2 === 0;
         const kx = x + w / 2 + rw / 2 - 5;
         const ky = y + 60 + (down ? 1.5 : 0);
-        sc.panel(kx, ky, 12, 12, down ? '#e3c890' : '#f6e2b8', '#8a6232');
-        sc.T((m.remaining[0] ?? '').toUpperCase(), kx + 6, ky + 2, 8, '#3a2414', 'center');
+        const label = keyLabel(i);
+        const kw = 12 + Math.max(0, label.length - 1) * 6;
+        sc.panel(kx, ky, kw, 12, down ? '#e3c890' : '#f6e2b8', '#8a6232');
+        sc.T(label, kx + kw / 2, ky + 2, 8, '#3a2414', 'center');
       }
       // 下の黒板：通常は自己ベスト、ひがわりは今日の日付とお題
       sc.panel(x + 12, y + 92, w - 24, 48, '#22322a', '#6b4422');

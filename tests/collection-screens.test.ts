@@ -130,6 +130,29 @@ describe('結果の貯金', () => {
     expect(g.result!.credited).toBe(4321);
     expect(store.loadCollection().coins).toBe(4321);
   });
+
+  it('ふくびきが引けるときだけ、結果の札に「ふくびき」が出て、そこから引きに行ける', () => {
+    const { g, store } = game();
+    const close = (score: number, id: string) => {
+      g.session = new PlaySession(1, difficultyOf('normal'), NORMAL_RULES);
+      g.playId = id;
+      g.openDate = '2026-11-08';
+      g.session.shop.score = score;
+      g.finish();
+      return g.menuItems().map((it) => it.kana);
+    };
+    // 初回の1回は無料なので引ける
+    expect(close(100, 'p1')).toContain('ふくびき');
+    // 無料を使ったあと、貯金が足りないときは出さない
+    store.updateCollection((c) => ({ ...c, freeUsed: true, coins: 0 }));
+    expect(close(PULL_PRICE - 1, 'p2')).not.toContain('ふくびき');
+    // 足りたら出る。選ぶと、ふくびきの画面へ
+    const kanas = close(1, 'p3');
+    expect(kanas).toContain('ふくびき');
+    expect(kanas[kanas.length - 1]).toBe('たいとる');
+    g.menuItems().find((it) => it.kana === 'ふくびき')!.act();
+    expect(g.mode).toBe('fukubiki');
+  });
 });
 
 describe('最終確認での直し', () => {

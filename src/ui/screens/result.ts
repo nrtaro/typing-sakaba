@@ -1,4 +1,5 @@
 // 画面：result
+import { PULL_PRICE } from '../../core/collection';
 import { C } from '../palette';
 import { LW } from '../screen';
 import { dateLabel } from '../../core/daily';
@@ -125,6 +126,13 @@ export function drawResult(g: Game) {
     }
     sc.T('タイトルの「きろく」で会話が読めます', x + 6, y + 27, sc.fitSize('タイトルの「きろく」で会話が読めます', 6.5, w - 12, 5), C.cream2, 'left', p);
   }
+  // 売上を貯金箱へ：小さく1行だけ（実績のお知らせがあればその下）
+  if (r.credited && age > 2.6) {
+    const p = ease((age - 2.6) / 0.3);
+    const short = PULL_PRICE - (r.coins ?? 0);
+    const line = `貯金箱 +${r.credited.toLocaleString()}円${r.canPull ? '' : short > 0 ? `（ふくびきまで あと${short.toLocaleString()}円）` : ''}`;
+    sc.T(line, 334 + 4, r.unlocked?.length ? 114 : 74, sc.fitSize(line, 7.5, 130, 5.5), r.canPull ? C.gold3 : '#f2efe2', 'left', p);
+  }
   // 家族が見送る
   if (g.art) {
     const p = ease((age - 0.4) / 0.5);
@@ -181,6 +189,12 @@ export function drawResultMenu(g: Game) {
   const total = rest.length * w + (rest.length - 1) * gap;
   rest.forEach((it, k) => {
     const last = k === rest.length - 1;
-    button(g, it, LW / 2 - total / 2 + k * (w + gap), 238, w, 27, 'plain', last ? 'Esc' : undefined);
+    const bx = LW / 2 - total / 2 + k * (w + gap);
+    button(g, it, bx, 238, w, 27, 'plain', last ? 'Esc' : undefined);
+    // ふくびきが引けるときの印（タイトルの札と同じ）
+    if (it.kana === 'ふくびき') {
+      g.sc.panel(bx + w / 2 - 19, 229, 38, 10, '#2a5a3a', C.gold3);
+      g.sc.T('引ける！', bx + w / 2, 230.5, 6.5, C.gold3, 'center');
+    }
   });
 }

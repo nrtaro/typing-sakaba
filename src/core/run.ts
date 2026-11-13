@@ -153,6 +153,8 @@ export interface RunState {
   pairs: string[];
   /** このランで方針ごとに増えた売上 */
   yen: Partial<Record<PolicyId, number>>;
+  /** 常連の見舞いの段階（同じのれんで続けて負けたあとの挑戦だけ。0＝なし） */
+  aid: number;
 }
 
 export interface RunSummary {
@@ -182,13 +184,15 @@ export interface RunMeta {
   last: RunSummary | null;
   /** 貯金箱へ足し終えたランのID */
   paid: string[];
+  /** 今ののれんで続けて負けた回数（クリアで0に戻る） */
+  losses: number;
 }
 
 export function emptyMeta(): RunMeta {
   return {
     v: 1, loop: 1, clears: 0, runs: 0, daysCleared: 0,
     best: { total: 0, day: 0, combo: 0, chain: 0, serve: 0, ratio: 0, stack: 0 },
-    discovered: [], sets: [], sigs: [], policies: [], flags: { noAngry: false, max3: false }, active: null, last: null, paid: [],
+    discovered: [], sets: [], sigs: [], policies: [], flags: { noAngry: false, max3: false }, active: null, last: null, paid: [], losses: 0,
   };
 }
 
@@ -225,7 +229,7 @@ function readRun(v: unknown): RunState | null {
   if (days.length !== (stage === 'closed' || stage === 'road' ? day + 1 : day)) return null;
   return {
     v: 1, id: o.id.slice(0, 64), seed: num(o.seed, 0xffffffff), loop: Math.max(1, num(o.loop)), day, stage, owned: readOwned(o.owned),
-    rerolls: num(o.rerolls, 9), boost: o.boost === true, road: isRoad(o.road) ? o.road : 'joren', days, pairs: readPairs(o.pairs), yen: readYen(o.yen),
+    rerolls: num(o.rerolls, 9), boost: o.boost === true, road: isRoad(o.road) ? o.road : 'joren', days, pairs: readPairs(o.pairs), yen: readYen(o.yen), aid: num(o.aid, AIDS.length),
   };
 }
 
@@ -253,6 +257,7 @@ export function readMeta(raw: unknown): RunMeta {
       owned: readOwned(l.owned), days: arr(l.days).slice(0, RUN_DAYS).map(readDay), pairs: readPairs(l.pairs), at: l.at,
     };
   }
+  m.losses = num(o.losses);
   m.paid = arr(o.paid).filter((x): x is string => typeof x === 'string').slice(-50);
   return m;
 }
@@ -267,20 +272,35 @@ export const PERKS: Perk[] = [
 ];
 export const perkCount = (m: RunMeta) => PERKS.filter((p) => m.daysCleared >= p.at).length;
 
+// ---------- 常連の見舞い（同じのれんで負け続けたときの助け） ----------
+
+/**
+ * 同じのれんで続けて負けた回数ごとの見舞い。「難しさを下げますか」とは聞かず、店の出来事として付く。
+ * 目標額は変えない。その挑戦の間だけ効き、クリアすると負けた回数は0に戻る
+ */
+export const AIDS = [
+  { at: 2, stock: 1, boost: false, text: '開店のとき、全部の素材が+1' },
+  { at: 3, stock: 2, boost: true, text: '開店の素材が全部+2、1日目の朝の方針はLv+1' },
+] as const;
+export const aidFor = (losses: number) => AIDS.filter((a) => losses >= a.at).length;
+const aidOf = (run: RunState) => (run.aid > 0 ? AIDS[Math.min(AIDS.length, run.aid) - 1] : null);
+
 /** いま選べる方針（最初からのものと、解放したもの） */
 export function availablePolicies(m: RunMeta): PolicyId[] {
   return POLICIES.filter((p) => p.starter || m.policies.includes(p.id)).map((p) => p.id);
 }
 
 export function newRun(meta: RunMeta, seed: number, id: string): RunState {
-  return { v: 1, id, seed: seed >>> 0, loop: meta.loop, day: 0, stage: 'morning', owned: [], rerolls: 1 + (perkCount(meta) >= 2 ? 1 : 0), boost: false, road: 'joren', days: [], pairs: [], yen: {} };
+  const aid = aidFor(meta.losses);
+  const boost = aid > 0 && AIDS[aid - 1].boost;
+  return { v: 1, id, seed: seed >>> 0, loop: meta.loop, day: 0, stage: 'morning', owned: [], rerolls: 1 + (perkCount(meta) >= 2 ? 1 : 0), boost, road: 'joren', days: [], pairs: [], yen: {}, aid };
 }
 
 /** その日の営業に渡すもの：難しさ・お題のルール・方針のはたらき・目標・乱数の種 */
 export function dayPlan(run: RunState, meta: RunMeta) {
   const road = roadOf(run.road);
   const trial = trialMods(run.loop);
-  const base: Partial<BuildMods> = { ...trial, ...road.mods, tripMult: BASE_TRIP_MULT * (trial.tripMult ?? 1) * (road.mods.tripMult ?? 1), startStock: perkCount(meta) >= 1 ? 1 : 0 };
+  const base: Partial<BuildMods> = { ...trial, ...road.mods, tripMult: BASE_TRIP_MULT * (trial.tripMult ?? 1) * (road.mods.tripMult ?? 1), startStock: (perkCount(meta) >= 1 ? 1 : 0) + (aidOf(run)?.stock ?? 0) };
   return {
     seed: (subRng(run.seed, 5, run.day).next() * 4294967296) >>> 0,
     difficulty: dayDifficulty(run.day, run.loop),
@@ -457,6 +477,8 @@ export function closeDay(run: RunState, meta: RunMeta, f: DayFacts, now = new Da
     summary = { cleared, loop: run.loop, day: run.day, total, sig: signature(run), owned: run.owned.map((o) => ({ ...o })), days: run.days.map((d) => ({ ...d })), pairs: [...run.pairs], at: now.toISOString() };
     meta.runs++;
     b.total = Math.max(b.total, total);
+    if (cleared) meta.losses = 0;
+    else if (run.loop === meta.loop) meta.losses++;
     if (cleared) {
       meta.clears++;
       meta.loop = Math.max(meta.loop, run.loop + 1);

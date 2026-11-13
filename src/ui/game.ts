@@ -214,7 +214,8 @@ export class Game {
         { text: 'さいかい', kana: 'さいかい', act: () => { this.paused = false; } },
         { text: `おと：${VOLUME_NAMES[this.volume]}`, kana: 'おと', act: () => this.setVolume(this.volume === 0 ? 3 : this.volume - 1) },
         { text: `演出：${this.settings.fxLevel === 0 ? 'ひかえめ' : 'ふつう'}`, kana: 'えんしゅつ', act: () => this.toggleFx() },
-        { text: this.runUI?.inRun ? '中断する' : 'やめる', kana: 'やめる', act: () => this.toTitle() },
+        // 繁盛記の営業中は、日の結果の「ちゅうだん」と同じ言葉で打つ
+        this.runUI?.inRun ? { text: '中断する', kana: 'ちゅうだん', act: () => this.toTitle() } : { text: 'やめる', kana: 'やめる', act: () => this.toTitle() },
       ];
     }
     // 繁盛記：入口・方針えらび・結果などは RunUI が受け持つ
@@ -296,6 +297,8 @@ export class Game {
           { text: 'Xにポスト', kana: 'ぽすと', act: () => this.shareToX() },
           // 送ったあとは、今日のランキングをすぐ見られるように
           ...(this.result?.daily && this.submission.state === 'sent' ? [{ text: 'らんきんぐ', kana: 'らんきんぐ', act: () => this.openRanking() }] : []),
+          // 売上で貯金箱が足りたら、その場でふくびきへ行ける（引けないときは札を出さない）
+          ...(this.result?.canPull ? [{ text: 'ふくびき', kana: 'ふくびき', act: () => this.openFukubiki() }] : []),
           { text: 'たいとる', kana: 'たいとる', act: () => this.toTitle() },
         ];
       default:
@@ -1063,6 +1066,8 @@ export class Game {
       if (this.t - this.resultAt > RESULT_LOCK) this.resultAt = this.t - RESULT_READY;
       return;
     }
+    // 繁盛記の日の結果・最終結果も同じ：演出の途中のキーは、演出を送るだけで次へは進まない
+    if (this.mode === 'run' && this.runUI?.holdResultKey()) { e.preventDefault(); return; }
     // 記録・実績：↑↓でえらぶ、Enter で会話を開く／閉じる、会話の中は↑↓で送り、←→でほかの会話へ
     // ふくびき：Enter の押しっぱなし（キーの自動の繰り返し）では、引いたり交換したりしない
     if (this.mode === 'fukubiki' && k === 'Enter' && e.repeat) { e.preventDefault(); return; }
@@ -1384,8 +1389,8 @@ export class Game {
       }
       this.runUI?.drawOverlay();
       drawTutorial(this);
-      if (this.tutorial?.step === 'done' && !this.paused) drawMenuScreen(this, '練習はおしまい！', '本番は3分間。時間が進み、お客が次々に来ます');
-      if (this.paused) drawMenuScreen(this, '一時停止中', this.runUI?.inRun ? `中断すると${(this.runUI.run?.day ?? 0) + 1}日目の開店から。今日の途中の売上・方針は戻ります` : '');
+      if (this.tutorial?.step === 'done' && !this.paused) drawMenuScreen(this, '練習はおしまい！', '本番は3分間。調達に出ている間も時計は進むので、素材が尽きる前に出かけよう');
+      if (this.paused) drawMenuScreen(this, '一時停止中', this.runUI?.inRun ? `中断すると${(this.runUI.run?.day ?? 0) + 1}日目は開店からやり直し。今日の売上と昼・夜の方針は消える` : '');
       if (this.paused || this.tutorial?.step === 'done') drawClickHint(this);
       drawImeHint(this);
       drawVolume(this);

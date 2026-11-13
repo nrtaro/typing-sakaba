@@ -56,8 +56,10 @@ export const REFILL_EAT = 0.9;
 /** 一発勝負：ミスした言葉で出した皿の倍率 */
 export const IPPATSU_MISS = 0.8;
 /** 連打の熱：前に打って出した皿から、何秒以内なら熱が上がるか／1皿で上がる量 */
-export const HEAT_GAP = 3;
+export const HEAT_GAP = 2.5;
 export const HEAT_STEP = 0.1;
+/** 連打の熱：ミスしたときに残る熱の割合（速さだけでなく、正確さにも損を置く） */
+export const HEAT_MISS_KEEP = 0.5;
 /** 延長営業：閉店の時点で、このコンボ以上なら延長する */
 export const ENCHO_COMBO = 30;
 /** 朝市：昼と夜の調達で持ち帰る素材の倍率 */
@@ -203,7 +205,7 @@ export const POLICIES: Policy[] = [
   {
     id: 'netsu', name: '連打の熱', kana: 'ねつ', family: 'combo', fires: true, starter: true,
     quip: '「手が止まったら、熱が逃げる」',
-    text: `前に打って出した皿から${HEAT_GAP}秒以内に出すと、売上の倍率が+${HEAT_STEP}ずつ上がる（上限×{0}。${HEAT_GAP}秒あくと元に戻る。打った皿だけ）`,
+    text: `前に打って出した皿から${HEAT_GAP}秒以内に出すと、売上の倍率が+${HEAT_STEP}ずつ上がる（上限×{0}。ミスすると熱が半分に、${HEAT_GAP}秒あくと元に戻る。打った皿だけ）`,
     vals: v1(HEAT_CAP, s),
   },
   {

@@ -14,7 +14,7 @@ import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/l
 import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
 import { setOf } from '../core/build';
-import { FAMILY_COLOR, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
+import { FAMILY_COLOR, HEAT_GAP, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
 } from '../core/shopConfig';
@@ -954,8 +954,8 @@ export class ShopView {
     if (shop.fever) note(`大入り ${Math.ceil(shop.feverUntil - shop.clock)}秒`, '#ffe27a');
     if (shop.fresh > 0) note(`とれたて あと${Math.ceil(shop.fresh)}秒`, FAMILY_COLOR.trip);
     const b = shop.build;
-    // 連打の熱：今の倍率（3秒あくと冷める）。一発勝負：今の言葉にミスがあるか
-    if (b && b.heatCap > 1 && shop.heat > 0 && shop.clock - shop.lastTyped <= 3) note(`熱 ×${(1 + shop.heat).toFixed(1)}`, '#ff9a5a');
+    // 連打の熱：今の倍率（HEAT_GAP 秒あくと冷める）。一発勝負：今の言葉にミスがあるか
+    if (b && b.heatCap > 1 && shop.heat > 0 && shop.clock - shop.lastTyped <= HEAT_GAP) note(`熱 ×${(1 + shop.heat).toFixed(1)}`, '#ff9a5a');
     if (b && b.ippatsuMult > 1 && shop.input.typed.length > 0) note(shop.wordMisses ? '一発 ×0.8' : `一発 ×${b.ippatsuMult}`, shop.wordMisses ? '#ff7a6a' : FAMILY_COLOR.combo);
     if (shop.extra > 0 && shop.clock > 180) note('延長営業中', '#ffe27a');
     // 方針の判子：効いた瞬間に弾んで光る

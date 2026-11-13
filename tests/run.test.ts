@@ -6,10 +6,10 @@ import { DISHES, DIFFICULTIES } from '../src/core/shopConfig';
 import { NORMAL_RULES } from '../src/core/daily';
 import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, REFILL_EAT, SETS, SET_BONUS, setKey, descDiff, descOf, emptyMods, modsFor, pairBonus, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
-  GOAL_BASE, RUN_ACHIEVEMENTS, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
+  AIDS, GOAL_BASE, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
   loopEveryMult, loopGoalMult, loopWaitMult, newRun, offersFor, readMeta, roadOffers, takeRoad, trialMods, trialsFor, walkMult,
 } from '../src/core/run';
-import { emptyBuildStats } from '../src/core/build';
+import { emptyBuildStats, HEAT_GAP } from '../src/core/build';
 import { ITEMS, achievementItem, emptyCollection, itemById, owns, setEquip } from '../src/core/collection';
 import { SaveStore, type KeyValueStore } from '../src/core/save';
 import { readDecoration } from '../src/core/ranking';
@@ -217,7 +217,27 @@ describe('一発勝負・連打の熱・朝市・延長営業と、型', () => {
     expect(s.wordMisses).toBe(0);
   });
 
-  it('連打の熱：3秒以内に続けて打って出すと倍率が上がり、間があくと冷める', () => {
+  it('連打の熱：ミスすると熱が半分になり、2.5秒あくと冷める', () => {
+    expect(HEAT_GAP).toBe(2.5);
+    const s = shopWith([{ id: 'netsu', lv: 3 }], []);
+    s.heat = 0.8;
+    s.key('q');
+    expect(s.heat).toBeCloseTo(0.4);
+    // 熱の方針がない店では、ミスしても何も変わらない
+    const plain = shopWith([], []);
+    plain.heat = 0.8;
+    plain.key('q');
+    expect(plain.heat).toBe(0.8);
+    // 2.5秒を少し越えて出すと冷める
+    (s as unknown as { lastTypedAt: number }).lastTypedAt = s.clock;
+    s.clock += 2.6;
+    s.clearInput();
+    s.seats[0] = guest('grilledFish');
+    const cold = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    expect(cold.type === 'serve' && cold.heat).toBe(1);
+  });
+
+  it('連打の熱：2.5秒以内に続けて打って出すと倍率が上がり、間があくと冷める', () => {
     const s = shopWith([{ id: 'netsu', lv: 1 }], []);
     const D = (id: string) => dish(id);
     const order = ['grilledFish', 'vegSoup', 'ale', 'mushSaute', 'jerky'];
@@ -392,6 +412,43 @@ describe('進行', () => {
     expect(out.summary?.cleared).toBe(false);
     expect(meta.loop).toBe(2);
     expect(meta.runs).toBe(2);
+  });
+
+  it('同じのれんで続けて負けると、次の挑戦に常連の見舞い（素材と1日目の朝のLv）が付き、クリアで消える', () => {
+    const meta = emptyMeta();
+    const facts = (sales: number) => ({ sales, served: 30, maxCombo: 12, angry: 0, build: emptyBuildStats() });
+    const lose = (seed: number) => {
+      const run = newRun(meta, seed, `l${seed}`);
+      closeDay(run, meta, facts(0));
+      return run;
+    };
+    // 1回負けただけでは何も付かない
+    expect(lose(1).aid).toBe(0);
+    expect(meta.losses).toBe(1);
+    expect(aidFor(meta.losses)).toBe(0);
+    // 2回負けたあとの挑戦：開店の素材+1
+    lose(2);
+    const second = newRun(meta, 3, 'a2');
+    expect(second.aid).toBe(1);
+    expect(second.boost).toBe(false);
+    expect(dayPlan(second, meta).base.startStock).toBe(AIDS[0].stock);
+    // 3回負けたあとの挑戦：素材+2、1日目の朝の方針は Lv がおまけ
+    closeDay(second, meta, facts(0));
+    const third = newRun(meta, 4, 'a3');
+    expect(third.aid).toBe(2);
+    expect(third.boost).toBe(true);
+    expect(dayPlan(third, meta).base.startStock).toBe(AIDS[1].stock);
+    expect(offersFor(third, meta, 0, 0).every((o) => o.lv === 2)).toBe(true);
+    // 中断して開き直しても、見舞いはそのまま
+    expect(readMeta(JSON.parse(JSON.stringify({ ...meta, active: third }))).active?.aid).toBe(2);
+    expect(readMeta(JSON.parse(JSON.stringify(meta))).losses).toBe(meta.losses);
+    // 走りきったら、負けた回数は0に戻る
+    for (let d = 0; d < RUN_DAYS; d++) {
+      closeDay(third, meta, facts(goalFor(d, 1, third.road)));
+      if (d < RUN_DAYS - 1) takeRoad(third, meta, 'joren');
+    }
+    expect(meta.losses).toBe(0);
+    expect(newRun(meta, 5, 'a4').aid).toBe(0);
   });
 
   it('のれんは上限なく難しくなる：目標は増え続け、お客の多さと待ち時間は入力が追いつく範囲で止まる', () => {

@@ -17,13 +17,18 @@ import {
   type BuildStats, type Owned, type PolicyId,
 } from '../core/build';
 import {
-  PERKS, RUN_ACHIEVEMENTS, RUN_DAYS, RUN_NAME, TRIALS, applyOffer, availablePolicies, closeDay, coinsFor, dayPlan, earnedAchievements, goalFor, loopGoalMult,
+  AIDS, PERKS, RUN_ACHIEVEMENTS, RUN_DAYS, aidFor, RUN_NAME, TRIALS, applyOffer, availablePolicies, closeDay, coinsFor, dayPlan, earnedAchievements, goalFor, loopGoalMult,
   newRun, offersFor, roadOffers, roadOf, runTotal, takeRoad, trialsFor,
   type DayOutcome, type Offer, type Road, type RunMeta, type RunState,
 } from '../core/run';
 
 export type RunScreen = 'hub' | 'book' | 'pick' | 'day' | 'road' | 'end';
 const SLOT_NAME = ['朝', '昼', '夜'];
+/** 結果の演出：最初はキーを受け付けない秒数／判子・ごほうび・ボタンが出そろう秒数（日の結果・最終結果）／送ったあと次へ進めるまでの秒数 */
+const RESULT_LOCK = 0.4;
+const RESULT_DAY_READY = 2.4;
+const RESULT_END_READY = 1.9;
+const RESULT_AFTER_SKIP = 0.25;
 const KIND_NAME: Record<Item['kind'], string> = { front: '二つ名（前）', back: '二つ名（後ろ）', plate: 'プレート', sound: '打鍵音', sticker: 'シール' };
 const BOOK_TABS = ['実績とごほうび', '型とかけ合わせ', '方針', 'おまけと試練'] as const;
 const ease = (v: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
@@ -309,8 +314,29 @@ export class RunUI {
   /** Enter で選ばれる項目（方針えらびと明日の営業は、打って選ぶだけにして押し間違いを防ぐ） */
   enterItem(): MenuItem | undefined {
     if (this.pick || this.screen === 'road' || this.screen === 'pick') return undefined;
-    if (this.g.t - this.at < 0.9 && (this.screen === 'day' || this.screen === 'end')) return undefined;
+    if (this.resultReady() !== null) return undefined;
     return this.menuItems()[0];
+  }
+
+  /** 日の結果・最終結果の演出が終わるまでの残り時間の基準（演出中でなければ null） */
+  private resultReady(): number | null {
+    if (this.screen !== 'day' && this.screen !== 'end') return null;
+    if (this.outcome?.resumed) return null;
+    const ready = this.screen === 'day' ? RESULT_DAY_READY : RESULT_END_READY;
+    return this.g.t - this.at < ready ? ready : null;
+  }
+
+  /**
+   * 日の結果・最終結果の演出中のキー（打った文字・Enter・Esc）。
+   * 打ち続けたまま閉店しても飛ばされないよう最初の少しは受け付けず、そのあとは演出を最後の状態まで送る。
+   * 次へ進むのは、ボタンと判子・ごほうびが出そろってから押し直したとき。true ならこのキーはここで使い切る
+   */
+  holdResultKey(): boolean {
+    const ready = this.resultReady();
+    if (ready === null) return false;
+    if (this.g.t - this.at > RESULT_LOCK) this.at = this.g.t - ready + RESULT_AFTER_SKIP;
+    this.g.menu.reset();
+    return true;
   }
 
   escape() {
@@ -443,6 +469,16 @@ export class RunUI {
 
   // ---------- 入口 ----------
 
+  private aidTip(aid: number): Tip {
+    return {
+      title: '常連の見舞い', col: '#a9f0e4',
+      lines: [
+        { t: '同じのれんで続けて店じまいすると、常連が心配して差し入れてくれる。目標は変わらない。クリアすると元に戻る。', col: C.w },
+        ...AIDS.map((a, i) => ({ t: `${i < aid ? '◆' : '◇'}${a.at}回続けて店じまい：${a.text}` })),
+      ],
+    };
+  }
+
   private drawHub(sc: Screen) {
     const g = this.g;
     const m = this.meta;
@@ -463,14 +499,19 @@ export class RunUI {
     if (run) {
       const where = `挑戦の途中：のれん${run.loop}枚目・${run.day + 1}日目の${run.stage === 'road' ? '閉店後（明日の営業えらび）' : run.stage === 'closed' ? '閉店後' : '朝'}から`;
       sc.T(where, 28, 108, sc.fitSize(where, 8.5, 252, 6), C.gold3);
-      sc.T(`ここまでの売上 ${yen(runTotal(run))}`, 28, 121, 8, C.cream);
+      const sofar = `ここまでの売上 ${yen(runTotal(run))}${run.aid > 0 ? '・常連の見舞いつき' : ''}`;
+      sc.T(sofar, 28, 121, sc.fitSize(sofar, 8, 252, 6), C.cream);
+      if (run.aid > 0) this.tip(sc, 28, 120, 252, 10, this.aidTip(run.aid));
       this.build(sc, 28, 133, run.owned);
     } else {
       sc.T(`つぎの挑戦：のれん${m.loop}枚目`, 28, 108, 10, C.gold3);
       const goals = `1日ごとの目標 ${Array.from({ length: RUN_DAYS }, (_, d) => goalFor(d, m.loop, 'joren').toLocaleString()).join(' → ')}円`;
       sc.T(goals, 28, 123, sc.fitSize(goals, 8, 252, 6), C.w);
-      const note = 'クリアするたびに、のれんが1枚増えて難しくなる（上限なし）';
-      sc.T(note, 28, 136, sc.fitSize(note, 8, 252, 6), C.cream);
+      // 同じのれんで続けて負けたら、常連の見舞い（次の挑戦の間だけ効く）
+      const aid = aidFor(m.losses);
+      const note = aid > 0 ? `常連の見舞い：${AIDS[aid - 1].text}` : 'クリアするたびに、のれんが1枚増えて難しくなる（上限なし）';
+      sc.T(note, 28, 136, sc.fitSize(note, 8, 252, 6), aid > 0 ? '#a9f0e4' : C.cream);
+      if (aid > 0) this.tip(sc, 28, 135, 252, 10, this.aidTip(aid));
     }
     // のれんの試練（マウスを乗せると内容）
     const trials = trialsFor(loop);
@@ -523,8 +564,16 @@ export class RunUI {
     sc.TB(head, LW / 2, 8, 14, '#ffd98a', 'center', '#3a1408');
     const boosted = p.slot === 0 && run.boost && !p.swap;
     const sub = p.swap ? `「${policyOf(p.swap.id).name}」を入れるために、外す方針を打って選ぶ`
-      : boosted ? 'ごほうび：今朝えらぶ方針は、Lvが1つおまけ。名前を打って選ぶ' : '名前を打って選ぶ（選ぶと、すぐ効き始める）';
-    sc.T(sub, LW / 2, 27, 8, boosted ? '#ffe9b4' : C.cream, 'center');
+      : boosted ? `${run.day === 0 && run.aid > 0 ? '常連の見舞い' : 'ごほうび'}：今朝えらぶ方針は、Lvが1つおまけ。名前を打って選ぶ` : '名前を打って選ぶ（選ぶと、すぐ効き始める）';
+    // 営業中（昼・夜）の方針えらび：選ぶ材料になるよう、目標まであと幾らと閉店までの時間を見せる
+    const shop = p.inPlay && !p.swap ? g.session?.shop : null;
+    const goal = g.view.run?.goal;
+    if (shop && goal) {
+      const left = Math.ceil(shop.timeLeft);
+      const rest = goal - shop.score;
+      const status = `いま ${yen(shop.score)}／目標 ${yen(goal)}（${rest > 0 ? `あと ${yen(rest)}` : '突破済み'}）・閉店まで ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      sc.T(status, LW / 2, 26, sc.fitSize(status, 9, LW - 24, 6.5), rest > 0 ? '#ffe9b4' : C.gold3, 'center');
+    } else sc.T(sub, LW / 2, 27, 8, boosted ? '#ffe9b4' : C.cream, 'center');
     if (p.swap) {
       // 入れ替え：外す方針を選ぶ（マウスを乗せると、その方針の効果）
       run.owned.forEach((o, i) => {
@@ -804,7 +853,9 @@ export class RunUI {
       sc.T(nextText, LW / 2, 29, sc.fitSize(nextText, 8.5, 440, 6), '#fff0b0', 'center', k);
     } else {
       sc.TB(`${s.day + 1}日目で店じまい…`, LW / 2, 8, 16, '#c8d4f0', 'center', C.ink, ease(age / 0.35));
-      sc.T(`目標まで あと${yen(last.goal - last.sales)}。方針を変えて、もういちど`, LW / 2, 29, 8.5, C.cream, 'center', ease(age / 0.35));
+      const aided = aidFor(this.meta.losses) > 0;
+      const lost = `目標まで あと${yen(last.goal - last.sales)}。${aided ? '心配した常連が、次の挑戦に差し入れてくれる' : '方針を変えて、もういちど'}`;
+      sc.T(lost, LW / 2, 29, sc.fitSize(lost, 8.5, 440, 6), aided ? '#a9f0e4' : C.cream, 'center', ease(age / 0.35));
     }
     const a = ease((age - 0.4) / 0.4);
     // 左：日ごとの売上と目標
