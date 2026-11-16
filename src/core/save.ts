@@ -64,7 +64,16 @@ function safe<T>(fn: () => T, fallback: T): T {
   }
 }
 
+export interface RunReward {
+  runId: string | null;
+  amount: number;
+  achievements: string[];
+}
+export class RunConflict extends Error {}
+interface RunCheckpoint { raw: string | null; pending: RunReward[] }
+
 export class SaveStore {
+  private checkpoints = new WeakMap<RunMeta, RunCheckpoint>();
   private keys: typeof KEYS;
   private player: string | null = null;
 
@@ -112,11 +121,58 @@ export class SaveStore {
 
   /** 繁盛記の記録（進行中の挑戦を含む）。通常営業・ひがわりの記録とは別の場所に残す */
   loadRun(): RunMeta {
-    return readMeta(this.read<unknown>(this.keys.run));
+    const raw = safe(() => this.store?.getItem(this.keys.run) ?? null, null);
+    let data: { _pending?: RunReward[] } | null = null;
+    try { data = raw ? JSON.parse(raw) : null; } catch { /* 古い破損データは空から */ }
+    const meta = readMeta(data);
+    const pending = Array.isArray(data?._pending) ? data._pending.filter((r) => r && (r.runId === null || typeof r.runId === 'string') && Number.isFinite(r.amount) && r.amount >= 0 && Array.isArray(r.achievements) && r.achievements.every((id) => typeof id === 'string')) : [];
+    this.checkpoints.set(meta, { raw, pending });
+    return meta;
   }
 
+  /** 同期APIでも保存失敗・古い世代を黙殺しない。UIは必ずcommitRunでタブ間排他する。 */
   saveRun(m: RunMeta) {
-    this.write(this.keys.run, m);
+    const checkpoint = this.checkpoints.get(m) ?? { raw: null, pending: [] };
+    if ((this.store?.getItem(this.keys.run) ?? null) !== checkpoint.raw) throw new RunConflict('別タブで進行が更新されました');
+    if (!this.store) throw new Error('保存先を利用できません');
+    const raw = JSON.stringify({ ...m, _revision: crypto.randomUUID(), _pending: checkpoint.pending });
+    this.store.setItem(this.keys.run, raw);
+    this.checkpoints.set(m, { ...checkpoint, raw });
+  }
+
+  /** 進行＋未受領報酬を先に一括保存。途中で止まっても次回再試行できる。 */
+  async commitRun(meta: RunMeta, reward?: RunReward): Promise<{ coins: number; achievements: string[] }> {
+    const commit = () => {
+      const checkpoint = this.checkpoints.get(meta) ?? { raw: null, pending: [] };
+      if ((this.store?.getItem(this.keys.run) ?? null) !== checkpoint.raw) throw new RunConflict('別タブで進行が更新されました');
+      if (reward && !checkpoint.pending.some((r) => JSON.stringify(r) === JSON.stringify(reward))) checkpoint.pending = [...checkpoint.pending, reward];
+      this.checkpoints.set(meta, checkpoint);
+      this.saveRun(meta);
+      let coins = 0;
+      const achievements: string[] = [];
+      for (const r of checkpoint.pending) {
+        achievements.push(...this.unlockAchievements(r.achievements));
+        if (r.runId && !meta.paid.includes(r.runId)) {
+          this.creditRun(`run:${r.runId}`, r.amount);
+          meta.paid = [...meta.paid, r.runId].slice(-50);
+        }
+        if (r.runId) coins += r.amount;
+      }
+      if (checkpoint.pending.length) {
+        // 受領済みの記録に失敗しても、永続したjournalが再試行を可能にする。
+        const current = this.checkpoints.get(meta)!;
+        this.checkpoints.set(meta, { ...current, pending: [] });
+        try { this.saveRun(meta); }
+        catch (error) { this.checkpoints.set(meta, { ...current, pending: checkpoint.pending }); throw error; }
+      }
+      return { coins, achievements };
+    };
+    if (typeof window !== 'undefined') {
+      if (!navigator.locks) throw new Error('このブラウザでは安全な繁盛記の保存を利用できません');
+      return navigator.locks.request(this.keys.run, commit);
+    }
+    // ブラウザ以外の同期メモリストアによる単体テスト用。
+    return commit();
   }
 
   /**
@@ -124,23 +180,23 @@ export class SaveStore {
    * 直前に読み直し、新しく解放した分だけを返す。
    */
   unlockAchievements(ids: string[], now = new Date()): string[] {
-    const r = this.loadRecords();
+    const r = readRecords(this.readStrict(this.keys.records));
     const fresh = ids.filter((id) => !r.unlocked[id]);
     if (!fresh.length) return [];
     const unlocked = { ...r.unlocked };
     for (const id of fresh) unlocked[id] = now.toISOString();
-    this.write(this.keys.records, { ...r, unlocked });
+    if (!this.store) throw new Error('保存先を利用できません');
+    this.store.setItem(this.keys.records, JSON.stringify({ ...r, unlocked }));
     return fresh;
   }
 
   /** 繁盛記のごほうびを貯金箱へ（同じ挑戦のIDでは一度だけ） */
   creditRun(id: string, amount: number): number {
-    let credited = 0;
-    this.updateCollection((s) => {
-      if (s.credited.includes(id)) return s;
-      credited = Math.max(0, Math.floor(amount));
-      return { ...s, coins: s.coins + credited, credited: [...s.credited, id].slice(-200) };
-    });
+    const before = readCollection(this.readStrict(this.keys.collection));
+    if (before.credited.includes(id) || before.runCredits?.includes(id)) return 0;
+    const credited = Math.max(0, Math.floor(amount));
+    if (!this.store) throw new Error('保存先を利用できません');
+    this.store.setItem(this.keys.collection, JSON.stringify({ ...before, coins: before.coins + credited, credited: [...before.credited, id].slice(-200), runCredits: [...(before.runCredits ?? []), id] }));
     return credited;
   }
 
@@ -158,6 +214,12 @@ export class SaveStore {
     this.player = typeof saved === 'string' && PLAYER_ID.test(saved) ? saved.toLowerCase() : crypto.randomUUID();
     this.write(this.keys.player, this.player);
     return this.player;
+  }
+
+  private readStrict(key: string): unknown {
+    if (!this.store) throw new Error('保存先を利用できません');
+    const raw = this.store.getItem(key);
+    return raw === null ? null : JSON.parse(raw);
   }
 
   private read<T>(key: string): T | null {

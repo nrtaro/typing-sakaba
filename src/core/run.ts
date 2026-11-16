@@ -431,10 +431,10 @@ export interface DayOutcome {
   summary: RunSummary | null;
 }
 
-/** このランのいちばん稼いだ方針（主力） */
+/** このラン全体の直接売上推計が最大の方針（外した方針も含む主力） */
 export function signature(run: RunState): PolicyId | null {
   let best: PolicyId | null = null;
-  for (const o of run.owned) if ((run.yen[o.id] ?? 0) > (best ? run.yen[best] ?? 0 : 0)) best = o.id;
+  for (const p of POLICIES) if ((run.yen[p.id] ?? 0) > (best ? run.yen[best] ?? 0 : 0)) best = p.id;
   return best;
 }
 

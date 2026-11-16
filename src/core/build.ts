@@ -193,7 +193,7 @@ export const POLICIES: Policy[] = [
   {
     id: 'omotenashi', name: 'おもてなし', kana: 'おもてなし', family: 'guest', fires: true, starter: true,
     quip: '「ごゆっくり。ほんとうに、ごゆっくり」',
-    text: `前の皿から間があくほどチップが増える。1秒につき+{0}円（${IDLE_MAX}秒ぶんまで）`,
+    text: `前の皿から${IDLE_MIN}秒以上あけて打って出すとチップ増加。1秒につき+{0}円（${IDLE_MAX}秒ぶんまで。ついでの皿には付かない）`,
     vals: v1(IDLE_TIP, s),
   },
   {
@@ -459,7 +459,7 @@ export function stockGainOnPick(id: PolicyId, from: number, to: number) {
 
 /** 営業の中で数える、方針のはたらき（結果の振り返りと実績に使う） */
 export interface BuildStats {
-  /** 方針ごとに増えた売上 */
+  /** 発動タグに配分した直接売上の推計（補給・客数・コンボ進行等の間接効果は含まない） */
   yen: Partial<Record<PolicyId, number>>;
   /** 方針ごとに効いた回数 */
   fired: Partial<Record<PolicyId, number>>;

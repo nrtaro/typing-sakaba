@@ -1,5 +1,6 @@
 // 繁盛記の画面と進行：入口・方針えらび・日別の結果・明日の営業えらび・最終結果・ずかん。
 // 1日の営業そのものは Game／ShopView が動かし、ここは日をまたぐ流れと、その画面を受け持つ。
+import { RunConflict, type RunReward } from '../core/save';
 import { C, type Color } from './palette';
 import { LW, type Screen } from './screen';
 import type { Game } from './game';
@@ -72,8 +73,32 @@ export class RunUI {
     return !!this.run && this.g.mode === 'play' && !this.g.tutorial && !!this.g.view.run;
   }
 
-  private save() {
-    try { this.g.store.saveRun(this.meta); } catch { /* 保存できなくても、この起動中は続けられる */ }
+  saving = false;
+  saveNote = '';
+  private retrySave: (() => void) | null = null;
+
+  private save(next: (result: { coins: number; achievements: string[] }) => void, reward?: RunReward) {
+    if (this.saving) return;
+    this.saving = true;
+    this.saveNote = '';
+    this.retrySave = null;
+    void this.g.store.commitRun(this.meta, reward).then((result) => {
+      this.saving = false;
+      next(result);
+    }).catch((error: unknown) => {
+      this.saving = false;
+      this.pick = null;
+      this.go('hub');
+      if (error instanceof RunConflict) {
+        this.meta = this.g.store.loadRun();
+        this.run = this.meta.active;
+        this.outcome = null;
+        this.saveNote = '別タブで更新されました。最新の進行を読み込みました。';
+      } else {
+        this.saveNote = '保存できません。再試行してください。保存せず戻ると未保存の進行は消えます。';
+        this.retrySave = () => this.save(next, reward);
+      }
+    });
   }
 
   private go(screen: RunScreen) {
@@ -86,21 +111,24 @@ export class RunUI {
   // ---------- 流れ ----------
 
   open() {
+    if (this.saving || this.retrySave) return;
+    this.saveNote = '';
     this.meta = this.g.store.loadRun();
     this.run = this.meta.active;
     this.pick = null;
     this.outcome = null;
     if (this.g.settings.playMode !== 'run') { this.g.settings.playMode = 'run'; this.g.store.saveSettings(this.g.settings); }
     this.go('hub');
+    this.save(() => { this.run = this.meta.active; this.g.refreshCollection(); });
   }
 
   /** 新しい挑戦を始める（進行中のものは捨てる） */
   begin() {
+    if (this.saving || this.retrySave) return;
     this.meta = this.g.store.loadRun();
     this.run = newRun(this.meta, Math.floor(Math.random() * 4294967296), crypto.randomUUID());
     this.meta.active = this.run;
-    this.save();
-    this.enter();
+    this.save(() => this.enter());
   }
 
   /** 保存された段階から続ける */
@@ -182,8 +210,7 @@ export class RunUI {
       run.stage = 'open';
       run.boost = false;
       this.meta.active = run;
-      this.save();
-      this.startDay();
+      this.save(() => this.startDay());
     }
   }
 
@@ -203,6 +230,7 @@ export class RunUI {
   /** 営業中の1コマ。営業を止めているあいだは true を返す */
   step(dt: number): boolean {
     const g = this.g;
+    if (this.saving || this.retrySave) return true;
     const p = this.pick;
     if (p?.chosen && g.t - p.chosen.at > 0.85) this.afterPick(p.slot, p.inPlay);
     if (!this.inRun) return false;
@@ -226,42 +254,36 @@ export class RunUI {
     if (!run || !session) return;
     const shop = session.shop;
     const out = closeDay(run, this.meta, { sales: shop.score, served: shop.stats.served, maxCombo: shop.stats.maxCombo, angry: shop.stats.angry, build: shop.buildStats });
-    let achievements: string[] = [];
-    let coins = 0;
-    try { achievements = g.store.unlockAchievements(earnedAchievements(this.meta)); } catch { achievements = []; }
-    if (out.summary && !this.meta.paid.includes(run.id)) {
-      try { coins = g.store.creditRun(`run:${run.id}`, coinsFor(out.summary)); } catch { coins = 0; }
-      this.meta.paid = [...this.meta.paid, run.id].slice(-50);
-    }
-    this.save();
-    this.outcome = { ...out, achievements, coins, yen: { ...shop.buildStats.yen } };
-    if (out.summary) this.run = null;
+    const reward: RunReward = { runId: out.summary ? run.id : null, amount: out.summary ? coinsFor(out.summary) : 0, achievements: earnedAchievements(this.meta) };
+    // 二重閉店を防ぎ、保存が完了するまで次の日へ進めない。
     this.pick = null;
     this.pendingSlot = null;
-    this.fxDone = { stamp: false, tick: 0, reward: false };
     g.session = null;
     g.view.run = null;
-    g.refreshCollection();
-    g.sound.play('result');
-    this.go(out.summary ? 'end' : 'day');
+    this.go('hub');
+    this.save(({ achievements, coins }) => {
+      this.outcome = { ...out, achievements, coins, yen: { ...shop.buildStats.yen } };
+      if (out.summary) this.run = null;
+      this.fxDone = { stamp: false, tick: 0, reward: false };
+      g.refreshCollection();
+      g.sound.play('result');
+      this.go(out.summary ? 'end' : 'day');
+    }, reward);
   }
 
-  private toRoad() {
+  private toRoad(interrupt = false) {
     const run = this.run;
     if (!run) return;
     run.stage = 'road';
     this.meta.active = run;
-    this.save();
-    this.go('road');
+    this.save(() => { if (interrupt) this.open(); else this.go('road'); });
   }
 
   private pickRoad(road: Road) {
     const run = this.run;
     if (!run) return;
     takeRoad(run, this.meta, road.id);
-    this.save();
-    this.g.sound.bell();
-    this.openPick(0, false);
+    this.save(() => { this.g.sound.bell(); this.openPick(0, false); });
   }
 
   private openBook() {
@@ -273,6 +295,19 @@ export class RunUI {
   // ---------- 入力 ----------
 
   menuItems(): MenuItem[] {
+    if (this.saving) return [];
+    if (this.retrySave) return [
+      { text: '保存を再試行', kana: 'さいしこう', act: () => this.retrySave?.() },
+      { text: '保存せず戻る', kana: 'もどる', act: () => {
+        this.retrySave = null;
+        this.meta = this.g.store.loadRun();
+        this.run = this.meta.active;
+        this.pick = null;
+        this.outcome = null;
+        this.saveNote = '';
+        this.g.toTitle();
+      } },
+    ];
     const g = this.g;
     const p = this.pick;
     if (p && (this.screen === 'pick' || p.inPlay) && (g.mode === 'run' || g.mode === 'play')) {
@@ -298,7 +333,7 @@ export class RunUI {
       case 'book':
         return [{ text: 'もどる', kana: 'もどる', act: () => this.go(this.book.from) }];
       case 'day':
-        return [{ text: 'つぎへ', kana: 'つぎへ', act: () => this.toRoad() }, { text: 'ちゅうだん', kana: 'ちゅうだん', act: () => { this.toRoad(); this.open(); } }];
+        return [{ text: 'つぎへ', kana: 'つぎへ', act: () => this.toRoad() }, { text: 'ちゅうだん', kana: 'ちゅうだん', act: () => { this.toRoad(true); } }];
       case 'road':
         return this.run ? roadOffers(this.run.seed, this.run.day).map((r) => ({ text: r.name, kana: r.kana, act: () => this.pickRoad(r) })) : [];
       case 'end':
@@ -332,6 +367,7 @@ export class RunUI {
    * 次へ進むのは、ボタンと判子・ごほうびが出そろってから押し直したとき。true ならこのキーはここで使い切る
    */
   holdResultKey(): boolean {
+    if (this.saving || this.retrySave) return false;
     const ready = this.resultReady();
     if (ready === null) return false;
     if (this.g.t - this.at > RESULT_LOCK) this.at = this.g.t - ready + RESULT_AFTER_SKIP;
@@ -340,6 +376,7 @@ export class RunUI {
   }
 
   escape() {
+    if (this.saving || this.retrySave) return;
     const g = this.g;
     if (this.screen === 'book') this.go(this.book.from);
     else if (this.screen === 'hub') g.mode = 'modeSelect';
@@ -447,6 +484,13 @@ export class RunUI {
 
   draw() {
     const sc = this.g.sc;
+    if (this.saving || this.retrySave) {
+      sc.cover(C.bg, 0.8);
+      sc.TB(this.saving ? '保存中' : '保存できませんでした', LW / 2, 70, 16, C.gold3, 'center', C.ink);
+      this.para(sc, this.saving ? '進行と報酬を保存しています…' : this.saveNote, 42, 112, 9, 396, C.cream);
+      this.menuItems().forEach((it, i) => button(this.g, it, 70 + i * 178, 180, 162, 36, i ? 'plain' : 'primary'));
+      return;
+    }
     // 札や数字を読みやすくするため、入口以外は背景の店をもう少し沈める
     if (this.screen !== 'hub') sc.cover(C.bg, 0.4);
     if (this.screen === 'hub') this.drawHub(sc);
@@ -455,6 +499,10 @@ export class RunUI {
     else if (this.screen === 'day') this.drawDay(sc);
     else if (this.screen === 'road') this.drawRoad(sc);
     else this.drawEnd(sc);
+    if (this.saving || this.retrySave || this.saveNote) {
+      sc.panel(10, 171, 460, 40, '#211712', C.gold2);
+      this.para(sc, this.saving ? '進行と報酬を保存しています…' : this.saveNote, 18, 177, 8, 440, C.cream);
+    }
   }
 
   /** 営業中に重ねる：方針えらびと、再開の合図 */
@@ -664,8 +712,9 @@ export class RunUI {
   /** いちばん働いた方針（増えた売上の多い順に3つ） */
   private drawTop(sc: Screen, x: number, y: number, w: number, yenBy: BuildStats['yen'], a: number, owned: Owned[]) {
     const top = (Object.entries(yenBy) as [PolicyId, number][]).filter(([, v]) => v > 0).sort((p, q) => q[1] - p[1]).slice(0, 3);
-    sc.T('いちばん働いた方針', x, y, 8, C.gold3, 'left', a);
-    if (!top.length) { sc.T('方針で増えた売上はなし', x, y + 14, 8, C.gray, 'left', a); return; }
+    sc.T('直接売上の推計（上位3つ）', x, y, 8, C.gold3, 'left', a);
+    sc.T('補給・客数・コンボ進行等は含まない', x, y + 63, 7, C.gray, 'left', a);
+    if (!top.length) { sc.T('直接売上の計上なし', x, y + 14, 8, C.gray, 'left', a); return; }
     const max = top[0][1];
     top.forEach(([id, v], i) => {
       const pol = policyOf(id);
@@ -674,7 +723,8 @@ export class RunUI {
       sc.T(pol.name, x, yy, sc.fitSize(pol.name, 8, 78), C.w, 'left', a);
       sc.PR(x + 82, yy + 1, (w - 150) * (v / max) * a, 8, col, 0.9);
       sc.T(`+${yen(v)}`, x + w, yy, 8, col, 'right', a);
-      this.tip(sc, x, yy - 2, w, 13, policyTip(id, owned.find((o) => o.id === id)?.lv ?? 1, owned));
+      const current = owned.find((o) => o.id === id);
+      if (current) this.tip(sc, x, yy - 2, w, 13, policyTip(id, current.lv, owned));
     });
   }
 
@@ -881,8 +931,8 @@ export class RunUI {
     if (!s.owned.length) sc.T('方針なし', 254, 68, 8, C.gray, 'left', a);
     if (s.sig) {
       const sig = s.sig;
-      sc.T(`主力：${policyOf(sig).name}`, 254, 87, 8.5, FAMILY_COLOR[policyOf(sig).family], 'left', a);
-      this.tip(sc, 254, 86, 200, 11, policyTip(sig, s.owned.find((q) => q.id === sig)?.lv ?? 1, s.owned));
+      sc.T(`主力（直接売上推計）：${policyOf(sig).name}`, 254, 87, 8.5, FAMILY_COLOR[policyOf(sig).family], 'left', a);
+      this.tip(sc, 254, 86, 200, 11, { title: '主力（全日程の直接売上推計）', col: C.gold3, lines: [{ t: '入れ替えで外した方針も含む。補給・客数・コンボ進行等の間接的な助けは含まない。', col: C.w }] });
     }
     let py = 100;
     if (s.pairs.length) py += this.pairList(sc, s.pairs, 254, py, 200, '#ffe9b4', a);
@@ -905,7 +955,8 @@ export class RunUI {
   private hint(cleared: boolean, owned: Owned[], pairs: string[]): string {
     if (cleared) return 'ちがう主力でも、クリアを狙ってみよう';
     const has = (p: PolicyId) => owned.some((o) => o.id === p);
-    const near = PAIRS.find((p) => has(p.a) !== has(p.b) && !pairs.includes(pairKey(p.a, p.b)));
+    const available = availablePolicies(this.meta);
+    const near = PAIRS.find((p) => has(p.a) !== has(p.b) && available.includes(has(p.a) ? p.b : p.a) && !pairs.includes(pairKey(p.a, p.b)));
     if (near) return `次は「${policyOf(has(near.a) ? near.b : near.a).name}」を足すと『${near.name}』になる`;
     if (owned.some((o) => o.lv < MAX_LEVEL)) return '広げすぎず、かけ合わせの2つを最大まで育てると伸びる';
     return '明日の営業は、目標の軽い日を選ぶ手もある';

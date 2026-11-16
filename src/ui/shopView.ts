@@ -1217,14 +1217,14 @@ export class ShopView {
       } else if (p.t >= 0) sc.TB(p.text, p.x, p.y - p.t * 16, p.slot?.startsWith('tags') ? 8 : (p.big ? 12 : 11) * (1 + Math.max(0, 0.12 - p.t) * 2.5), p.col, 'center', C.ink, a);
     }
     if (this.callout) {
-      // 節目の掛け声：客席の列の間（注文の札を隠さない位置）に大きく弾ませる
+      // 節目の掛け声：厨房内（注文の札を隠さない位置）に大きく弾ませる
       const c = this.callout;
       const grow = c.t < 0.12 ? 0.6 + c.t / 0.12 * 0.6 : 1.2 - Math.min(0.2, (c.t - 0.12) * 0.8);
       const a = Math.min(1, (1.1 - c.t) * 3);
       const size = (14 + c.level * 1.2) * grow;
-      const drawSize = this.run ? sc.fitSize(c.text, size, 150) : size;
-      const cx = this.run ? 105 : LW / 2 + 40;
-      const cy = this.run ? 123 : 150;
+      const drawSize = sc.fitSize(c.text, size, 150);
+      const cx = 105;
+      const cy = 123;
       const col = c.level >= 10 ? CONFETTI[Math.floor(this.time * 12) % CONFETTI.length] : c.col;
       sc.TB(c.text, cx + 1.5, cy + 1.5 - drawSize / 2, drawSize, C.ink, 'center', col, a * 0.8);
       sc.TB(c.text, cx, cy - drawSize / 2, drawSize, col, 'center', C.ink, a);

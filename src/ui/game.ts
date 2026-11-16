@@ -152,6 +152,7 @@ export class Game {
   clickHintAt = -10;
   /** 日本語入力のまま打たれた時刻（「日本語入力をオフに」を出す） */
   imeHintAt = -10;
+  imePaused = false;
   /** 遊び方のページ（0=基本、1=調達のしかた、2=ひがわり営業） */
   helpPage = 0;
   /** 結果画面の演出の開始時刻と、鳴らした音の記録 */
@@ -181,6 +182,7 @@ export class Game {
       });
     this.menu = new CandidateInput(() => this.menuItems().map((it) => ({ id: it.kana, kana: it.kana, data: it })));
     window.addEventListener('keydown', (e) => this.onKey(e));
+    window.addEventListener('compositionstart', () => this.pauseForIme());
     // クリックでも音を鳴らせるようにする（ブラウザは操作の前に音を出させない）
     // クリックしても反応しないと戸惑うので、メニューでクリックされたら「キーボードで打つ」ことを知らせる
     window.addEventListener('pointerdown', () => {
@@ -1036,6 +1038,12 @@ export class Game {
 
   // ---------- 入力 ----------
 
+  pauseForIme() {
+    if (this.nameEntry || this.artState === 'loading') return;
+    this.imeHintAt = this.t;
+    if (this.mode === 'play') { this.imePaused = true; this.paused = true; this.menu.reset(); }
+  }
+
   onKey(e: KeyboardEvent) {
     if (this.nameEntry) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1044,11 +1052,21 @@ export class Game {
     this.clickHintAt = -10;
     // 日本語入力がオンのまま打つと、文字が届かない。黙って無視せず、オフにするよう知らせる
     if (e.isComposing || e.key === 'Process' || (e.key.length === 1 && /[^ -]/.test(e.key))) {
-      if (this.artState !== 'loading') this.imeHintAt = this.t;
+      this.pauseForIme();
       return;
     }
     if (this.artState === 'loading') return;
     const k = e.key;
+    if (this.imePaused) {
+      e.preventDefault();
+      if (k === 'Enter' && !e.repeat) {
+        this.imePaused = false;
+        this.paused = false;
+        this.imeHintAt = -10;
+        this.menu.reset();
+      }
+      return;
+    }
     // 繁盛記：入れ替える方針を選んでいる最中の Esc は、一時停止ではなく「やめる」
     if (k === 'Escape' && this.mode === 'play' && !this.paused && this.runUI?.cancelSwap()) { e.preventDefault(); this.sound.select(); return; }
     if (k === 'Escape' && this.mode === 'play') {

@@ -138,12 +138,12 @@ export function drawKeyboard(g: Game, x: number, y: number, a = 1) {
 /** 日本語入力がオンのとき：画面の中央に、オフにする方法をはっきり出す（遊んでいる最中も出す） */
 export function drawImeHint(g: Game) {
   const age = g.t - g.imeHintAt;
-  if (age >= IME_HINT) return;
+  if (age >= IME_HINT && !g.imePaused) return;
   const sc = g.sc;
-  const a = Math.min(1, age * 8, (IME_HINT - age) * 2);
+  const a = g.imePaused ? Math.min(1, age * 8) : Math.min(1, age * 8, (IME_HINT - age) * 2);
   const bob = Math.sin(age * 12) * Math.max(0, 1 - age * 2.5) * 3;
-  const title = '日本語入力がオンになっています';
-  const sub = 'キーボードの「半角/全角」キーで、半角英数にしてください';
+  const title = g.imePaused ? '日本語入力のため一時停止中' : '日本語入力がオンになっています';
+  const sub = g.imePaused ? '半角英数に切り替え、Enterで再開します' : 'キーボードの「半角/全角」キーで、半角英数にしてください';
   const w = Math.max(sc.W(title, 12), sc.W(sub, 9)) + 56;
   const x = LW / 2 - w / 2;
   const y = 110 + bob;

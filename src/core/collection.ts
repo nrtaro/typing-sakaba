@@ -63,6 +63,8 @@ export interface CollectionState {
   freeUsed: boolean;
   /** 売上を足した営業ID（直近の分） */
   credited: string[];
+  /** 繁盛記の受領済みID。未受領journalの再試行が何日後でも二重付与しない。 */
+  runCredits?: string[];
 }
 
 export function emptyCollection(): CollectionState {
@@ -90,6 +92,7 @@ export function readCollection(raw: unknown): CollectionState {
   };
   s.freeUsed = o.freeUsed === true;
   s.credited = Array.isArray(o.credited) ? o.credited.filter((x): x is string => typeof x === 'string').slice(-CREDITED_KEEP) : [];
+  if (Array.isArray(o.runCredits)) s.runCredits = [...new Set(o.runCredits.filter((x): x is string => typeof x === 'string'))];
   return s;
 }
 
