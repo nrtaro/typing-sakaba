@@ -22,13 +22,13 @@ export function drawVolume(g: Game) {
 export function drawMenu(g: Game, y: number) {
   const sc = g.sc;
   const items = g.menuItems();
-  if (g.mode === 'title') return;
+  if (g.mode === 'title' || g.mode === 'intro') return;
   if (g.mode === 'difficulty' || g.mode === 'modeSelect' || g.mode === 'daily' || g.mode === 'prep' || g.mode === 'ranking' || g.mode === 'records' || g.mode === 'fukubiki' || g.mode === 'settings' || g.mode === 'run') return;
   if (g.mode === 'help') {
     if (g.helpPage === 0) {
-      ['もどる', 'ひがわり', 'はんじょうき', 'ちょうたつ'].forEach((kana, i) => {
+      ['もどる', 'あんない', 'ひがわり', 'はんじょうき', 'ちょうたつ'].forEach((kana, i) => {
         const item = items.find((entry) => entry.kana === kana);
-        if (item) button(g, item, 22 + i * 111, 226, 103, 30, 'plain', kana === 'もどる' ? 'Esc' : undefined);
+        if (item) button(g, item, 16 + i * 91, 226, 86, 30, 'plain', kana === 'もどる' ? 'Esc' : undefined);
       });
     } else button(g, items[items.length - 1], 22, 226, 116, 30, 'plain', 'Esc', '◀');
     return;
@@ -160,6 +160,8 @@ export function drawImeHint(g: Game) {
 }
 
 export function drawClickHint(g: Game) {
+  // はじめての案内では、押すキーまで添えた案内を自分の画面で出す
+  if (g.mode === 'intro') return;
   const age = g.t - g.clickHintAt;
   if (age >= CLICK_HINT) return;
   const sc = g.sc;

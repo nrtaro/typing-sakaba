@@ -35,6 +35,7 @@ import { drawRanking } from './screens/ranking';
 import { drawRecords, dialogueRows, READER_ROWS } from './screens/records';
 import { ACHIEVEMENTS, type PlayFacts, type Records } from '../core/achievements';
 import { drawTutorial } from './screens/tutorial';
+import { drawIntro, finishIntro, introEnter, introItems, introStep, startIntro, type IntroState } from './screens/intro';
 import { setupTutorial, tutorialEvent, tutorialStep, type TutorialState } from './tutorial';
 import { drawPrep, PREP_WORDS } from './screens/prep';
 import { helpPlay, drawHelp, openTripHelp, drawTripHelp, drawModeHelp, drawRunHelp } from './screens/help';
@@ -51,7 +52,7 @@ export const NAME_ROW = DECOR_ROWS.length;
 export const APPLY_ROW = DECOR_ROWS.length + 1;
 /** 飾りの一覧の列の数 */
 export const PICKER_COLS = 3;
-export type Mode = 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki' | 'settings' | 'run';
+export type Mode = 'intro' | 'title' | 'help' | 'modeSelect' | 'difficulty' | 'daily' | 'prep' | 'play' | 'result' | 'ranking' | 'records' | 'fukubiki' | 'settings' | 'run';
 export type PlayMode = 'normal' | 'daily';
 
 const TYPABLE = /^[a-z\-]$/;
@@ -84,6 +85,8 @@ export class Game {
   settings = this.store.loadSettings();
   readonly sound = new Sound(this.settings);
   mode: Mode = 'title';
+  /** はじめて開いた人への案内（タイトルの前）。出していないときは null */
+  intro: IntroState | null = null;
   /** 営業中の1回分（1/60秒刻みで進み、入力を記録する）。営業していないときは null */
   session: PlaySession | null = null;
   get shop(): Shop | null { return this.session?.shop ?? null; }
@@ -193,6 +196,8 @@ export class Game {
       }
     });
     this.sound.play('title');
+    // はじめて開いた人には、タイトルの前に短い案内を出す
+    if (!this.settings.introDone) startIntro(this);
     // マウスの位置（説明を出すためだけに使う。操作はキーボードのまま）
     window.addEventListener('pointermove', (e) => { const d = window.devicePixelRatio || 1; this.hover.move(e.clientX * d, e.clientY * d); });
     document.addEventListener('pointerleave', () => this.hover.move(null));
@@ -223,6 +228,8 @@ export class Game {
     // 繁盛記：入口・方針えらび・結果などは RunUI が受け持つ
     if (this.mode === 'run' || (this.mode === 'play' && this.runUI?.pick)) return this.runUI.menuItems();
     switch (this.mode) {
+      case 'intro':
+        return introItems(this);
       case 'title':
         return [
           { text: 'はじめる', kana: 'はじめる', act: () => { this.mode = 'modeSelect'; } },
@@ -242,6 +249,7 @@ export class Game {
           { text: 'かり', kana: 'かり', act: () => helpPlay(this, 'hunting') },
           { text: 'ひがわり営業', kana: 'ひがわり', act: () => { this.helpPage = 2; } },
           { text: '繁盛記', kana: 'はんじょうき', act: () => { this.helpPage = 3; } },
+          { text: 'はじめの案内', kana: 'あんない', act: () => startIntro(this, 'help') },
           { text: '調達のしかた', kana: 'ちょうたつ', act: () => openTripHelp(this) },
           { text: 'もどる', kana: 'もどる', act: () => { this.mode = 'title'; } },
         ];
@@ -969,6 +977,8 @@ export class Game {
   enterItem(): MenuItem | undefined {
     if (this.mode === 'run' || (this.mode === 'play' && !this.paused && this.runUI?.pick)) return this.runUI.enterItem();
     const items = this.menuItems();
+    // はじめての人（れんしゅうをまだ終えていない人）は、Enter で「れんしゅう」に入れる（画面でも勧めている札）
+    if (this.mode === 'modeSelect' && !this.settings.tutorialDone) return items.find((it) => it.kana === 'れんしゅう');
     if (this.mode === 'modeSelect') return items[this.settings.playMode === 'daily' ? 1 : this.settings.playMode === 'run' ? 2 : 0];
     if (this.mode === 'difficulty') return items.find((it) => it.kana === difficultyOf(this.settings.difficulty).kana);
     if (this.mode === 'help') return items[items.length - 1];
@@ -1108,6 +1118,11 @@ export class Game {
       this.recordsKey(k);
       return;
     }
+    // はじめての案内：Esc で飛ばす。Enter は最後の段（メニュー）だけ選べて、ほかの段では打つキーを強く見せる
+    if (this.mode === 'intro' && this.intro) {
+      if (k === 'Escape') { e.preventDefault(); this.sound.select(); finishIntro(this); return; }
+      if (k === 'Enter') { e.preventDefault(); introEnter(this); return; }
+    }
     if (k === 'Escape' && this.mode !== 'title') {
       e.preventDefault();
       this.sound.select();
@@ -1145,7 +1160,7 @@ export class Game {
       if (k.length === 1 && TYPABLE.test(k.toLowerCase())) {
         e.preventDefault();
         const r = this.menu.key(k);
-        if (r.kind === 'miss') { this.sound.miss(); this.missFlash = 0.25; return; }
+        if (r.kind === 'miss') { this.sound.miss(); this.missFlash = 0.25; if (this.intro) this.intro.missAt = this.t; return; }
         this.sound.key(this.menu.typed.length || 1);
         if (r.done.length) { if (this.mode !== 'help' || r.done[0].data.kana === 'もどる') this.sound.select(); r.done[0].data.act(); this.menu.reset(); }
       }
@@ -1220,6 +1235,7 @@ export class Game {
     // タイトル画面では、今日のランキングの1位を見せるために順位表を読んでおく
     if (this.mode === 'title' && this.artState !== 'loading') void this.loadBoards(jstDate());
     if (this.mode === 'result') resultStep(this);
+    if (this.mode === 'intro') introStep(this);
     if (this.mode === 'run') this.runUI?.step(dt);
     this.view.fxScale = this.fxScale;
     this.view.hover = this.hover;
@@ -1369,7 +1385,7 @@ export class Game {
 
   /** タイトルと同じ、にぎわう店を背景に使う画面 */
   get overTavern() {
-    return this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'settings' || this.mode === 'run';
+    return this.mode === 'intro' || this.mode === 'title' || this.mode === 'modeSelect' || this.mode === 'difficulty' || this.mode === 'daily' || this.mode === 'prep' || this.mode === 'ranking' || this.mode === 'records' || this.mode === 'settings' || this.mode === 'run';
   }
 
   // ---------- 描画 ----------
@@ -1442,6 +1458,7 @@ export class Game {
       sc.cover(C.bg, 0.4);
     } else sc.cover(C.bg, 0.7);
     if (this.mode === 'title') drawTitle(this);
+    else if (this.mode === 'intro') drawIntro(this);
     else if (this.mode === 'help') { if (this.helpPage === 1) drawTripHelp(this); else if (this.helpPage === 2) drawModeHelp(this); else if (this.helpPage === 3) drawRunHelp(this); else drawHelp(this); }
     else if (this.mode === 'modeSelect') drawModeSelect(this);
     else if (this.mode === 'difficulty') drawDifficulty(this);

@@ -30,13 +30,15 @@ export interface Settings {
   playMode: 'normal' | 'daily' | 'run';
   /** れんしゅうを最後まで終えたか */
   tutorialDone: boolean;
+  /** はじめて開いたときの案内（タイトルの前）を見終えたか、飛ばしたか */
+  introDone: boolean;
   /** ランキングで前回使った名前 */
   rankingName: string;
   /** 演出の強さ（0=ひかえめ、1=ふつう）。光・揺れ・紙吹雪の量を変える */
   fxLevel: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '', tutorialDone: false, bgmLevel: 8, seLevel: 8, keyLevel: 8, fxLevel: 1 };
+export const DEFAULT_SETTINGS: Settings = { muted: false, bgmVolume: 0.5, seVolume: 0.7, difficulty: 'normal', guided: false, volume: 3, playMode: 'normal', rankingName: '', tutorialDone: false, introDone: false, bgmLevel: 8, seLevel: 8, keyLevel: 8, fxLevel: 1 };
 
 export interface DayRecord {
   score: number;
@@ -234,7 +236,9 @@ export class SaveStore {
 
   loadSettings(): Settings {
     const d = this.read<Partial<Settings>>(this.keys.settings);
-    return { ...DEFAULT_SETTINGS, ...(d && typeof d === 'object' ? d : {}) };
+    const saved = d && typeof d === 'object' ? d : null;
+    // 案内ができる前から遊んでいる人（設定の保存がある人）には、はじめての案内を出さない
+    return { ...DEFAULT_SETTINGS, ...(saved ? { introDone: true } : {}), ...(saved ?? {}) };
   }
 
   saveSettings(s: Settings) {

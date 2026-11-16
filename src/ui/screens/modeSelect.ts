@@ -50,7 +50,8 @@ export function drawModeSelect(g: Game) {
     };
     MODES.forEach((md, i) => {
       const live = g.menu.active.find((l) => l.target.id === md.kana);
-      const last = g.settings.playMode === MODE_ID[i];
+      // はじめての人には、営業の札ではなく「れんしゅう」に Enter の印を付ける
+      const last = g.settings.tutorialDone && g.settings.playMode === MODE_ID[i];
       const dim = typing && !live;
       const w = 148;
       const h = 150;
@@ -114,7 +115,7 @@ export function drawModeSelect(g: Game) {
     if (practice) {
       const first = !g.settings.tutorialDone;
       if (first && !g.menu.typed) g.sc.glow(300, 226, 158, 34, C.gold3, 0.4 + 0.3 * Math.sin(g.t * 3));
-      button(g, practice, 300, 226, 158, 34, first ? 'primary' : 'plain', undefined, '▶');
+      button(g, practice, 300, 226, 158, 34, first ? 'primary' : 'plain', first ? 'Enter' : undefined, '▶');
       if (first) {
         g.sc.panel(306, 218, 92, 11, '#a7c99d', '#4c6b43');
         g.sc.T('はじめての人はここから', 310, 219.5, 7, '#203321');

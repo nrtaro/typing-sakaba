@@ -151,6 +151,20 @@ export class Art {
     sc.blit(s.img, sx, src.y, w, h, x, y, size * (w / h), size, false, alpha);
   }
 
+  /**
+   * 人物の頭から肩までを、正方形に切り抜いて描く（大きめの肖像用）。
+   * 見えている範囲の左右の中央にそろえて、上端から正方形を切るので、あごが切れず、顔が枠の中央に来る。
+   */
+  drawBust(sc: Screen, id: string, index: number, x: number, y: number, size: number, alpha = 1) {
+    const s = this.sheet(id);
+    const src = sourceRect(this.frame(id, index));
+    // 幅の85%の正方形：髪の先が少しかかる程度に寄せて、顔を大きく見せる。上に少し余白をとる
+    const side = Math.min(src.w * 0.85, src.h);
+    const sx = src.x + (src.w - side) / 2;
+    const sy = src.y - side * 0.04;
+    sc.blit(s.img, sx, sy, side, side, x, y, size, size, false, alpha);
+  }
+
   /** 背景の一部（基準座標の範囲）を描き直す。カウンターの前板で人物の下半身を隠すのに使う */
   redrawRegion(sc: Screen, id: string, r: { x: number; y: number; w: number; h: number }) {
     const { img } = this.sheet(id);
