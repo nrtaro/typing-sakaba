@@ -7,7 +7,7 @@ import { NORMAL_RULES } from '../src/core/daily';
 import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, REFILL_EAT, SETS, SET_BONUS, setKey, descDiff, descOf, emptyMods, modsFor, pairBonus, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
   AIDS, GOAL_BASE, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
-  DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
+  DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, GOAL_EASE_LOOP, GOAL_LATE_STEP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
   GIFT_CAP_LOOP, GIFT_PER_LOOP, NOREN_RANKS, bestCleared, clampPick, firstClearGift, nextNorenRank, norenRank,
   loopEveryMult, loopGoalMult, loopWaitMult, newRun, offersFor, readMeta, roadOffers, takeRoad, trialMods, trialsFor, walkMult,
 } from '../src/core/run';
@@ -564,6 +564,12 @@ describe('進行', () => {
       expect(dayDifficulty(3, loop).everyMult).toBeGreaterThan(0.39);
     }
     expect(loopGoalMult(1)).toBe(1);
+    // 10枚目までは伸びが少しずつ大きくなり、その先は1枚ごとに一定（15枚目・20枚目の節目に、組み方と速さしだいで届くように）
+    expect(loopGoalMult(GOAL_EASE_LOOP)).toBeCloseTo(2.728);
+    expect(loopGoalMult(15)).toBeCloseTo(3.328);
+    expect(loopGoalMult(20)).toBeCloseTo(3.928);
+    expect(loopGoalMult(GOAL_EASE_LOOP) - loopGoalMult(GOAL_EASE_LOOP - 1)).toBeGreaterThanOrEqual(GOAL_LATE_STEP);
+    for (const l of [11, 16, 40]) expect(loopGoalMult(l) - loopGoalMult(l - 1)).toBeCloseTo(GOAL_LATE_STEP);
     // 売上の目標のほかにも、営業そのものが難しくなる。新しい試練は1枚に1つずつ（段差を急にしない）
     expect(trialsFor(1)).toHaveLength(0);
     for (let l = 2; l <= 7; l++) expect(trialsFor(l)).toHaveLength(l - 1);

@@ -25,10 +25,21 @@ const DAY_EVERY = [0.95, 0.8, 0.66, 0.56];
 export const BASE_TRIP_MULT = 1.3;
 const DAY_WAIT = [1.15, 1.05, 0.95, 0.9];
 
-/** のれん n 枚目の目標の倍率（上限なし。枚数が増えるほど、1枚ごとの伸びも少しずつ大きくなる） */
+/** 目標の伸びをゆるめる枚数（ここまでは1枚ごとの伸びが少しずつ大きくなる） */
+export const GOAL_EASE_LOOP = 10;
+/**
+ * GOAL_EASE_LOOP 枚目より先の、1枚ごとの目標の伸び。
+ * 15枚目・20枚目の節目に、組み方を詰めて速く打てば届き、組み方が合わないと届かないくらい（2026-11-20、ボット6通りで確かめた）。
+ */
+export const GOAL_LATE_STEP = 0.12;
+/**
+ * のれん n 枚目の目標の倍率（上限なし）。
+ * GOAL_EASE_LOOP 枚目までは1枚ごとの伸びが少しずつ大きくなり（10枚目で約2.73倍）、その先は1枚ごとに GOAL_LATE_STEP ずつ（15枚目で約3.33倍、20枚目で約3.93倍）。
+ */
 export function loopGoalMult(loop: number) {
-  const k = Math.max(1, loop) - 1;
-  return 1 + 0.12 * k + 0.008 * k * k;
+  const n = Math.max(1, loop);
+  const k = Math.min(n, GOAL_EASE_LOOP) - 1;
+  return 1 + 0.12 * k + 0.008 * k * k + GOAL_LATE_STEP * Math.max(0, n - GOAL_EASE_LOOP);
 }
 /** のれんが増えるとお客も増え、せっかちになる（入力が追いつく範囲で止め、その先は目標だけが伸びる） */
 export function loopEveryMult(loop: number) {
