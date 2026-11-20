@@ -178,13 +178,17 @@ export interface RunState {
 
 export interface RunSummary {
   cleared: boolean; loop: number; day: number; total: number; sig: PolicyId | null; owned: Owned[]; days: DayResult[]; pairs: string[]; at: string;
+  /** そののれんを初めてクリアした（ご祝儀が付く） */
+  first: boolean;
 }
 
 /** 端末に残す繁盛記の記録（版付き） */
 export interface RunMeta {
   v: 1;
-  /** いま挑む「のれん」の枚数（クリアするたびに1枚増える。上限なし） */
+  /** 届いた「のれん」の枚数（いちばん上。初めてクリアするたびに1枚増える。上限なし。下がらない） */
   loop: number;
+  /** 次に挑むのれん（入口で 1〜loop から選ぶ。下ののれんでもご褒美は同じ） */
+  pick: number;
   clears: number;
   runs: number;
   /** 目標を越えた日の累計（心得の解放に使う） */
@@ -209,7 +213,7 @@ export interface RunMeta {
 
 export function emptyMeta(): RunMeta {
   return {
-    v: 1, loop: 1, clears: 0, runs: 0, daysCleared: 0,
+    v: 1, loop: 1, pick: 1, clears: 0, runs: 0, daysCleared: 0,
     best: { total: 0, day: 0, combo: 0, chain: 0, serve: 0, ratio: 0, stack: 0 },
     discovered: [], sets: [], sigs: [], policies: [], flags: { noAngry: false, max3: false }, active: null, last: null, paid: [], losses: 0,
   };
@@ -257,6 +261,8 @@ export function readMeta(raw: unknown): RunMeta {
   const m = emptyMeta();
   const o = obj(raw);
   m.loop = Math.max(1, num(o.loop));
+  // 選んだ枚数がない古い保存は、いちばん上（今までどおり）から
+  m.pick = o.pick === undefined ? m.loop : clampPick(m, num(o.pick));
   m.clears = num(o.clears);
   m.runs = num(o.runs);
   m.daysCleared = num(o.daysCleared);
@@ -273,7 +279,7 @@ export function readMeta(raw: unknown): RunMeta {
   if (typeof l.at === 'string') {
     m.last = {
       cleared: l.cleared === true, loop: Math.max(1, num(l.loop)), day: num(l.day, RUN_DAYS - 1), total: num(l.total), sig: isPolicy(l.sig) ? l.sig : null,
-      owned: readOwned(l.owned), days: arr(l.days).slice(0, RUN_DAYS).map(readDay), pairs: readPairs(l.pairs), at: l.at,
+      owned: readOwned(l.owned), days: arr(l.days).slice(0, RUN_DAYS).map(readDay), pairs: readPairs(l.pairs), at: l.at, first: l.first === true,
     };
   }
   m.losses = num(o.losses);
@@ -309,10 +315,17 @@ export function availablePolicies(m: RunMeta): PolicyId[] {
   return POLICIES.filter((p) => p.starter || m.policies.includes(p.id)).map((p) => p.id);
 }
 
+/** 選べるのれんの範囲（1〜届いた枚数）に収める */
+export const clampPick = (m: RunMeta, loop: number) => Math.max(1, Math.min(m.loop, Math.floor(loop) || 1));
+/** 届いた枚数のうち、クリアしたいちばん上（まだなければ 0） */
+export const bestCleared = (m: RunMeta) => m.loop - 1;
+
 export function newRun(meta: RunMeta, seed: number, id: string): RunState {
-  const aid = aidFor(meta.losses);
+  const loop = clampPick(meta, meta.pick);
+  // 常連の見舞いは、いちばん上ののれんで負け続けたときだけ（下ののれんでは付かない）
+  const aid = loop === meta.loop ? aidFor(meta.losses) : 0;
   const boost = aid > 0 && AIDS[aid - 1].boost;
-  return { v: 1, id, seed: seed >>> 0, loop: meta.loop, day: 0, stage: 'morning', owned: [], rerolls: 1 + (perkCount(meta) >= 2 ? 1 : 0), boost, road: 'joren', days: [], pairs: [], yen: {}, aid };
+  return { v: 1, id, seed: seed >>> 0, loop, day: 0, stage: 'morning', owned: [], rerolls: 1 + (perkCount(meta) >= 2 ? 1 : 0), boost, road: 'joren', days: [], pairs: [], yen: {}, aid };
 }
 
 /** その日の営業に渡すもの：難しさ・お題のルール・方針のはたらき・目標・乱数の種 */
@@ -493,14 +506,18 @@ export function closeDay(run: RunState, meta: RunMeta, f: DayFacts, now = new Da
   let summary: RunSummary | null = null;
   if (!passed || cleared) {
     const total = runTotal(run);
-    summary = { cleared, loop: run.loop, day: run.day, total, sig: signature(run), owned: run.owned.map((o) => ({ ...o })), days: run.days.map((d) => ({ ...d })), pairs: [...run.pairs], at: now.toISOString() };
+    const first = cleared && run.loop >= meta.loop;
+    summary = { cleared, loop: run.loop, day: run.day, total, sig: signature(run), owned: run.owned.map((o) => ({ ...o })), days: run.days.map((d) => ({ ...d })), pairs: [...run.pairs], at: now.toISOString(), first };
     meta.runs++;
     b.total = Math.max(b.total, total);
-    if (cleared) meta.losses = 0;
-    else if (run.loop === meta.loop) meta.losses++;
+    // 見舞いの数え方は、いちばん上ののれんだけ（下ののれんの勝ち負けでは変わらない）
+    if (first) meta.losses = 0;
+    else if (!cleared && run.loop === meta.loop) meta.losses++;
     if (cleared) {
       meta.clears++;
       meta.loop = Math.max(meta.loop, run.loop + 1);
+      // 次に挑むのは、クリアしたひとつ上（下ののれんを回していたら、その続き）
+      meta.pick = clampPick(meta, run.loop + 1);
       if (summary.sig && !meta.sigs.includes(summary.sig)) meta.sigs.push(summary.sig);
       if (run.owned.filter((o) => o.lv >= MAX_LEVEL).length >= 3) meta.flags.max3 = true;
     }
@@ -524,11 +541,36 @@ export function takeRoad(run: RunState, meta: RunMeta, road: RoadId) {
   meta.active = run;
 }
 
-/** 貯金箱へ入れるお金：繁盛記の売上はそのまま入れず、越えた日数で決める（ふくびきの値段を崩さない） */
+/** 初めてクリアしたのれんのご祝儀：【ご祝儀の1枚あたり】× 枚数（【ご祝儀が伸びる上限の枚数】まで） */
+export const GIFT_PER_LOOP = 3000;
+export const GIFT_CAP_LOOP = 20;
+export const firstClearGift = (loop: number) => GIFT_PER_LOOP * Math.max(1, Math.min(GIFT_CAP_LOOP, Math.floor(loop)));
+
+/**
+ * 貯金箱へ入れるお金：繁盛記の売上はそのまま入れず、越えた日数で決める（ふくびきの値段を崩さない）。
+ * どののれんを選んでも同じ額。そののれんを初めてクリアしたときだけ、ご祝儀が足される（1回きり）
+ */
 export function coinsFor(s: RunSummary) {
   const days = s.days.filter((d) => d.sales >= d.goal).length;
-  return days * 3000 + (s.cleared ? 8000 : 0);
+  return days * 3000 + (s.cleared ? 8000 : 0) + (s.first ? firstClearGift(s.loop) : 0);
 }
+
+// ---------- のれんの格（クリアしたいちばん上の枚数で、店ののれんの色が変わる） ----------
+
+export interface NorenRank { at: number; name: string; cloth: string; dark: string; mark: string }
+export const NOREN_RANKS: NorenRank[] = [
+  { at: 0, name: '生成りののれん', cloth: '#d8ccb0', dark: '#9a8a6a', mark: '#5a4128' },
+  { at: 3, name: '藍のれん', cloth: '#2a4a8a', dark: '#16284e', mark: '#f2efe2' },
+  { at: 5, name: '茜のれん', cloth: '#b83a3a', dark: '#6a1a20', mark: '#fff0d0' },
+  { at: 7, name: '紫のれん', cloth: '#6a3a8a', dark: '#381a4e', mark: '#f8e8ff' },
+  { at: 10, name: '金のれん', cloth: '#d8a030', dark: '#8a5a10', mark: '#3a2008' },
+  { at: 15, name: '錦のれん', cloth: '#1e5a3a', dark: '#0c2a1a', mark: '#ffd98a' },
+  { at: 20, name: '百年のれん', cloth: '#1a1410', dark: '#000000', mark: '#ffd25c' },
+];
+/** クリアしたいちばん上の枚数から、今の格 */
+export const norenRank = (cleared: number) => [...NOREN_RANKS].reverse().find((r) => cleared >= r.at)!;
+/** 次の格（いちばん上まで来ていれば null） */
+export const nextNorenRank = (cleared: number) => NOREN_RANKS.find((r) => cleared < r.at) ?? null;
 
 // ---------- 専用の実績（報酬は collectionItems.ts の限定の飾り） ----------
 
@@ -544,8 +586,8 @@ const flag = (v: boolean) => ({ now: v ? 1 : 0, goal: 1 });
 export const RUN_ACHIEVEMENTS: RunAchievement[] = [
   { id: 'run-first-day', title: 'のれんを上げる', condition: '1日目の目標を突破する', progress: (m) => ({ now: Math.min(1, m.daysCleared), goal: 1 }) },
   { id: 'run-clear', title: '四日目の灯り', condition: '4日間を走りきる', progress: (m) => ({ now: Math.min(1, m.clears), goal: 1 }) },
-  { id: 'run-loop3', title: 'のれん三枚', condition: '繁盛記を3回クリアする', progress: (m) => ({ now: m.clears, goal: 3 }) },
-  { id: 'run-loop5', title: '千両箱', condition: '繁盛記を5回クリアする', progress: (m) => ({ now: m.clears, goal: 5 }) },
+  { id: 'run-loop3', title: '三たびの灯り', condition: '繁盛記を3回クリアする（どののれんでもよい）', progress: (m) => ({ now: m.clears, goal: 3 }) },
+  { id: 'run-loop5', title: '千両箱', condition: '繁盛記を5回クリアする（どののれんでもよい）', progress: (m) => ({ now: m.clears, goal: 5 }) },
   { id: 'run-chain', title: '四皿いっぺん', condition: '1回の入力で4皿を同時に出す', progress: (m) => ({ now: m.best.chain, goal: 4 }) },
   { id: 'run-combo50', title: '止まらない手', condition: '繁盛記で50コンボを出す', progress: (m) => ({ now: m.best.combo, goal: 50 }) },
   { id: 'run-bigserve', title: '一皿五千円', condition: '1皿で5,000円以上を売り上げる', progress: (m) => ({ now: m.best.serve, goal: 5000 }) },
@@ -556,6 +598,11 @@ export const RUN_ACHIEVEMENTS: RunAchievement[] = [
   { id: 'run-no-angry', title: 'もてなし上手', condition: '3日目か4日目を、誰も怒らせずに突破する', progress: (m) => flag(m.flags.noAngry) },
   { id: 'run-max3', title: '三本柱', condition: '方針3つを最大まで育ててクリアする', progress: (m) => flag(m.flags.max3) },
   { id: 'run-100k', title: '大繁盛', condition: '1回の挑戦で合計10万円を売り上げる', progress: (m) => ({ now: m.best.total, goal: 100000 }) },
+  // のれんの節目（格が上がる枚数と同じ）。クリアしたいちばん上の枚数で数えるので、下ののれんを回しても取れない
+  ...NOREN_RANKS.filter((r) => r.at > 0).map((r): RunAchievement => ({
+    id: `run-noren${r.at}`, title: r.name, condition: `のれん${r.at}枚目をクリアする（店ののれんが「${r.name}」になる）`,
+    progress: (m) => ({ now: bestCleared(m), goal: r.at }),
+  })),
 ];
 
 /** 条件を満たした実績のID */

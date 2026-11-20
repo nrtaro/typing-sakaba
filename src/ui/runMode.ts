@@ -18,9 +18,9 @@ import {
   type BuildStats, type Owned, type PolicyId,
 } from '../core/build';
 import {
-  AIDS, PERKS, RUN_ACHIEVEMENTS, RUN_DAYS, aidFor, RUN_NAME, TRIALS, applyOffer, availablePolicies, closeDay, coinsFor, dayPlan, earnedAchievements, goalFor, loopGoalMult,
-  newRun, offersFor, roadOffers, roadOf, runTotal, takeRoad, trialsFor,
-  type DayOutcome, type Offer, type Road, type RunMeta, type RunState,
+  AIDS, PERKS, RUN_ACHIEVEMENTS, RUN_DAYS, aidFor, RUN_NAME, TRIALS, applyOffer, availablePolicies, bestCleared, clampPick, closeDay, coinsFor, dayPlan, earnedAchievements, firstClearGift, goalFor, loopGoalMult,
+  newRun, nextNorenRank, norenRank, offersFor, roadOffers, roadOf, runTotal, takeRoad, trialsFor,
+  type DayOutcome, type NorenRank, type Offer, type Road, type RunMeta, type RunState,
 } from '../core/run';
 
 export type RunScreen = 'hub' | 'book' | 'pick' | 'day' | 'road' | 'end';
@@ -30,6 +30,11 @@ const RESULT_LOCK = 0.4;
 const RESULT_DAY_READY = 2.4;
 const RESULT_END_READY = 1.9;
 const RESULT_AFTER_SKIP = 0.25;
+/** 入口で、さかのぼって届いた飾りを知らせる秒数 */
+const NOTICE_TIME = 4;
+/** 最終結果：ご祝儀が数え上がる秒数／格上げののれんが下りきる秒数 */
+const GIFT_COUNT = 0.6;
+const RANK_DROP = 0.5;
 const KIND_NAME: Record<Item['kind'], string> = { front: '二つ名（前）', back: '二つ名（後ろ）', plate: 'プレート', sound: '打鍵音', sticker: 'シール' };
 const BOOK_TABS = ['実績とごほうび', '型とかけ合わせ', '方針', 'おまけと試練'] as const;
 const ease = (v: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
@@ -62,7 +67,13 @@ export class RunUI {
   resumeIn = 0;
   outcome: (DayOutcome & { achievements: string[]; coins: number; yen: BuildStats['yen']; resumed?: boolean }) | null = null;
   book = { tab: 0, sel: 0, from: 'hub' as RunScreen, note: '' };
-  private fxDone = { stamp: false, tick: 0, reward: false };
+  private fxDone = { stamp: false, tick: 0, reward: false, gift: false, rank: false };
+  /** 入口を開いたときに、さかのぼって届いた飾りの知らせ */
+  private notice: { ids: string[]; at: number } | null = null;
+  /** 入口でのれんを選び直した時刻（数字を少し弾ませる） */
+  private pickedAt = -10;
+  /** 入口で選び直して、まだ保存していない枚数（なければ null。保存された枚数を使う） */
+  private pickChoice: number | null = null;
 
   constructor(private g: Game) {
     this.meta = g.store.loadRun();
@@ -114,18 +125,30 @@ export class RunUI {
     if (this.saving || this.retrySave) return;
     this.saveNote = '';
     this.meta = this.g.store.loadRun();
+    // 入口で選び直した枚数（まだ保存していない）は、開き直しても残す
+    if (this.pickChoice !== null) this.meta.pick = clampPick(this.meta, this.pickChoice);
     this.run = this.meta.active;
     this.pick = null;
     this.outcome = null;
+    this.notice = null;
     if (this.g.settings.playMode !== 'run') { this.g.settings.playMode = 'run'; this.g.store.saveSettings(this.g.settings); }
     this.go('hub');
-    this.save(() => { this.run = this.meta.active; this.g.refreshCollection(); });
+    // 条件を満たしている実績は、入口を開いたときにも渡す（のれんの節目は、届いている人にさかのぼって付く）
+    const achievements = earnedAchievements(this.meta);
+    this.save(({ achievements: got }) => {
+      this.run = this.meta.active;
+      this.g.refreshCollection();
+      if (got.length) { this.notice = { ids: got, at: this.g.t }; this.g.sound.reward(); }
+    }, achievements.length ? { runId: null, amount: 0, achievements } : undefined);
   }
 
   /** 新しい挑戦を始める（進行中のものは捨てる） */
   begin() {
     if (this.saving || this.retrySave) return;
+    // 入口で選んだのれん（まだ保存していない）を、読み直した記録に引き継ぐ
     this.meta = this.g.store.loadRun();
+    if (this.pickChoice !== null) this.meta.pick = clampPick(this.meta, this.pickChoice);
+    this.pickChoice = null;
     this.run = newRun(this.meta, Math.floor(Math.random() * 4294967296), crypto.randomUUID());
     this.meta.active = this.run;
     this.save(() => this.enter());
@@ -142,7 +165,7 @@ export class RunUI {
       // 閉店の結果を見ている途中でやめた：結果をもう一度見せる
       const result = run.days[run.days.length - 1];
       this.outcome = { passed: true, cleared: false, result, newPairs: [], newSets: [], newPolicies: [], summary: null, achievements: [], coins: 0, yen: {}, resumed: true };
-      this.fxDone = { stamp: true, tick: 9, reward: true };
+      this.fxDone = { stamp: true, tick: 9, reward: true, gift: true, rank: true };
       this.go('day');
     } else this.go('road');
   }
@@ -264,7 +287,7 @@ export class RunUI {
     this.save(({ achievements, coins }) => {
       this.outcome = { ...out, achievements, coins, yen: { ...shop.buildStats.yen } };
       if (out.summary) this.run = null;
-      this.fxDone = { stamp: false, tick: 0, reward: false };
+      this.fxDone = { stamp: false, tick: 0, reward: false, gift: false, rank: false };
       g.refreshCollection();
       g.sound.play('result');
       this.go(out.summary ? 'end' : 'day');
@@ -393,6 +416,7 @@ export class RunUI {
 
   /** ずかんのキー：←→でページ、↑↓でえらぶ、Enter でごほうびを付ける／打鍵音を試す */
   key(k: string): boolean {
+    if (this.g.mode === 'run' && this.screen === 'hub') return this.pickKey(k);
     if (this.g.mode !== 'run' || this.screen !== 'book') return false;
     const b = this.book;
     const n = this.bookCount();
@@ -400,6 +424,21 @@ export class RunUI {
     if (k === 'ArrowUp' || k === 'ArrowDown') { b.sel = (b.sel + (k === 'ArrowDown' ? 1 : n - 1)) % n; b.note = ''; this.g.sound.key(1); return true; }
     if (k === 'Enter') { if (b.tab === 0) this.equipReward(RUN_ACHIEVEMENTS[b.sel].id); return true; }
     return false;
+  }
+
+  /** 入口でのれんを選ぶ：←→で1枚ずつ、↑でいちばん上、↓で1枚目（挑戦の途中は選べない） */
+  private pickKey(k: string): boolean {
+    const m = this.meta;
+    if (this.run || this.saving || this.retrySave || m.loop <= 1) return false;
+    const to = k === 'ArrowLeft' ? m.pick - 1 : k === 'ArrowRight' ? m.pick + 1 : k === 'ArrowUp' ? m.loop : k === 'ArrowDown' ? 1 : null;
+    if (to === null) return false;
+    const next = clampPick(m, to);
+    if (next === m.pick) { this.g.sound.miss(); return true; }
+    m.pick = next;
+    this.pickChoice = next;
+    this.pickedAt = this.g.t;
+    this.g.sound.key(next === m.loop ? 3 : 1);
+    return true;
   }
 
   /** 実績のごほうびを付ける（打鍵音はその場で鳴らす）。まだ手に入れていなければ知らせる */
@@ -533,10 +572,40 @@ export class RunUI {
     };
   }
 
+  private giftTip(m: RunMeta): Tip {
+    return {
+      title: 'のれんのえらび方とご祝儀', col: '#ffd98a',
+      lines: [
+        { t: '入口で←→を押すと、届いたのれん（1枚目〜いちばん上）のどれでも選べる。↑でいちばん上、↓で1枚目。下ののれんでも、ご褒美の額はふだんと同じ。', col: C.w },
+        { t: `いちばん上ののれんを初めてクリアすると、ご祝儀（${yen(firstClearGift(1))}×枚数）が貯金箱に入る。` },
+        { t: `いま届いたのは のれん${m.loop}枚目。次のご祝儀は ${yen(firstClearGift(m.loop))}` },
+      ],
+    };
+  }
+
+  private rankTip(m: RunMeta): Tip {
+    const best = bestCleared(m);
+    const rank = norenRank(best);
+    const next = nextNorenRank(best);
+    return {
+      title: `のれんの格「${rank.name}」`, col: '#ffd98a',
+      lines: [
+        { t: `クリアしたいちばん上ののれんで、店ののれんが変わる（いま${best}枚目まで）。`, col: C.w },
+        { t: next ? `つぎは のれん${next.at}枚目をクリアで「${next.name}」と、限定の飾り` : 'いちばん上の格。ここから先は、ご祝儀と記録を伸ばそう' },
+      ],
+    };
+  }
+
   private drawHub(sc: Screen) {
     const g = this.g;
     const m = this.meta;
     const run = this.run;
+    // 看板の左右に、店ののれん（クリアしたいちばん上の枚数で色が変わる）
+    const rank = norenRank(bestCleared(m));
+    for (const nx of [66, 338]) {
+      drawNoren(sc, nx, 6, 76, 34, rank, g.t);
+      this.tip(sc, nx, 6, 76, 34, this.rankTip(m));
+    }
     drawSignboard(g, 150, 4, 180, 36);
     sc.TB(RUN_NAME, LW / 2, 9, 18, '#ffd98a', 'center', '#3a1408');
     sc.T('方針を選んで店を育てる四日間', LW / 2, 29, 8, '#f3dcb0', 'center');
@@ -549,7 +618,7 @@ export class RunUI {
     ];
     lines.forEach(([t, c], i) => sc.T(t, 28, 53 + i * 12, sc.fitSize(t, 8, 252, 6), c));
     sc.PR(28, 103, 250, 1, '#5a3a1c');
-    const loop = run?.loop ?? m.loop;
+    const loop = run?.loop ?? m.pick;
     if (run) {
       const where = `挑戦の途中：のれん${run.loop}枚目・${run.day + 1}日目の${run.stage === 'road' ? '閉店後（明日の営業えらび）' : run.stage === 'closed' ? '閉店後' : '朝'}から`;
       sc.T(where, 28, 108, sc.fitSize(where, 8.5, 252, 6), C.gold3);
@@ -558,14 +627,33 @@ export class RunUI {
       if (run.aid > 0) this.tip(sc, 28, 120, 252, 10, this.aidTip(run.aid));
       this.build(sc, 28, 133, run.owned, true, 284);
     } else {
-      sc.T(`つぎの挑戦：のれん${m.loop}枚目`, 28, 108, 10, C.gold3);
-      const goals = `1日ごとの目標 ${Array.from({ length: RUN_DAYS }, (_, d) => goalFor(d, m.loop, 'joren').toLocaleString()).join(' → ')}円`;
+      // つぎの挑戦：届いたのれんのどれでも選べる（←→）
+      const top = m.pick === m.loop;
+      const head = 'つぎの挑戦：';
+      sc.T(head, 28, 108, 10, C.gold3);
+      const nx = 28 + sc.W(head, 10);
+      const bump = Math.max(0, 1 - (g.t - this.pickedAt) / 0.18);
+      const label = `のれん${m.pick}枚目`;
+      const lw = sc.W(label, 10);
+      if (m.loop > 1) {
+        sc.T('◀', nx, 108, 10, m.pick > 1 ? C.gold3 : '#5a4a3a');
+        sc.T('▶', nx + 14 + lw + 4, 108, 10, m.pick < m.loop ? C.gold3 : '#5a4a3a');
+      }
+      sc.T(label, nx + (m.loop > 1 ? 14 : 0), 108 - bump * 2, 10, top ? C.gold3 : '#cfe3ff');
+      if (m.loop > 1) {
+        const keys = '←→↑↓で選ぶ';
+        sc.T(keys, 280, 109, sc.fitSize(keys, 8, 280 - (nx + lw + 34), 6), C.cream, 'right');
+        this.tip(sc, 200, 107, 82, 11, this.giftTip(m));
+      }
+      const goals = `1日ごとの目標 ${Array.from({ length: RUN_DAYS }, (_, d) => goalFor(d, m.pick, 'joren').toLocaleString()).join(' → ')}円`;
       sc.T(goals, 28, 123, sc.fitSize(goals, 8, 252, 6), C.w);
-      // 同じのれんで続けて負けたら、常連の見舞い（次の挑戦の間だけ効く）
-      const aid = aidFor(m.losses);
-      const note = aid > 0 ? `常連の見舞い：${AIDS[aid - 1].text}` : 'クリアするたびに、のれんが1枚増えて難しくなる（上限なし）';
-      sc.T(note, 28, 136, sc.fitSize(note, 8, 252, 6), aid > 0 ? '#a9f0e4' : C.cream);
-      if (aid > 0) this.tip(sc, 28, 135, 252, 10, this.aidTip(aid));
+      // いちばん上：初めてクリアするとご祝儀（と、負け続けていれば常連の見舞い）。下ののれん：ご褒美はふだんどおり
+      const aid = top ? aidFor(m.losses) : 0;
+      const note = top
+        ? `初めてクリアすると、ご祝儀 +${yen(firstClearGift(m.pick))}${aid > 0 ? '・常連の見舞いつき（←で下ののれんも選べる）' : ''}`
+        : `届いたのは のれん${m.loop}枚目まで。ここではご祝儀なし、ご褒美はふだんどおり`;
+      sc.T(note, 28, 136, sc.fitSize(note, 8, 252, 6), top ? (aid > 0 ? '#a9f0e4' : '#ffd98a') : C.cream);
+      this.tip(sc, 28, 135, 252, 10, aid > 0 ? this.aidTip(aid) : this.giftTip(m));
     }
     // のれんの試練（マウスを乗せると内容）
     const trials = trialsFor(loop);
@@ -593,14 +681,24 @@ export class RunUI {
     sc.panel(296, 46, 166, 160, '#22322a', '#6b4422');
     sc.T('これまでの記録', 379, 52, 9, '#f2efe2', 'center');
     const rows: [string, string][] = [
-      ['クリア', `${m.clears}回`], ['挑戦', `${m.runs}回`], ['最高の合計', m.best.total ? yen(m.best.total) : '―'], ['1日の最高', m.best.day ? yen(m.best.day) : '―'],
+      ['クリア', `${m.clears}回`], ['挑戦', `${m.runs}回`], ['届いたのれん', `${m.loop}枚目`], ['のれんの格', `${rank.name}${nextNorenRank(bestCleared(m)) ? `・あと${nextNorenRank(bestCleared(m))!.at - bestCleared(m)}枚` : ''}`], ['最高の合計', m.best.total ? yen(m.best.total) : '―'], ['1日の最高', m.best.day ? yen(m.best.day) : '―'],
       ['一皿の最高', m.best.serve ? yen(m.best.serve) : '―'], ['最大コンボ', m.best.combo ? `${m.best.combo}` : '―'], ['同時に出した皿', m.best.chain > 1 ? `${m.best.chain}皿` : '―'],
       ['かけ合わせ・型', `${m.discovered.length}/${PAIRS.length}・${m.sets.length}/${SETS.length}`],
     ];
     rows.forEach(([k, v], i) => {
-      sc.T(k, 306, 68 + i * 16, 8, '#d9e4cf');
-      sc.T(v, 452, 68 + i * 16, sc.fitSize(v, 8.5, 80), '#fff7ea', 'right');
+      sc.T(k, 306, 68 + i * 14, 8, '#d9e4cf');
+      sc.T(v, 452, 68 + i * 14, sc.fitSize(v, 8.5, 80), '#fff7ea', 'right');
     });
+    this.tip(sc, 300, 66 + 3 * 14, 158, 12, this.rankTip(m));
+    // さかのぼって届いた節目の飾りを、入口を開いたときに一度だけ知らせる
+    const n = this.notice;
+    if (n && g.t - n.at < NOTICE_TIME) {
+      const na = Math.min(1, (g.t - n.at) * 5, (NOTICE_TIME - (g.t - n.at)) * 2);
+      const rows = Math.min(3, n.ids.length);
+      sc.panel(50, 50, 380, 26 + rows * 18, 'rgba(36,23,14,0.97)', C.gold3, na);
+      sc.T('のれんの格が認められて、限定の飾りが届いた！', LW / 2, 56, 9, C.gold3, 'center', na);
+      this.drawRewards(sc, 60, 70, 360, n.ids, na);
+    }
     const items = this.menuItems();
     const w = items.length >= 4 ? 106 : 138;
     const gap = 8;
@@ -906,13 +1004,31 @@ export class RunUI {
     sc.radialGlow(LW / 2, 50, 170, s.cleared ? '#ffcf5a' : '#6a7aa0', 0.25 * ease(age / 0.6), 0.45);
     if (s.cleared) {
       const k = ease(age / 0.35);
-      sc.TB(`のれん${s.loop}枚目　四日間を走りきった！`, LW / 2, 8 - (1 - k) * 10, 16, C.gold3, 'center', '#3a1408', k);
+      const rank = norenRank(s.loop);
+      const rankUp = s.first && rank.at === s.loop;
+      if (rankUp) {
+        // 新しい格ののれんを、見出しの後ろに横いっぱいで下ろす。下りきったら光と鈴
+        const drop = ease((age - 0.3) / RANK_DROP);
+        drawNoren(sc, LW / 2 - 150, -46 + drop * 48, 300, 44, rank, g.t);
+        if (!this.fxDone.rank && age > 0.3 + RANK_DROP) { this.fxDone.rank = true; g.sound.bell(); }
+        const fl = age - (0.3 + RANK_DROP);
+        if (fl > 0 && fl < 0.18) sc.cover('#fff4d0', 0.45 * (1 - fl / 0.18));
+      }
+      sc.TB(`のれん${s.loop}枚目　${s.first ? '初めて' : '四日間を'}走りきった！`, LW / 2, 8 - (1 - k) * 10, 16, C.gold3, 'center', '#3a1408', k);
       const fresh = TRIALS.filter((t) => t.from === s.loop + 1).map((t) => t.name);
-      const nextText = `つぎは のれん${s.loop + 1}枚目：目標${loopGoalMult(s.loop + 1).toFixed(2)}倍、お客の足も速い${fresh.length ? `。新しい試練「${fresh.join('」「')}」` : ''}`;
-      sc.T(nextText, LW / 2, 29, sc.fitSize(nextText, 8.5, 440, 6), '#fff0b0', 'center', k);
+      // すでに届いている枚数へ戻るだけなら「新しい」とは言わない
+      const known = !s.first && s.loop + 1 <= this.meta.loop;
+      const trialText = fresh.length && !known ? `。新しい試練「${fresh.join('」「')}」` : '';
+      const nextText = rankUp
+        ? `店ののれんが「${rank.name}」になった！　つぎは のれん${s.loop + 1}枚目${trialText}`
+        : known
+          ? `つぎは のれん${s.loop + 1}枚目（届いたのは のれん${this.meta.loop}枚目まで）`
+          : `つぎは のれん${s.loop + 1}枚目：目標${loopGoalMult(s.loop + 1).toFixed(2)}倍、お客の足も速い${trialText}${s.first && s.loop === 1 ? '。入口の←→で、届いたのれんを選べる' : ''}`;
+      sc.TB(nextText, LW / 2, 29, sc.fitSize(nextText, 8.5, 440, 6), rankUp ? '#ffd98a' : '#fff0b0', 'center', '#3a1408', k);
     } else {
       sc.TB(`${s.day + 1}日目で店じまい…`, LW / 2, 8, 16, '#c8d4f0', 'center', C.ink, ease(age / 0.35));
-      const aided = aidFor(this.meta.losses) > 0;
+      // 見舞いが付くのは、いちばん上ののれんで負けたときだけ（下ののれんの「もういちど」には付かない）
+      const aided = s.loop === this.meta.loop && aidFor(this.meta.losses) > 0;
       const lost = `目標まで あと${yen(last.goal - last.sales)}。${aided ? '心配した常連が、次の挑戦に差し入れてくれる' : '方針を変えて、もういちど'}`;
       sc.T(lost, LW / 2, 29, sc.fitSize(lost, 8.5, 440, 6), aided ? '#a9f0e4' : C.cream, 'center', ease(age / 0.35));
     }
@@ -946,8 +1062,23 @@ export class RunUI {
     let py = 100;
     if (s.pairs.length) py += this.pairList(sc, s.pairs, 254, py, 200, '#ffe9b4', a);
     else { sc.T('かけ合わせは成立しなかった', 254, py, 8, C.gray, 'left', a); py += 11; }
-    if (py < 136) this.para(sc, this.hint(s.cleared, s.owned, s.pairs), 254, py + 1, 8, 200, '#a9f0e4', a, 9);
-    if (o.coins > 0) sc.T(`ごほうび：貯金箱に +${yen(o.coins)}`, 254, 146, 8, C.gold, 'left', a);
+    if (py < (s.first ? 122 : 136)) this.para(sc, this.hint(s.cleared, s.owned, s.pairs), 254, py + 1, 8, 200, '#a9f0e4', a, 9);
+    if (s.first) {
+      // ご祝儀は1行を独り立ちさせて、数え上げて見せる
+      const gift = firstClearGift(s.loop);
+      const c = ease((age - 1.0) / GIFT_COUNT);
+      if (!this.fxDone.gift && age > 1.0) { this.fxDone.gift = true; g.sound.coin(); }
+      if (age > 1.0) {
+        sc.glow(252, 131, 204, 14, C.gold3, 0.35 * (0.7 + 0.3 * Math.sin(g.t * 5)));
+        sc.TB(`ご祝儀 +${yen(Math.round((gift * c) / 100) * 100)}`, 254, 132, 10, C.gold3, 'left', '#3a1408');
+        sc.T(`のれん${s.loop}枚目を初めてクリア`, 454, 134, 7, '#ffe9b4', 'right');
+        this.tip(sc, 252, 131, 204, 14, this.giftTip(this.meta));
+      }
+    }
+    if (o.coins > 0) {
+      const line = `ごほうび：貯金箱に +${yen(o.coins)}`;
+      sc.T(line, 254, 146, sc.fitSize(line, 8, 200, 6), C.gold, 'left', a);
+    }
     // 下：実績と限定の飾り
     if (o.achievements.length) this.drawRewards(sc, 60, 160, 360, o.achievements, ease((age - 1.6) / 0.3));
     else if (o.newPolicies.length) sc.T(`新しい方針が選べるように：${o.newPolicies.map((p) => `「${policyOf(p).name}」`).join('')}`, LW / 2, 170, 8.5, '#a9f0e4', 'center', a);
@@ -1078,7 +1209,7 @@ export class RunUI {
         this.para(sc, `かけ合わせ：${partners.map((q) => (m.discovered.includes(pairKey(q.a, q.b)) ? `『${q.name}』` : `${policyOf(q.a === p.id ? q.b : q.a).name}と…`)).join(' ')}`, X, y + 11, 8, W, '#ffe9b4', 1, 9);
       } else this.para(sc, `解放の条件：${p.unlock}`, X, 80, 8.5, W, C.cream);
     } else {
-      const loop = m.loop;
+      const loop = this.run?.loop ?? m.pick;
       PERKS.forEach((q, i) => row(i, (y) => {
         const on = m.daysCleared >= q.at;
         sc.T(`${on ? '◆' : '◇'}おまけ「${q.name}」`, 36, y, 8, on ? '#a9f0e4' : C.gray);
@@ -1109,4 +1240,35 @@ export class RunUI {
     sc.T('←→ ページ　↑↓ えらぶ' + (b.tab === 0 ? '　Enter 付ける' : ''), 150, 238, 8, C.cream, 'left');
     button(g, this.menuItems()[0], 24, 228, 116, 28, 'plain', 'Esc', '◀');
   }
+}
+
+/** 店ののれん：竿と、切れ目の入った布。のれんの格で色が変わり、裾がゆっくり揺れる */
+export function drawNoren(sc: Screen, x: number, y: number, w: number, h: number, rank: NorenRank, t: number) {
+  const panels = 3;
+  const pw = w / panels;
+  // 竿
+  sc.PR(x - 4, y, w + 8, 3, '#5a3a1c');
+  sc.PR(x - 4, y, w + 8, 1, '#a8743f');
+  // 上の縫い目の帯（布はここから3枚に分かれる）
+  sc.PR(x, y + 3, w, 4, rank.dark);
+  for (let i = 0; i < panels; i++) {
+    const px = x + i * pw + 1.2;
+    const cw = pw - 2.4;
+    const sway = Math.sin(t * 1.4 + i * 1.3) * 0.8;
+    const ph = h - 7 + Math.sin(t * 1.1 + i) * 0.6;
+    sc.PR(px, y + 7, cw, ph, rank.cloth);
+    sc.fade(px, y + 7, cw, ph, rank.dark, 0, 0.6, 'y');
+    sc.PR(px, y + 7, 0.8, ph, '#ffffff', 0.12);
+    // 裾の揺れ
+    sc.PR(px + sway, y + 5 + ph, cw, 2, rank.dark);
+    // 錦から上は金の柄、百年は布のふちも金
+    if (rank.at >= 15) for (let k = 0; k < 3; k++) sc.PR(px + 2 + k * (cw / 3), y + 10, 2.5, 2.5, rank.mark, 0.7);
+    if (rank.at >= 20) { sc.PR(px, y + 7, 0.8, ph, rank.mark, 0.8); sc.PR(px + cw - 0.8, y + 7, 0.8, ph, rank.mark, 0.8); }
+  }
+  // 真ん中の布に、屋号の印
+  const cx = x + w / 2;
+  const cy = y + 7 + (h - 7) * 0.45;
+  sc.PR(cx - 7, cy - 7, 14, 14, rank.mark, 0.9);
+  sc.PR(cx - 6, cy - 6, 12, 12, rank.cloth);
+  sc.T('繁', cx, cy - 4.5, 9, rank.mark, 'center');
 }

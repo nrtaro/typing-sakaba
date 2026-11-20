@@ -7,6 +7,9 @@ export type Kind = 'front' | 'back' | 'plate' | 'sound' | 'sticker';
 export type Star = 1 | 2 | 3 | 4 | 5;
 /** 入手先：実績（段階5の永続ID）か、ふくびき */
 export type Source = { achievement: string } | 'gacha';
+/** 繁盛記の限定プレートの、コードで描く仮の札（絵が届くまで、または読めないとき） */
+export type RunPlateArt = 'noren' | 'senryo' | 'hiden' | 'kinnoren' | 'hyakunen';
+
 export interface Item {
   id: string;
   kind: Kind;
@@ -15,7 +18,7 @@ export interface Item {
   name: string;
   plate?: { bg: string; border: string; text: string; pattern?: 'plain' | 'stripe' | 'dots' | 'wood' | 'gold';
     /** 繁盛記の限定プレート：絵が届くまでの、コードで描く仮の柄 */
-    art?: 'noren' | 'senryo' | 'hiden' };
+    art?: RunPlateArt };
   sound?: { wave: OscillatorType; base: number; decay: number; partial?: number; noise?: number };
   /** シール：シリーズと台紙の枠（0〜8） */
   sticker?: { series: string; slot: number };

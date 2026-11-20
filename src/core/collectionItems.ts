@@ -87,6 +87,7 @@ export const ITEM_LIST: Item[] = [
   word('front', 'shobaihanjo', 4, '商売繁盛', ach('run-loop3')),
   word('front', 'hengenjizai', 4, '変幻自在', ach('run-two-builds')),
   word('front', 'daihanjo', 5, '大繁盛', ach('run-100k')),
+  word('front', 'shinise', 4, '老舗', ach('run-noren5')),
 
   // ---------- 二つ名・後ろの言葉（人を表す） ----------
   word('back', 'joren', 2, '常連', ach('usual-seat')),
@@ -135,6 +136,8 @@ export const ITEM_LIST: Item[] = [
   word('back', 'oobanburu', 3, '大盤振る舞い', ach('run-bigserve')),
   word('back', 'shikakenin', 3, '仕掛け人', ach('run-discover5')),
   word('back', 'motenashi', 3, 'もてなし上手', ach('run-no-angry')),
+  word('back', 'nidaime', 3, '二代目', ach('run-noren3')),
+  word('back', 'meitennoaruji', 4, '名店の主', ach('run-noren7')),
 
   // ---------- ネームプレート ----------
   plate('furunajimi', 3, '古なじみの木札', '#6b4a2a', '#c99a5a', '#fff6e0', 'wood', ach('long-friends')),
@@ -166,6 +169,9 @@ export const ITEM_LIST: Item[] = [
   { id: 'p-hanjofuda', kind: 'plate', star: 4, source: ach('run-clear'), name: '繁盛のれん', plate: { bg: '#7a1f2a', border: '#ffd98a', text: '#fff6e0', art: 'noren' } },
   { id: 'p-senryobako', kind: 'plate', star: 5, source: ach('run-loop5'), name: '千両箱', plate: { bg: '#2a1a10', border: '#ffd25c', text: '#fff6e0', art: 'senryo' } },
   { id: 'p-hidencho', kind: 'plate', star: 4, source: ach('run-discover-all'), name: '秘伝の書', plate: { bg: '#efe2c0', border: '#8a3a2a', text: '#2a1a10', art: 'hiden' } },
+  // のれんの節目（絵のプロンプトは docs/hanjoki-plate-prompts.md の2つ目。絵が読めないときはコードで描いた仮の札）
+  { id: 'p-kinnoren', kind: 'plate', star: 5, source: ach('run-noren10'), name: '金のれん', plate: { bg: '#c8902a', border: '#fff0b0', text: '#2a1a10', art: 'kinnoren' } },
+  { id: 'p-hyakunen', kind: 'plate', star: 5, source: ach('run-noren20'), name: '百年の看板', plate: { bg: '#1a1410', border: '#ffd25c', text: '#ffe9b4', art: 'hyakunen' } },
 
   // ---------- 打鍵音 ----------
   sound('kifuda', 4, '魚の木札（カコン）', { wave: 'triangle', base: 520, decay: 0.07, partial: 3, noise: 0.03 }, ach('past-fish-tag')),
@@ -174,6 +180,7 @@ export const ITEM_LIST: Item[] = [
   sound('hyoshigi', 4, '連鎖の拍子木（カカン）', { wave: 'square', base: 740, decay: 0.045, partial: 2.02, noise: 0.045 }, ach('run-chain')),
   sound('koban', 4, '千両の小判（チャリン）', { wave: 'sine', base: 1560, decay: 0.16, partial: 1.5 }, ach('run-double')),
   sound('ooiridaiko', 5, '大入り太鼓（ドドン）', { wave: 'sine', base: 196, decay: 0.11, partial: 0.5, noise: 0.07 }, ach('run-max3')),
+  sound('senkyakusuzu', 5, '千客万来の鈴（シャラン）', { wave: 'sine', base: 1180, decay: 0.14, partial: 2.76, noise: 0.02 }, ach('run-noren15')),
   sound('kinomi', 1, '木の実', { wave: 'sine', base: 660, decay: 0.07 }),
   sound('pokopoko', 1, 'ぽこぽこ', { wave: 'triangle', base: 330, decay: 0.09 }),
   sound('koishi', 1, '小石', { wave: 'square', base: 880, decay: 0.03 }),

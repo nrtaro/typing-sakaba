@@ -8,6 +8,7 @@ import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, REFILL_EAT, SETS, SET_BONUS, set
 import {
   AIDS, GOAL_BASE, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
   DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
+  GIFT_CAP_LOOP, GIFT_PER_LOOP, NOREN_RANKS, bestCleared, clampPick, firstClearGift, nextNorenRank, norenRank,
   loopEveryMult, loopGoalMult, loopWaitMult, newRun, offersFor, readMeta, roadOffers, takeRoad, trialMods, trialsFor, walkMult,
 } from '../src/core/run';
 import { emptyBuildStats, HEAT_GAP } from '../src/core/build';
@@ -403,7 +404,9 @@ describe('進行', () => {
         expect(out.cleared).toBe(true);
         expect(meta.loop).toBe(2);
         expect(meta.active).toBeNull();
-        expect(coinsFor(out.summary!)).toBe(4 * 3000 + 8000);
+        // のれん1枚目を初めてクリア：ふだんの額にご祝儀（3,000円×1枚）
+        expect(out.summary!.first).toBe(true);
+        expect(coinsFor(out.summary!)).toBe(4 * 3000 + 8000 + firstClearGift(1));
       }
     }
     const next = newRun(meta, 6, 'r2');
@@ -450,6 +453,103 @@ describe('進行', () => {
     }
     expect(meta.losses).toBe(0);
     expect(newRun(meta, 5, 'a4').aid).toBe(0);
+  });
+
+  describe('選べるのれん', () => {
+    const facts = (sales: number) => ({ sales, served: 30, maxCombo: 12, angry: 0, build: emptyBuildStats() });
+    /** 選んだのれんで4日間を走りきる */
+    const clearRun = (meta: ReturnType<typeof emptyMeta>, seed: number) => {
+      const run = newRun(meta, seed, `c${seed}`);
+      let out = null as ReturnType<typeof closeDay> | null;
+      for (let d = 0; d < RUN_DAYS; d++) {
+        out = closeDay(run, meta, facts(goalFor(d, run.loop, run.road)));
+        if (d < RUN_DAYS - 1) takeRoad(run, meta, 'joren');
+      }
+      return { run, out: out! };
+    };
+    const reached = (loop: number) => { const m = emptyMeta(); m.loop = loop; m.pick = loop; return m; };
+
+    it('古い保存（選んだ枚数がない）は、いちばん上から。範囲の外は収める', () => {
+      expect(readMeta({ loop: 6 }).pick).toBe(6);
+      expect(readMeta({ loop: 6, pick: 3 }).pick).toBe(3);
+      expect(readMeta({ loop: 6, pick: 99 }).pick).toBe(6);
+      expect(readMeta({ loop: 6, pick: 0 }).pick).toBe(1);
+      expect(readMeta({}).pick).toBe(1);
+      const m = reached(8);
+      expect(clampPick(m, 0)).toBe(1);
+      expect(clampPick(m, 12)).toBe(8);
+      expect(readMeta(JSON.parse(JSON.stringify({ ...m, pick: 4 }))).pick).toBe(4);
+    });
+
+    it('下ののれんを選べる。クリアしても届いた枚数は下がらず、ご褒美はふだんと同じ（ご祝儀なし）', () => {
+      const meta = reached(8);
+      meta.pick = 3;
+      const { run, out } = clearRun(meta, 1);
+      expect(run.loop).toBe(3);
+      expect(out.cleared).toBe(true);
+      expect(out.summary!.first).toBe(false);
+      expect(coinsFor(out.summary!)).toBe(4 * 3000 + 8000);
+      expect(meta.loop).toBe(8);
+      // 次は、クリアしたひとつ上
+      expect(meta.pick).toBe(4);
+    });
+
+    it('いちばん上を初めてクリアすると、ご祝儀が付き、届いた枚数と選んだ枚数がひとつ上がる', () => {
+      const meta = reached(8);
+      const { out } = clearRun(meta, 2);
+      expect(out.summary!.first).toBe(true);
+      expect(coinsFor(out.summary!)).toBe(4 * 3000 + 8000 + 8 * GIFT_PER_LOOP);
+      expect(meta.loop).toBe(9);
+      expect(meta.pick).toBe(9);
+      // 同じ枚数を2回目にクリアしても、ご祝儀は付かない
+      meta.pick = 8;
+      expect(clearRun(meta, 3).out.summary!.first).toBe(false);
+    });
+
+    it('ご祝儀は枚数に比例し、上限の枚数で止まる', () => {
+      expect(firstClearGift(1)).toBe(GIFT_PER_LOOP);
+      expect(firstClearGift(10)).toBe(10 * GIFT_PER_LOOP);
+      expect(firstClearGift(GIFT_CAP_LOOP)).toBe(firstClearGift(GIFT_CAP_LOOP + 50));
+    });
+
+    it('常連の見舞いは、いちばん上ののれんだけ。下ののれんの勝ち負けでは数えも消えもしない', () => {
+      const meta = reached(5);
+      for (const seed of [1, 2, 3]) closeDay(newRun(meta, seed, `l${seed}`), meta, facts(0));
+      expect(meta.losses).toBe(3);
+      expect(newRun(meta, 9, 'top').aid).toBe(2);
+      meta.pick = 2;
+      expect(newRun(meta, 9, 'low').aid).toBe(0);
+      closeDay(newRun(meta, 10, 'lowlose'), meta, facts(0));
+      expect(meta.losses).toBe(3);
+      meta.pick = 2;
+      clearRun(meta, 11);
+      expect(meta.losses).toBe(3);
+      meta.pick = 5;
+      clearRun(meta, 12);
+      expect(meta.losses).toBe(0);
+    });
+
+    it('のれんの格と節目の実績は、クリアしたいちばん上の枚数で決まる（下を何度回しても取れない）', () => {
+      expect(norenRank(0).name).toBe(NOREN_RANKS[0].name);
+      expect(norenRank(2).at).toBe(0);
+      expect(norenRank(3).name).toBe('藍のれん');
+      expect(norenRank(9).name).toBe('紫のれん');
+      expect(norenRank(100).at).toBe(20);
+      expect(nextNorenRank(3)?.at).toBe(5);
+      expect(nextNorenRank(20)).toBeNull();
+      const meta = reached(3);
+      expect(bestCleared(meta)).toBe(2);
+      meta.pick = 1;
+      for (let i = 0; i < 6; i++) { meta.pick = 1; clearRun(meta, 20 + i); }
+      expect(meta.clears).toBe(6);
+      expect(earnedAchievements(meta)).not.toContain('run-noren3');
+      expect(earnedAchievements(meta)).toContain('run-loop5');
+      meta.pick = 3;
+      clearRun(meta, 40);
+      expect(earnedAchievements(meta)).toContain('run-noren3');
+      expect(earnedAchievements(meta)).not.toContain('run-noren5');
+      for (const r of NOREN_RANKS.filter((x) => x.at > 0)) expect(achievementItem(`run-noren${r.at}`)).toBeDefined();
+    });
   });
 
   it('のれんは上限なく難しくなる：目標は増え続け、お客の多さと待ち時間は入力が追いつく範囲で止まる', () => {
@@ -558,15 +658,15 @@ describe('進行', () => {
 });
 
 describe('実績と限定の飾り', () => {
-  it('繁盛記の実績14件に、限定の飾りがちょうど1つずつ（二つ名8・プレート3・打鍵音3）', () => {
-    expect(RUN_ACHIEVEMENTS).toHaveLength(14);
+  it('繁盛記の実績20件に、限定の飾りがちょうど1つずつ（二つ名11・プレート5・打鍵音4）', () => {
+    expect(RUN_ACHIEVEMENTS).toHaveLength(20);
     const kinds: Record<string, number> = {};
     for (const a of RUN_ACHIEVEMENTS) {
       const it = achievementItem(a.id);
       expect(ITEMS.filter((i) => typeof i.source === 'object' && i.source.achievement === a.id)).toHaveLength(1);
       kinds[it!.kind] = (kinds[it!.kind] ?? 0) + 1;
     }
-    expect(kinds).toEqual({ front: 4, back: 4, plate: 3, sound: 3 });
+    expect(kinds).toEqual({ front: 5, back: 6, plate: 5, sound: 4 });
   });
 
   it('条件を満たすと解放され、ふだんの飾りとして付けられる。ふくびきでは出ない', () => {

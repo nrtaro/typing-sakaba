@@ -53,6 +53,7 @@ function suitableRoad(ids: RoadId[], run: RunState): RoadId {
 /** 1回の挑戦を最後まで（目標に届かなくても forceAll なら4日間続けて、日ごとの売上を見る） */
 export function botRun(seed: number, strat: Strategy, kps: number, missRate: number, loop = 1, meta: RunMeta = emptyMeta(), forceAll = false, think = 0.4): BotRun {
   meta.loop = loop;
+  meta.pick = loop;
   const run = newRun(meta, seed, `bot-${seed}`);
   const rng = new Rng(seed * 13 + 5);
   const days: BotRun['days'] = [];

@@ -1,7 +1,7 @@
 // 段階6：ランキングや飾りの見本で使う、ネームプレートと二つ名の描き方
 import type { Screen } from './screen';
 import type { Decoration } from '../core/ranking';
-import { itemById, titleText } from '../core/collection';
+import { itemById, titleText, type RunPlateArt } from '../core/collection';
 import { StickerArt, phaseOf } from './stickerArt';
 import { shined } from './shine';
 
@@ -53,9 +53,9 @@ function drawPlateImage(sc: Screen, img: HTMLImageElement, x: number, y: number,
 }
 
 /**
- * 繁盛記の限定プレートの仮の札（のれん・千両箱・秘伝の書）。絵（docs/hanjoki-plate-prompts.md）が届くまで使う。
+ * 繁盛記の限定プレートの仮の札（のれん・千両箱・秘伝の書・金のれん・百年の看板）。絵（docs/hanjoki-plate-prompts.md）が届くまで使う。
  */
-function drawRunPlate(sc: Screen, art: 'noren' | 'senryo' | 'hiden', x: number, y: number, w: number, h: number) {
+function drawRunPlate(sc: Screen, art: RunPlateArt, x: number, y: number, w: number, h: number) {
   const t = Date.now() / 1000;
   sc.clip(x, y, w, h, () => {
     if (art === 'noren') {
@@ -74,6 +74,32 @@ function drawRunPlate(sc: Screen, art: 'noren' | 'senryo' | 'hiden', x: number, 
       sc.PR(x, y, w, Math.max(1.5, h * 0.14), '#e0a43a');
       sc.PR(x, y, w, 0.8, '#fff0b0');
       sc.PR(x, y + h - 1, w, 1, '#4a1018');
+    } else if (art === 'kinnoren') {
+      // 金の布ののれん：濃い金の竿、布の切れ目、中央に屋号の紋
+      sc.PR(x, y, w, h, '#c8902a');
+      sc.fade(x, y, w, h, '#ffe08a', 0.6, 0, 'y');
+      const n = Math.max(3, Math.round(w / 26));
+      for (let i = 1; i < n; i++) {
+        const sx = x + (w * i) / n + Math.sin(t * 1.6 + i) * 0.5;
+        sc.PR(sx - 0.4, y + h * 0.4, 0.9, h * 0.65, '#7a4a10', 0.85);
+      }
+      sc.PR(x, y, w, Math.max(1.5, h * 0.14), '#5a3a1c');
+      sc.PR(x, y, w, 0.8, '#a8743f');
+      const r = Math.min(h * 0.32, 5);
+      sc.PR(x + w - r * 2 - 4, y + h / 2 - r, r * 2, r * 2, '#fff4c0', 0.85);
+      sc.PR(x + w - r * 2 - 3, y + h / 2 - r + 1, r * 2 - 2, r * 2 - 2, '#c8902a');
+      sc.PR(x, y + h - 1, w, 1, '#8a5a10');
+    } else if (art === 'hyakunen') {
+      // 黒漆の看板に金の縁。百年使い込んだ木目と、金のきらめき
+      sc.PR(x, y, w, h, '#1a1410');
+      for (let ly = y + 2; ly < y + h - 1; ly += Math.max(2.5, h * 0.18)) sc.PR(x, ly, w, 0.5, '#3a2a1c', 0.7);
+      sc.PR(x + 1, y + 1, w - 2, 1, '#ffd25c');
+      sc.PR(x + 1, y + h - 2, w - 2, 1, '#b8862a');
+      for (const [px, py] of [[x + 2, y + 2.4], [x + w - 4, y + 2.4], [x + 2, y + h - 4.4], [x + w - 4, y + h - 4.4]]) sc.PR(px, py, 2, 2, '#ffd25c');
+      for (let i = 0; i < 4; i++) {
+        const k = (Math.sin(t * 1.9 + i * 2.1) + 1) / 2;
+        sc.PR(x + ((i * 0.27 + 0.6) % 1) * w, y + ((i * 0.41 + 0.25) % 1) * (h - 3), 1.5, 1.5, '#fff4b0', k * 0.8);
+      }
     } else if (art === 'senryo') {
       // 黒漆の箱に金の帯と鋲。小判の光がまたたく
       sc.PR(x, y, w, h, '#22140c');
@@ -106,7 +132,7 @@ function drawRunPlate(sc: Screen, art: 'noren' | 'senryo' | 'hiden', x: number, 
     sc.fade(gx - 8, y, 8, h, '#ffffff', 0, art === 'hiden' ? 0.3 : 0.38, 'x');
     sc.fade(gx, y, 8, h, '#ffffff', art === 'hiden' ? 0.3 : 0.38, 0, 'x');
   });
-  const edge = art === 'noren' ? '#ffd98a' : art === 'senryo' ? '#ffd25c' : '#8a3a2a';
+  const edge = art === 'noren' ? '#ffd98a' : art === 'senryo' || art === 'hyakunen' ? '#ffd25c' : art === 'kinnoren' ? '#fff0b0' : '#8a3a2a';
   sc.PR(x, y, 0.8, h, edge, 0.9);
   sc.PR(x + w - 0.8, y, 0.8, h, edge, 0.9);
 }
@@ -130,7 +156,7 @@ export function drawNameplate(sc: Screen, x: number, y: number, w: number, h: nu
     else sc.panel(x, y, w, h, p.bg, p.border);
     textCol = p.text;
     // 角の飾りにかからないよう、文字を内側から（☆4〜5は飾りが大きいので、さらに内側）
-    pad = p.art && !img ? Math.max(4, h * (p.art === 'senryo' ? 1.15 : p.art === 'hiden' ? 0.6 : 0.3)) : Math.max(3, h * (plate.star >= 4 ? 1.1 : 0.5));
+    pad = p.art && !img ? Math.max(4, h * (p.art === 'senryo' ? 1.15 : p.art === 'hiden' ? 0.6 : p.art === 'hyakunen' ? 0.45 : 0.3)) : Math.max(3, h * (plate.star >= 4 ? 1.1 : 0.5));
   }
   // 明るい文字は縁取りを付けて、絵の上でも読めるように
   const light = textCol !== '#2a1a10';

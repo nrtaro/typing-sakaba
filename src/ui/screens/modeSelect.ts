@@ -91,8 +91,11 @@ export function drawModeSelect(g: Game) {
         sc.T(line, x + w / 2, y + 118, sc.fitSize(line, 8, w - 30, 6), '#d9e4cf', 'center');
       } else if (i === 2) {
         const m = g.runUI.meta;
-        sc.T(`のれん${m.loop}枚目${m.active ? '（途中）' : ''}`, x + w / 2, y + 96, 9, '#f2efe2', 'center');
-        sc.T(`3分×4日・目標 ${goalFor(0, m.loop, 'joren').toLocaleString()}円から`, x + w / 2, y + 111, sc.fitSize(`3分×4日・目標 ${goalFor(0, m.loop, 'joren').toLocaleString()}円から`, 7.5, w - 30, 5.5), '#d9e4cf', 'center');
+        // 途中の挑戦があればその枚数、なければ次に挑む枚数（入口で選べる）
+        const loop = m.active?.loop ?? m.pick;
+        sc.T(`のれん${loop}枚目${m.active ? '（途中）' : ''}`, x + w / 2, y + 96, 9, '#f2efe2', 'center');
+        const goal = `3分×4日・目標 ${goalFor(0, loop, 'joren').toLocaleString()}円から`;
+        sc.T(goal, x + w / 2, y + 111, sc.fitSize(goal, 7.5, w - 30, 5.5), '#d9e4cf', 'center');
         sc.T(`クリア ${m.clears}回`, x + w / 2, y + 124, 7.5, '#d9e4cf', 'center');
       } else {
         const date = jstDate();

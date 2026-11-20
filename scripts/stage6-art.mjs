@@ -20,6 +20,8 @@ const PLATES = {
   'plates-4': ['ginzaiku', 'momijinishiki', 'yoiyami', 'yonkyaku', 'kinpaku', 'niji'],
   // 繁盛記の限定（docs/hanjoki-plate-prompts.md）
   'plates-run': ['hanjofuda', 'senryobako', 'hidencho'],
+  // のれんの節目（2026-11-20 に組み込み。元画像がないときは飛ばす）
+  'plates-run2': ['kinnoren', 'hyakunen'],
 };
 /** 家族の毎日の 7〜9 枚目は、描き直した別の画像を使う */
 /** [画像, 書き出すID, 列数, 段数]。シールは並びのマス目ごとに、そのマスに中心があるかけらをまとめて1枚にする */
@@ -128,6 +130,7 @@ for (const dir of ['plates', 'stickers', 'sheets']) {
 
 const report = [];
 for (const [name, ids] of Object.entries(PLATES)) {
+  if (!existsSync(`${SRC}/${name}.webp`) && !existsSync(`${SRC}/${name}.png`)) { report.push(`${name}：元画像がないので飛ばしました`); continue; }
   const img = await load(name);
   clearBackground(img);
   const found = readingOrder(merge(blobs(img, 2000), 4));
