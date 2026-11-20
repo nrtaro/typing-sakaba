@@ -7,6 +7,7 @@ import { NORMAL_RULES } from '../src/core/daily';
 import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, REFILL_EAT, SETS, SET_BONUS, setKey, descDiff, descOf, emptyMods, modsFor, pairBonus, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
   AIDS, GOAL_BASE, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
+  DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
   loopEveryMult, loopGoalMult, loopWaitMult, newRun, offersFor, readMeta, roadOffers, takeRoad, trialMods, trialsFor, walkMult,
 } from '../src/core/run';
 import { emptyBuildStats, HEAT_GAP } from '../src/core/build';
@@ -463,16 +464,35 @@ describe('進行', () => {
       expect(dayDifficulty(3, loop).everyMult).toBeGreaterThan(0.39);
     }
     expect(loopGoalMult(1)).toBe(1);
-    // 売上の目標のほかにも、営業そのものが難しくなる：お客の足・献立・ミスの猶予・せっかちな客・減点・調達
+    // 売上の目標のほかにも、営業そのものが難しくなる。新しい試練は1枚に1つずつ（段差を急にしない）
     expect(trialsFor(1)).toHaveLength(0);
-    expect(trialsFor(6).length).toBe(6);
+    for (let l = 2; l <= 7; l++) expect(trialsFor(l)).toHaveLength(l - 1);
     expect(walkMult(1)).toBe(1);
     expect(walkMult(3)).toBeGreaterThan(walkMult(2));
-    expect(trialMods(2).dishShift).toBe(1);
-    expect(dayDifficulty(0, 3).comboMissAllowance).toBe(1);
-    expect(trialMods(4).impatient).toBeGreaterThan(0);
-    expect(trialMods(50).angryMult).toBe(47);
-    expect(trialMods(50).tripMult).toBeCloseTo(0.6);
+    expect(trialMods(2).dishShift).toBe(0);
+    expect(trialMods(3).dishShift).toBe(1);
+    expect(trialMods(DISH_SHIFT2_LOOP).dishShift).toBe(2);
+    expect(dayDifficulty(0, STRICT_MISS_LOOP - 1).comboMissAllowance).toBe(2);
+    expect(dayDifficulty(0, STRICT_MISS_LOOP).comboMissAllowance).toBe(1);
+    expect(trialMods(3).impatient).toBe(0);
+    expect(trialMods(4).impatient).toBeCloseTo(0.1);
+    // 試練の数字は TRIAL_STOP_LOOP 枚目で止まる（罰が重くなりすぎない）。目標だけは伸び続ける
+    for (const l of [TRIAL_STOP_LOOP, 50, 100000]) {
+      expect(trialMods(l)).toEqual(trialMods(TRIAL_STOP_LOOP));
+    }
+    expect(trialMods(TRIAL_STOP_LOOP).angryMult).toBe(6);
+    expect(trialMods(TRIAL_STOP_LOOP).tripMult).toBeCloseTo(0.8);
+    expect(trialMods(TRIAL_STOP_LOOP).walkMult).toBeCloseTo(2.08);
+    expect(trialMods(TRIAL_STOP_LOOP).impatient).toBeCloseTo(0.4);
+    // のれんの目標の伸びは、方針のそろっていない1日目・2日目には小さく効き、3・4日目にはそのまま効く
+    for (const l of [1, 2, 8, 30]) {
+      expect(dayGoalMult(3, l)).toBeCloseTo(loopGoalMult(l));
+      expect(dayGoalMult(2, l)).toBeCloseTo(loopGoalMult(l));
+      expect(dayGoalMult(0, l)).toBeCloseTo(1 + (loopGoalMult(l) - 1) * DAY_LOOP_WEIGHT[0]);
+      expect(dayGoalMult(0, l)).toBeLessThanOrEqual(dayGoalMult(1, l));
+    }
+    expect(goalFor(0, 8, 'joren')).toBe(13400);
+    expect(goalFor(3, 8, 'joren')).toBe(169600);
     // 1日目はゆるく、4日目がいちばんきつい
     expect(GOAL_BASE[3] / GOAL_BASE[0]).toBeGreaterThanOrEqual(6);
     expect(GOAL_BASE).toHaveLength(RUN_DAYS);

@@ -430,7 +430,8 @@ export class RunUI {
     this.tip(sc, x, y, 22, 21, policyTip(o.id, o.lv, owned));
   }
 
-  private build(sc: Screen, x: number, y: number, owned: Owned[], label = true) {
+  /** right：案内文が収まる右端（はみ出すときは2行に折り返す） */
+  private build(sc: Screen, x: number, y: number, owned: Owned[], label = true, right = LW - 8) {
     const text = `いまの方針 ${owned.length}/${MAX_SLOTS}`;
     if (label) sc.T(text, x, y + 6, 8, C.cream);
     const x0 = x + (label ? sc.W(text, 8) + 8 : 0);
@@ -438,7 +439,12 @@ export class RunUI {
       if (owned[i]) this.seal(sc, x0 + i * 25, y, owned[i], 1, owned);
       else sc.panel(x0 + i * 25, y, 22, 21, 'rgba(20,14,18,0.6)', '#4a3a44');
     }
-    if (label && owned.length) sc.T('マウスを乗せると効果', x0 + MAX_SLOTS * 25 + 4, y + 7, 7.5, C.gray);
+    if (label && owned.length) {
+      const hx = x0 + MAX_SLOTS * 25 + 4;
+      const hint = 'マウスを乗せると効果';
+      if (hx + sc.W(hint, 7.5) <= right) sc.T(hint, hx, y + 7, 7.5, C.gray);
+      else { sc.T('マウスを', hx, y + 2, 7.5, C.gray); sc.T('乗せると効果', hx, y + 11, 7.5, C.gray); }
+    }
   }
 
   /** 打つ言葉の札 */
@@ -534,7 +540,7 @@ export class RunUI {
     drawSignboard(g, 150, 4, 180, 36);
     sc.TB(RUN_NAME, LW / 2, 9, 18, '#ffd98a', 'center', '#3a1408');
     sc.T('方針を選んで店を育てる四日間', LW / 2, 29, 8, '#f3dcb0', 'center');
-    sc.panel(18, 46, 270, 156, 'rgba(36,23,14,0.95)', '#8a6232');
+    sc.panel(18, 46, 270, 160, 'rgba(36,23,14,0.95)', '#8a6232');
     const lines: [string, Color][] = [
       ['朝・昼・夜に「方針」を1つ選んで、店を育てる。', C.cream],
       ['毎日の売上目標に届かないと、そこで店じまい。', C.cream],
@@ -550,7 +556,7 @@ export class RunUI {
       const sofar = `ここまでの売上 ${yen(runTotal(run))}${run.aid > 0 ? '・常連の見舞いつき' : ''}`;
       sc.T(sofar, 28, 121, sc.fitSize(sofar, 8, 252, 6), C.cream);
       if (run.aid > 0) this.tip(sc, 28, 120, 252, 10, this.aidTip(run.aid));
-      this.build(sc, 28, 133, run.owned);
+      this.build(sc, 28, 133, run.owned, true, 284);
     } else {
       sc.T(`つぎの挑戦：のれん${m.loop}枚目`, 28, 108, 10, C.gold3);
       const goals = `1日ごとの目標 ${Array.from({ length: RUN_DAYS }, (_, d) => goalFor(d, m.loop, 'joren').toLocaleString()).join(' → ')}円`;
@@ -563,25 +569,28 @@ export class RunUI {
     }
     // のれんの試練（マウスを乗せると内容）
     const trials = trialsFor(loop);
-    const ty = run ? 160 : 150;
+    const ty = run ? 157 : 150;
     sc.T(trials.length ? `のれん${loop}枚目の試練` : '試練：2枚目から、営業そのものも難しくなる', 28, ty, 8, trials.length ? '#ff9a8a' : C.gray);
+    // 札が枠に入りきらないときは、次の行へ折り返す
     let tx = 28;
+    let rowY = ty + 11;
     trials.forEach((t) => {
-      const w = sc.W(t.name, 7.5) + 8;
-      sc.panel(tx, ty + 11, w, 12, '#3a1418', '#c06060');
-      sc.T(t.name, tx + 4, ty + 13, 8, '#ffb0a0');
-      this.tip(sc, tx, ty + 11, w, 12, { title: `試練「${t.name}」`, col: '#ff9a8a', lines: [{ t: t.text(loop), col: C.w }, { t: `のれん${t.from}枚目から` }] });
+      const w = sc.W(t.name, 8) + 8;
+      if (tx > 28 && tx + w > 280) { tx = 28; rowY += 14; }
+      sc.panel(tx, rowY, w, 12, '#3a1418', '#c06060');
+      sc.T(t.name, tx + 4, rowY + 2, 8, '#ffb0a0');
+      this.tip(sc, tx, rowY, w, 12, { title: `試練「${t.name}」`, col: '#ff9a8a', lines: [{ t: t.text(loop), col: C.w }, { t: `のれん${t.from}枚目から` }] });
       tx += w + 3;
     });
     // 常連のおまけ：挑戦をまたいで残る、小さな助け
     const perks = PERKS.filter((p) => m.daysCleared >= p.at);
     const next = PERKS.find((p) => m.daysCleared < p.at);
-    const py = ty + (trials.length ? 27 : 13);
+    const py = trials.length ? rowY + 16 : ty + 13;
     const ptext = `常連のおまけ ${perks.length}/${PERKS.length}${next ? `（つぎは、目標突破があと${next.at - m.daysCleared}日）` : ''}`;
     sc.T(ptext, 28, py, sc.fitSize(ptext, 8, 252, 6), perks.length ? '#a9f0e4' : C.gray);
     this.tip(sc, 28, py - 1, 252, 10, { title: '常連のおまけ', col: '#a9f0e4', lines: [{ t: '目標を越えた日の数で増える、次の挑戦からずっと効く小さな助け。方針とちがって、選ばなくても付く。', col: C.w }, ...PERKS.map((p) => ({ t: `${m.daysCleared >= p.at ? '◆' : '◇'}${p.name}（${p.at}日）：${p.text}` }))] });
     // 右：これまでの記録
-    sc.panel(296, 46, 166, 156, '#22322a', '#6b4422');
+    sc.panel(296, 46, 166, 160, '#22322a', '#6b4422');
     sc.T('これまでの記録', 379, 52, 9, '#f2efe2', 'center');
     const rows: [string, string][] = [
       ['クリア', `${m.clears}回`], ['挑戦', `${m.runs}回`], ['最高の合計', m.best.total ? yen(m.best.total) : '―'], ['1日の最高', m.best.day ? yen(m.best.day) : '―'],

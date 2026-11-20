@@ -40,29 +40,36 @@ export function loopWaitMult(loop: number) {
 
 /**
  * のれんの試練：枚数が増えると、売上の目標だけでなく営業そのものが難しくなる（重なっていく）。
- * お客の足は1枚ごとに速くなり、決まった枚数から新しい試練が加わる。数で伸びるものは上限なく伸び続ける。
+ * 段差が急にならないよう、新しい試練は1枚に1つずつ加わる（6枚目だけ、献立の強まりも重なる）。
+ * 試練の数字は TRIAL_STOP_LOOP 枚目で止まり、その先は目標だけが伸びる（減点などの罰が重くなりすぎないように）。
  */
 export interface Trial { from: number; name: string; text: (loop: number) => string }
+/** 試練の数字が伸びるのを止める枚数 */
+export const TRIAL_STOP_LOOP = 10;
+/** 献立が2時間帯早まる（夜の料理が朝から出る）枚数／コンボのミス猶予が1減る枚数 */
+export const DISH_SHIFT2_LOOP = 6;
+export const STRICT_MISS_LOOP = 5;
+const grown = (loop: number) => Math.min(TRIAL_STOP_LOOP, Math.max(1, loop));
 export const TRIALS: Trial[] = [
-  { from: 2, name: '早い足', text: (l) => `お客の歩く速さ×${walkMult(l).toFixed(2)}（1枚ごとに速くなる）` },
-  { from: 2, name: '背伸びの献立', text: (l) => (l >= 4 ? '夜の料理まで、朝から注文される' : '手のかかる料理が、ひとつ早い時間帯から出る') },
-  { from: 3, name: '目の肥えた客', text: () => 'コンボが切れるまでのミスが1回減る' },
-  { from: 4, name: 'せっかちな客', text: (l) => `お客の${Math.round(impatient(l) * 100)}%は、待ち時間が6割しかない` },
-  { from: 5, name: '評判の重み', text: (l) => `怒って帰ったときの減点が${angryMult(l)}倍（1枚ごとに増える）` },
-  { from: 6, name: '品薄', text: (l) => `調達で持ち帰る素材が${Math.round((1 - tripTrial(l)) * 100)}%減る` },
+  { from: 2, name: '早い足', text: (l) => `お客の歩く速さ×${walkMult(l).toFixed(2)}（${TRIAL_STOP_LOOP}枚目まで、1枚ごとに速くなる）` },
+  { from: 3, name: '背伸びの献立', text: (l) => (l >= DISH_SHIFT2_LOOP ? '夜の料理まで、朝から注文される' : `手のかかる料理が、ひとつ早い時間帯から出る（${DISH_SHIFT2_LOOP}枚目から、夜の料理も朝から）`) },
+  { from: 4, name: 'せっかちな客', text: (l) => `お客の${Math.round(impatient(l) * 100)}%は、待ち時間が6割しかない（${TRIAL_STOP_LOOP}枚目まで増える）` },
+  { from: STRICT_MISS_LOOP, name: '目の肥えた客', text: () => 'コンボが切れるまでのミスが1回減る' },
+  { from: 6, name: '評判の重み', text: (l) => `怒って帰ったときの減点が${angryMult(l)}倍（${TRIAL_STOP_LOOP}枚目まで増える）` },
+  { from: 7, name: '品薄', text: (l) => `調達で持ち帰る素材が${Math.round((1 - tripTrial(l)) * 100)}%減る（${TRIAL_STOP_LOOP}枚目まで増える）` },
 ];
-export const walkMult = (loop: number) => Math.min(3, 1 + 0.12 * (Math.max(1, loop) - 1));
-const impatient = (loop: number) => (loop >= 4 ? Math.min(0.6, 0.2 + 0.05 * (loop - 4)) : 0);
-const angryMult = (loop: number) => (loop >= 5 ? loop - 3 : 1);
-const tripTrial = (loop: number) => (loop >= 6 ? Math.max(0.6, 1 - 0.05 * (loop - 5)) : 1);
+export const walkMult = (loop: number) => 1 + 0.12 * (grown(loop) - 1);
+const impatient = (loop: number) => (loop >= 4 ? 0.1 + 0.05 * (grown(loop) - 4) : 0);
+const angryMult = (loop: number) => (loop >= 6 ? grown(loop) - 4 : 1);
+const tripTrial = (loop: number) => (loop >= 7 ? 1 - 0.05 * (grown(loop) - 6) : 1);
 export const trialsFor = (loop: number) => TRIALS.filter((t) => loop >= t.from);
 export function trialMods(loop: number): Partial<BuildMods> {
-  return { walkMult: walkMult(loop), dishShift: loop >= 4 ? 2 : loop >= 2 ? 1 : 0, impatient: impatient(loop), angryMult: angryMult(loop), tripMult: tripTrial(loop) };
+  return { walkMult: walkMult(loop), dishShift: loop >= DISH_SHIFT2_LOOP ? 2 : loop >= 3 ? 1 : 0, impatient: impatient(loop), angryMult: angryMult(loop), tripMult: tripTrial(loop) };
 }
 
 export function dayDifficulty(day: number, loop: number): Difficulty {
   const d = Math.max(0, Math.min(RUN_DAYS - 1, day));
-  return { ...difficultyOf('normal'), comboMissAllowance: loop >= 3 ? 1 : 2, everyMult: DAY_EVERY[d] * loopEveryMult(loop), waitMult: DAY_WAIT[d] * loopWaitMult(loop) };
+  return { ...difficultyOf('normal'), comboMissAllowance: loop >= STRICT_MISS_LOOP ? 1 : 2, everyMult: DAY_EVERY[d] * loopEveryMult(loop), waitMult: DAY_WAIT[d] * loopWaitMult(loop) };
 }
 
 // ---------- 道中：明日の営業をえらぶ ----------
@@ -122,9 +129,21 @@ export function roadOffers(seed: number, day: number): Road[] {
   return [...out.slice(k), ...out.slice(0, k)];
 }
 
+/**
+ * のれんの目標の伸びが、その日にどれだけ効くか（1日目・2日目・3日目・4日目）。
+ * 方針がそろっていない序盤は軽く、そろった終盤に重くする。高いのれんほど「打つ速さ」より「組んだ店の強さ」で決まるように
+ */
+export const DAY_LOOP_WEIGHT = [0.4, 0.5, 1, 1];
+
+/** その日の目標の、のれんによる倍率（1日目・2日目は伸びが小さい） */
+export function dayGoalMult(day: number, loop: number) {
+  const d = Math.max(0, Math.min(RUN_DAYS - 1, day));
+  return 1 + (loopGoalMult(loop) - 1) * DAY_LOOP_WEIGHT[d];
+}
+
 export function goalFor(day: number, loop: number, road: RoadId) {
   const d = Math.max(0, Math.min(RUN_DAYS - 1, day));
-  return Math.round((GOAL_BASE[d] * loopGoalMult(loop) * roadOf(road).goalMult) / 100) * 100;
+  return Math.round((GOAL_BASE[d] * dayGoalMult(d, loop) * roadOf(road).goalMult) / 100) * 100;
 }
 
 // ---------- ランの状態 ----------
