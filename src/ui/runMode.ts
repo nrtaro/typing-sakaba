@@ -1098,7 +1098,7 @@ export class RunUI {
     const available = availablePolicies(this.meta);
     const near = PAIRS.find((p) => has(p.a) !== has(p.b) && available.includes(has(p.a) ? p.b : p.a) && !pairs.includes(pairKey(p.a, p.b)));
     if (near) return `次は「${policyOf(has(near.a) ? near.b : near.a).name}」を足すと『${near.name}』になる`;
-    if (owned.some((o) => o.lv < MAX_LEVEL)) return '広げすぎず、かけ合わせの2つを最大まで育てると伸びる';
+    if (owned.some((o) => o.lv < MAX_LEVEL)) return '同じ皿に効く方針を重ねて育てると、倍率が掛け算で伸びる';
     return '明日の営業は、目標の軽い日を選ぶ手もある';
   }
 

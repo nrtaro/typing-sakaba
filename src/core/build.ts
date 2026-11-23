@@ -93,7 +93,7 @@ export const POLICIES: Policy[] = [
   {
     id: 'matome', name: 'まとめ出し', kana: 'まとめだし', family: 'chain', fires: true, starter: true,
     quip: '「ついでだ、そっちの卓も持ってけ」',
-    text: '料理を出すと、同じ主素材（札の左端の素材）の注文も{0}件いっしょに出る。ついでの皿も、その皿の条件で売上を数える（打った腕前の倍率は打った皿だけ）',
+    text: '料理を出すと、同じ主素材（札の左端の素材）の注文も{0}件いっしょに出る。ついでの皿も割引なし',
     vals: v1(CHAIN, s),
   },
   {

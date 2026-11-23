@@ -1,5 +1,7 @@
 // 繁盛記：1皿の倍率の掛け算と上限
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { descOf } from '../src/core/build';
 import { MULT_CAP, PREVIEW_GOLD, PREVIEW_SILVER, previewTier, priceOf } from '../src/core/dishPrice';
 
 describe('1皿の倍率', () => {
@@ -23,5 +25,15 @@ describe('札の予告', () => {
     expect(PREVIEW_SILVER).toBe(3);
     expect(PREVIEW_GOLD).toBe(10);
     expect([2.99, 3, 9.99, 10, 30].map(previewTier)).toEqual(['none', 'silver', 'silver', 'gold', 'gold']);
+  });
+});
+
+describe('説明文は新しい決まり（掛け算・かけ合わせは発見だけ）と合う', () => {
+  it('かけ合わせ・型で売上が増える・足される、と言う文が残っていない', () => {
+    const src = ['src/ui/hover.ts', 'src/ui/screens/help.ts', 'src/ui/runMode.ts'].map((p) => readFileSync(p, 'utf8')).join('\n');
+    for (const old of ['そのぶん足される', '「型」で売上が大きく増える', 'かけ合わせの2つを最大まで育てると伸びる']) expect(src).not.toContain(old);
+  });
+  it('まとめ出しの効果の文は、入れ替えの画面に収まる長さ（前と同じ50字以内）', () => {
+    for (const lv of [1, 2, 3]) expect([...descOf('matome', lv)].length).toBeLessThanOrEqual(50);
   });
 });

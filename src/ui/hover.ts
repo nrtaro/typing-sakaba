@@ -84,7 +84,6 @@ export function pairTip(key: string): Tip | null {
     lines: [
       { t: pairText(p), col: C.w },
       { t: '売上は変わらない。見つけるとずかんに残る' },
-      { t: 'いくつも重なると、そのぶん足される', col: '#8fb8a8' },
     ],
   };
 }
