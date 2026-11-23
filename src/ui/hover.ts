@@ -67,7 +67,6 @@ export function policyTip(id: PolicyId, lv: number, owned: Owned[] = []): Tip {
   const has = (q: PolicyId) => owned.some((o) => o.id === q);
   const lines: Tip['lines'] = [{ t: descOf(id, lv), col: C.w }];
   if (lv < MAX_LEVEL) lines.push({ t: `つぎの段階：${descOf(id, lv + 1)}`, col: '#b8a0b0' });
-  lines.push({ t: p.fires ? '皿ごとに効く方針' : '店全体に、いつも効く方針', col: '#8fb8a8' });
   const partners = partnersOf(id);
   if (partners.length) lines.push({ t: `かけ合わせの相手：${partners.map((q) => `${has(q) ? '◆' : '◇'}${policyOf(q).name}`).join(' ')}`, col: '#ffe9b4' });
   const sets = SETS.filter((x) => x.ids.includes(id));

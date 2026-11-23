@@ -1205,9 +1205,8 @@ export class RunUI {
         y += this.rich(sc, descAll(p.id), X, y, 8, W, C.cream, '#fff0a8', 1, 10.5) * 10.5 + 2;
         sc.T('色の付いた数字は Lv1→Lv2→Lv3', X, y, 8, '#b8a0b0');
         y += 12;
-        sc.T(p.fires ? '皿ごとに効く方針' : '店全体に、いつも効く方針', X, y, 8, '#8fb8a8');
         const partners = PAIRS.filter((q) => q.a === p.id || q.b === p.id);
-        this.para(sc, `かけ合わせ：${partners.map((q) => (m.discovered.includes(pairKey(q.a, q.b)) ? `『${q.name}』` : `${policyOf(q.a === p.id ? q.b : q.a).name}と…`)).join(' ')}`, X, y + 11, 8, W, '#ffe9b4', 1, 9);
+        this.para(sc, `かけ合わせ：${partners.map((q) => (m.discovered.includes(pairKey(q.a, q.b)) ? `『${q.name}』` : `${policyOf(q.a === p.id ? q.b : q.a).name}と…`)).join(' ')}`, X, y, 8, W, '#ffe9b4', 1, 9);
       } else this.para(sc, `解放の条件：${p.unlock}`, X, 80, 8.5, W, C.cream);
     } else {
       const loop = this.run?.loop ?? m.pick;

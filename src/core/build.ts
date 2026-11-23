@@ -24,8 +24,6 @@ export interface Policy {
   /** 効果の文。{0} {1} に段階ごとの値（vals）が入る */
   text: string;
   vals: [string[], string[], string[]];
-  /** 皿ごとに効く方針か（false は店全体にいつも効く方針。かけ合わせでは「持っているだけ」で数える） */
-  fires: boolean;
   /** 最初から選べるか（false は解放が要る） */
   starter: boolean;
   /** 解放の条件の説明 */
@@ -115,121 +113,121 @@ const s = (x: number) => String(x);
 
 export const POLICIES: Policy[] = [
   {
-    id: 'matome', name: 'まとめ出し', kana: 'まとめだし', family: 'chain', fires: true, starter: true,
+    id: 'matome', name: 'まとめ出し', kana: 'まとめだし', family: 'chain', starter: true,
     quip: '「ついでだ、そっちの卓も持ってけ」',
     text: '料理を出すと、同じ主素材（札の左端の素材）の注文も{0}件いっしょに出る。ついでの皿も割引なし',
     vals: v1(CHAIN, s),
   },
   {
-    id: 'betsubara', name: 'しめは別腹', kana: 'べつばら', family: 'guest', fires: true, starter: true,
+    id: 'betsubara', name: 'しめは別腹', kana: 'べつばら', family: 'guest', starter: true,
     quip: '「さっき食べたのは前菜です」',
     text: 'お客の{0}が、食べたあとにもう1品たのむ。その2品目は売上×{1}',
     vals: v2(REFILL_CHANCE, REFILL_MULT, pct, s),
   },
   {
-    id: 'ryoshusho', name: '領収書はいらない', kana: 'りょうしゅうしょ', family: 'combo', fires: true, starter: true,
+    id: 'ryoshusho', name: '領収書はいらない', kana: 'りょうしゅうしょ', family: 'combo', starter: true,
     quip: '「勢いで払う客は、勢いで出す店に来る」',
     text: 'コンボで売上が増える倍率（10コンボごとに+0.5）の上限が、×2から×{0}に。コンボが切れるまでのミス{1}',
     vals: L([s(COMBO_CAP[0]), 'は今のまま'], [s(COMBO_CAP[1]), 'が+1回'], [s(COMBO_CAP[2]), 'が+1回']),
   },
   {
-    id: 'nushi', name: 'さっきのヌシ', kana: 'ぬし', family: 'trip', fires: true, starter: true,
+    id: 'nushi', name: 'さっきのヌシ', kana: 'ぬし', family: 'trip', starter: true,
     quip: '「本日のおすすめ：さっき捕ったやつ」',
     text: '調達から帰って{0}秒のあいだ「とれたて」。そのあいだは全部の皿が売上×{1}',
     vals: v2(FRESH_SECS, FRESH_MULT, s, s),
   },
   {
-    id: 'tairyo', name: '大漁旗', kana: 'たいりょうばた', family: 'trip', fires: false, starter: true,
+    id: 'tairyo', name: '大漁旗', kana: 'たいりょうばた', family: 'trip', starter: true,
     quip: '「かごが足りん。舟ごと持って帰る」',
     text: '調達で持ち帰る素材が×{0}。主素材が8個以上ある皿は売上×{1}',
     vals: v2(TRIP_MULT, PLENTY_MULT, s, s),
   },
   {
-    id: 'mie', name: 'おやじの見栄', kana: 'みえ', family: 'stock', fires: true, starter: true,
+    id: 'mie', name: 'おやじの見栄', kana: 'みえ', family: 'stock', starter: true,
     quip: '「残り少ない？ なら値打ちもんだ」',
     text: '残っている素材のうち、一番少ない素材を使う皿は売上×{0}（0個の素材は数えない）',
     vals: v1(LOW_MULT, s),
   },
   {
-    id: 'sekkachi', name: '待たせない店', kana: 'またせない', family: 'combo', fires: true, starter: true,
+    id: 'sekkachi', name: '待たせない店', kana: 'またせない', family: 'combo', starter: true,
     quip: '「座る前に出てきたんだが」',
     text: '待ち時間が7割以上残っているお客の皿は売上×{0}',
     vals: v1(QUICK_MULT, s),
   },
   {
-    id: 'mouippai', name: 'とりあえずもう一杯', kana: 'もういっぱい', family: 'guest', fires: true, starter: true,
+    id: 'mouippai', name: 'とりあえずもう一杯', kana: 'もういっぱい', family: 'guest', starter: true,
     quip: '「頼んでないけど、飲む」',
     text: '酒以外の料理に酒を1杯付けた皿は売上×{0}（酒を1つ使う）',
     vals: v1(ALE_MULT, s),
   },
   {
-    id: 'oomori', name: '大盛り上等', kana: 'おおもり', family: 'stock', fires: true, starter: false, unlock: '2日目の目標を突破する',
+    id: 'oomori', name: '大盛り上等', kana: 'おおもり', family: 'stock', starter: false, unlock: '2日目の目標を突破する',
     quip: '「並？ うちにそんな量はない」',
     text: 'お客の{0}が「大盛り」をたのむ。大盛りは素材を2倍使い、売上×{1}',
     vals: v2(BIG_CHANCE, BIG_MULT, pct, s),
   },
   {
-    id: 'yobikomi', name: '呼び込み上手', kana: 'よびこみ', family: 'guest', fires: false, starter: true,
+    id: 'yobikomi', name: '呼び込み上手', kana: 'よびこみ', family: 'guest', starter: true,
     quip: '「通りすがりも、気づけば座ってる」',
     text: 'お客が{0}多く来る。8席が埋まっているあいだは全部の皿が売上×{1}',
     vals: v2(GUESTS, FULL_MULT, pct, s),
   },
   {
-    id: 'makanai', name: 'まかない名人', kana: 'まかない', family: 'stock', fires: true, starter: false, unlock: 'かけ合わせを3種類見つける',
+    id: 'makanai', name: 'まかない名人', kana: 'まかない', family: 'stock', starter: false, unlock: 'かけ合わせを3種類見つける',
     quip: '「切れ端で一品。原価は聞くな」',
     text: '料理を出すとき、{0}の確率で素材が減らない。減らなかった皿は売上×{1}',
     vals: v2(SAVE, SAVE_MULT, pct, s),
   },
   {
-    id: 'ooiri', name: '大入り袋', kana: 'おおいり', family: 'combo', fires: true, starter: false, unlock: '繁盛記で30コンボを出す',
+    id: 'ooiri', name: '大入り袋', kana: 'おおいり', family: 'combo', starter: false, unlock: '繁盛記で30コンボを出す',
     quip: '「袋が配りきれん。もう投げろ」',
     text: 'コンボを切らさずに10皿出すごとに{0}秒の「大入り」。そのあいだは全部の皿が売上×{1}',
     vals: v2(FEVER_SECS, FEVER_MULT, s, s),
   },
   {
-    id: 'aiso', name: '看板娘の愛想', kana: 'あいそ', family: 'guest', fires: false, starter: true,
+    id: 'aiso', name: '看板娘の愛想', kana: 'あいそ', family: 'guest', starter: true,
     quip: '「怒る気が、どこかへ行った」',
     text: 'お客が{0}長く待ち、怒って帰っても{1}。待ち時間が半分を切ったお客の皿は売上×{2}',
     vals: L([pct(WAIT[0]), '減点なし', s(LATE_MULT[0])], [pct(WAIT[1]), '減点なし', s(LATE_MULT[1])], [pct(WAIT[2]), '減点なし・コンボも続く', s(LATE_MULT[2])]),
   },
   {
-    id: 'shikomi', name: 'こまめな仕込み', kana: 'しこみ', family: 'stock', fires: false, starter: true,
+    id: 'shikomi', name: 'こまめな仕込み', kana: 'しこみ', family: 'stock', starter: true,
     quip: '「手が空いたら刻め。空いてなくても刻め」',
     text: `朝・昼・夜が始まるたびに全部の素材が+{0}。始まって${PREP_SECS}秒は全部の皿が売上×{1}`,
     vals: v2(STOCK, PREP_MULT, s, s),
   },
   {
-    id: 'yoyaku', name: '予約のみ', kana: 'よやく', family: 'combo', fires: false, starter: true,
+    id: 'yoyaku', name: '予約のみ', kana: 'よやく', family: 'combo', starter: true,
     quip: '「本日は、ご予約のお客様だけ」',
     text: 'お客が{0}減る。かわりに全部の皿が売上×{1}、1皿出すとコンボが{2}進む',
     vals: L([pct(FEWER[0]), s(YOYAKU_MULT[0]), String(COMBO_PLUS[0] + 1)], [pct(FEWER[1]), s(YOYAKU_MULT[1]), String(COMBO_PLUS[1] + 1)], [pct(FEWER[2]), s(YOYAKU_MULT[2]), String(COMBO_PLUS[2] + 1)]),
   },
   {
-    id: 'omotenashi', name: 'おもてなし', kana: 'おもてなし', family: 'guest', fires: true, starter: true,
+    id: 'omotenashi', name: 'おもてなし', kana: 'おもてなし', family: 'guest', starter: true,
     quip: '「ごゆっくり。ほんとうに、ごゆっくり」',
     text: `前の皿から${IDLE_MIN}秒以上あけて打った皿は売上×{0}（ついでの皿には付かない）`,
     vals: v1(IDLE_MULT, s),
   },
   {
-    id: 'ippatsu', name: '一発勝負', kana: 'いっぱつ', family: 'combo', fires: true, starter: true,
+    id: 'ippatsu', name: '一発勝負', kana: 'いっぱつ', family: 'combo', starter: true,
     quip: '「打ち直した皿は、出せん」',
     text: `ミスなしで打ち切った皿は売上×{0}。ミスした言葉で出した皿は×${IPPATSU_MISS}（打った皿だけ）`,
     vals: v1(IPPATSU, s),
   },
   {
-    id: 'netsu', name: '連打の熱', kana: 'ねつ', family: 'combo', fires: true, starter: true,
+    id: 'netsu', name: '連打の熱', kana: 'ねつ', family: 'combo', starter: true,
     quip: '「手が止まったら、熱が逃げる」',
     text: `前に打って出した皿から${HEAT_GAP}秒以内に出すと、売上の倍率が+${HEAT_STEP}ずつ上がる（上限×{0}。ミスすると熱が半分に、${HEAT_GAP}秒あくと元に戻る。打った皿だけ）`,
     vals: v1(HEAT_CAP, s),
   },
   {
-    id: 'asaichi', name: '朝市', kana: 'あさいち', family: 'trip', fires: false, starter: true,
+    id: 'asaichi', name: '朝市', kana: 'あさいち', family: 'trip', starter: true,
     quip: '「いいものは、日の出と一緒に売り切れる」',
     text: `朝に出かけた調達は持ち帰りが×{0}（昼と夜は×${LATE_TRIP}）。朝の皿は売上×{1}`,
     vals: v2(MORNING_TRIP, MORNING_MULT, s, s),
   },
   {
-    id: 'encho', name: '延長営業', kana: 'えんちょう', family: 'combo', fires: false, starter: true,
+    id: 'encho', name: '延長営業', kana: 'えんちょう', family: 'combo', starter: true,
     quip: '「のれんは、勢いが止まるまで下ろさない」',
     text: `閉店の時点でコンボが${ENCHO_COMBO}以上なら、営業が{0}秒延びる（1日1回）。延長のあいだは全部の皿が売上×{1}`,
     vals: v2(EXTEND, EXTEND_MULT, s, s),
@@ -284,7 +282,7 @@ export const FAMILY_NAME: Record<Family, string> = { chain: '連鎖', combo: '�
 
 /**
  * 名前の付いたかけ合わせ。2つがそろって、その皿に効いたときに「発見」として記録する（売上は変えない）。
- * 皿ごとに効く方針（fires）は「その皿に効いた」こと、店全体に効く方針は「持っている」ことが条件。
+ * 「効いた」は、その皿に倍率（効果）が乗ったこと。持っているだけでは数えない。
  * どの方針にも2つ以上の相手があり、どの系統からでも組める。
  */
 export interface Pair { a: PolicyId; b: PolicyId; name: string }
@@ -327,7 +325,7 @@ export const PAIRS: Pair[] = [
 
 /**
  * 型：決まった3つの方針がそろって、打った皿に効いたときに成立する（売上は変えない。まとめ出しは入らない）。
- * 皿ごとに効く方針はその皿に効いたこと、店全体に効く方針は持っていることが条件。ついでの皿には付かない。
+ * 3つともその皿に効いたことが条件。ついでの皿には付かない。
  */
 export interface FormSet { ids: [PolicyId, PolicyId, PolicyId]; name: string }
 export const SETS: FormSet[] = [
@@ -355,11 +353,7 @@ export function partnersOf(id: PolicyId): PolicyId[] {
 }
 /** かけ合わせの説明（どの2つで、いつ効くか） */
 export function pairText(p: Pair): string {
-  const when = (id: PolicyId) => (policyOf(id).fires ? `「${policyOf(id).name}」が効いた皿` : `「${policyOf(id).name}」を持っている`);
-  const [x, y] = policyOf(p.a).fires ? [p.a, p.b] : [p.b, p.a];
-  return policyOf(y).fires
-    ? `「${policyOf(x).name}」と「${policyOf(y).name}」が同じ皿に効くと、この組を発見`
-    : `${when(y)}と、${when(x)}で、この組を発見`;
+  return `「${policyOf(p.a).name}」と「${policyOf(p.b).name}」が同じ皿に効くと、この組を発見`;
 }
 
 export interface Owned { id: PolicyId; lv: number }
@@ -417,8 +411,6 @@ export interface BuildMods {
   morningMult: number;
   saveMult: number;
   prepMult: number;
-  /** 持っている「店全体に効く方針」（かけ合わせの判定に使う） */
-  passive: PolicyId[];
   /** 持っている方針の段階（かけ合わせの増え方に使う） */
   levels: Partial<Record<PolicyId, number>>;
   /** 一発勝負：ミスなしの皿の倍率（1 は持っていない） */
@@ -437,18 +429,17 @@ export function emptyMods(): BuildMods {
     chain: 0, refillChance: 0, refillMult: 1, comboCap: 2, missAllowance: 0, freshSecs: 0, freshMult: 1,
     tripMult: 1, lowMult: 1, plentyMult: 1, morningMult: 1, saveMult: 1, prepMult: 1, quickMult: 1, yoyakuMult: 1, extendMult: 1, aleMult: 1, fullMult: 1, lateMult: 1, idleMult: 1, bigChance: 0, bigMult: BIG_BASE_MULT, everyMult: 1, saveChance: 0,
     feverSecs: 0, feverMult: 1, waitMult: 1, noAngryPenalty: false, keepCombo: false, startStock: 0, phaseStock: 0,
-    comboPlus: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, passive: [], levels: {},
+    comboPlus: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, levels: {},
     ippatsuMult: 1, heatCap: 1, morningTrip: 1, laterTrip: 1, extendSecs: 0,
   };
 }
 
 /** 持っている方針から、営業への変更を作る（base は日ごとの営業条件と、のれんの試練） */
 export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMods {
-  const m = { ...emptyMods(), ...base, passive: [] as PolicyId[], levels: {} as Partial<Record<PolicyId, number>> };
+  const m = { ...emptyMods(), ...base, levels: {} as Partial<Record<PolicyId, number>> };
   for (const { id, lv } of owned) {
     const i = Math.max(1, Math.min(MAX_LEVEL, lv)) - 1;
     m.levels[id] = i + 1;
-    if (!policyOf(id).fires) m.passive.push(id);
     switch (id) {
       case 'matome': m.chain = CHAIN[i]; break;
       case 'betsubara': m.refillChance += REFILL_CHANCE[i]; m.refillMult = REFILL_MULT[i]; break;
@@ -485,8 +476,10 @@ export function stockGainOnPick(id: PolicyId, from: number, to: number) {
 export interface BuildStats {
   /** 発動タグに配分した直接売上の推計（補給・客数・コンボ進行等の間接効果は含まない） */
   yen: Partial<Record<PolicyId, number>>;
-  /** 方針ごとに効いた回数 */
+  /** 方針ごとに効いた（判子が付いた）回数 */
   fired: Partial<Record<PolicyId, number>>;
+  /** 方針ごとに、倍率（1より大きいもの）が乗った皿の数 */
+  boosted: Partial<Record<PolicyId, number>>;
   /** 1回の入力でいっしょに出た皿の最大（打った1皿を含む） */
   maxChain: number;
   chainServes: number;
@@ -505,5 +498,5 @@ export interface BuildStats {
   maxStack: number;
 }
 export function emptyBuildStats(): BuildStats {
-  return { yen: {}, fired: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0 };
+  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0 };
 }

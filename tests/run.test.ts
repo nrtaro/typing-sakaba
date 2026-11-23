@@ -170,8 +170,6 @@ describe('方針のはたらき', () => {
       for (const q of POLICIES) if (p !== q) expect(q.kana.startsWith(p.kana)).toBe(false);
       expect('ひきなおし'.startsWith(p.kana) || p.kana.startsWith('ひきなおし') || p.kana === 'やめる').toBe(false);
     }
-    // 店全体に効く方針どうしの組は作らない（どちらかは皿に効く）
-    for (const p of PAIRS) expect(policyOf(p.a).fires || policyOf(p.b).fires).toBe(true);
     expect(new Set(PAIRS.map((p) => pairKey(p.a, p.b))).size).toBe(PAIRS.length);
     expect(emptyMods().comboCap).toBe(2);
   });
@@ -617,12 +615,11 @@ describe('一発勝負・連打の熱・朝市・延長営業と、型', () => {
     expect(s.buildStats.sets).toEqual([setKey(SETS[0])]);
   });
 
-  it('型は7つ。どれも3つの方針で、まとめ出しは入らず、皿に効く方針を1つ以上含む。新しい4つにも相手が2つ以上ある', () => {
+  it('型は7つ。どれも3つの方針で、まとめ出しは入らない。新しい4つにも相手が2つ以上ある', () => {
     expect(SETS).toHaveLength(7);
     for (const x of SETS) {
       expect(new Set(x.ids).size).toBe(3);
       expect(x.ids).not.toContain('matome');
-      expect(x.ids.some((id) => policyOf(id).fires)).toBe(true);
     }
     for (const id of ['ippatsu', 'netsu', 'asaichi', 'encho'] as const) expect(partnersOf(id).length).toBeGreaterThanOrEqual(2);
   });
@@ -1074,5 +1071,54 @@ describe('実績と限定の飾り', () => {
     expect(store.creditRun('run:x', 20000)).toBe(0);
     expect(store.loadCollection().coins).toBe(20000);
     expect(store.loadSettings().fxLevel).toBe(1);
+  });
+});
+
+describe('第3段：かけ合わせは効いた皿だけ', () => {
+  const bigGuest = (id: string): Guest => ({ ...guest(id), big: true, bigMult: 3.3, bigFrom: 'policy' });
+
+  it('店全体の方針は持っているだけではかけ合わせにならない（倍率が乗った皿だけ）', () => {
+    const owned = [{ id: 'oomori' as const, lv: 3 }, { id: 'tairyo' as const, lv: 3 }];
+    const low = shopWith(owned, []);
+    low.seats[0] = bigGuest('grilledFish');
+    low.stock.fish = 3;
+    const a = type(low, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (a.type !== 'serve') throw new Error('serve');
+    expect(a.tags).not.toContain('tairyo');
+    expect(low.buildStats.pairs).not.toContain(pairKey('oomori', 'tairyo'));
+    const high = shopWith(owned, []);
+    high.seats[0] = bigGuest('grilledFish');
+    type(high, 'やきざかな');
+    expect(high.buildStats.pairs).toContain(pairKey('oomori', 'tairyo'));
+  });
+
+  it('型も、3つがその皿に効いたときだけ成立する', () => {
+    const owned = [{ id: 'asaichi' as const, lv: 1 }, { id: 'nushi' as const, lv: 1 }, { id: 'tairyo' as const, lv: 1 }];
+    const key = setKey(SETS.find((x) => x.name === '朝駆けの型')!);
+    const low = shopWith(owned, ['grilledFish']);
+    low.freshUntil = 10;
+    low.stock.fish = 3;
+    type(low, 'やきざかな');
+    expect(low.buildStats.sets).not.toContain(key);
+    const high = shopWith(owned, ['grilledFish']);
+    high.freshUntil = 10;
+    type(high, 'やきざかな');
+    expect(high.buildStats.sets).toContain(key);
+  });
+
+  it('倍率が乗った回数は、判子の回数と別に数える', () => {
+    const s = shopWith([{ id: 'ippatsu', lv: 1 }], ['grilledFish', 'vegSoup']);
+    s.key('q');
+    type(s, 'やきざかな');
+    expect(s.buildStats.fired.ippatsu ?? 0).toBe(0);
+    expect(s.buildStats.boosted.ippatsu ?? 0).toBe(0);
+    type(s, 'おんやさいもり');
+    expect(s.buildStats.fired.ippatsu).toBe(1);
+    expect(s.buildStats.boosted.ippatsu).toBe(1);
+    const m = shopWith([{ id: 'makanai', lv: 1 }], ['grilledFish']);
+    m.build!.saveChance = 1;
+    type(m, 'やきざかな');
+    expect(m.buildStats.fired.makanai).toBe(1);
+    expect(m.buildStats.boosted.makanai).toBe(1);
   });
 });

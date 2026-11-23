@@ -2,7 +2,7 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
-import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, PLENTY_AT, PREP_SECS, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, PLENTY_AT, PREP_SECS, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, isPolicy, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
 import { priceOf, type Factor, type Price } from './dishPrice';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
@@ -581,6 +581,7 @@ export class Shop {
       // まかないは、倍率を付けた皿（素材が減らなかった皿）でだけ稼ぎに数える
       const share = tags.filter((t) => t !== 'makanai' || q.factors.some((f) => f.id === 'makanai'));
       for (const t of tags) st.fired[t] = (st.fired[t] ?? 0) + 1;
+      for (const f of q.factors) if (f.mult > 1 && isPolicy(f.id)) st.boosted[f.id] = (st.boosted[f.id] ?? 0) + 1;
       for (const t of share) st.yen[t] = (st.yen[t] ?? 0) + extra / share.length;
       st.bestServe = Math.max(st.bestServe, gain);
     }
@@ -614,7 +615,7 @@ export class Shop {
 
   /**
    * かけ合わせ・型：名前付きの組が同じ皿に効いたら「発見」として記録する（売上は変えない）。
-   * 店全体に効く方針（呼び込み・大漁旗など）は、持っているだけで相手になる。型は打った皿だけ。
+   * 「効いた」は、その皿にタグ（倍率・効果）が付いたこと。持っているだけでは数えない。型は打った皿だけ。
    */
   private recordFinds(ev: ServeEvent, chain: number) {
     const b = this.build;
@@ -624,9 +625,8 @@ export class Shop {
     const hit = (x: PolicyId, y: PolicyId) => { if (pairOf(pairKey(x, y)) && !found.includes(pairKey(x, y))) found.push(pairKey(x, y)); };
     for (let i = 0; i < tags.length; i++) {
       for (let j = i + 1; j < tags.length; j++) hit(tags[i], tags[j]);
-      for (const p of b.passive) hit(tags[i], p);
     }
-    const on = (id: PolicyId) => tags.includes(id) || b.passive.includes(id);
+    const on = (id: PolicyId) => tags.includes(id);
     const setsHit = chain === 0 ? SETS.filter((x) => x.ids.every(on)) : [];
     const st = this.buildStats;
     ev.pairs = found.length;

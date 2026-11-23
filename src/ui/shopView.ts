@@ -984,7 +984,7 @@ export class ShopView {
       const k = hot ? 1 - age / 0.5 : 0;
       const dx = k * 3;
       if (hot) sc.radialGlow(x0 + 11 + dx, y + 10, 16 + k * 8, col, 0.75 * k);
-      sc.panel(x0 + dx, y, 22, 21, hot ? '#3a2430' : 'rgba(34,22,30,0.9)', col, pol.fires ? 1 : 0.8);
+      sc.panel(x0 + dx, y, 22, 21, hot ? '#3a2430' : 'rgba(34,22,30,0.9)', col, 1);
       sc.T(POLICY_SEAL[o.id], x0 + 11 + dx, y + 2 - k * 1.5, 8 + k * 2, hot ? C.w : col, 'center');
       for (let n = 0; n < MAX_LEVEL; n++) sc.PR(x0 + 3 + n * 6 + dx, y + 15, 4, 3, n < o.lv ? col : '#4a3a44');
       // マウスを乗せると効果（営業中も、一時停止中も）
