@@ -1,0 +1,4844 @@
+{
+  "seeds": [
+    11,
+    23,
+    37,
+    41,
+    59,
+    67,
+    83,
+    97
+  ],
+  "rows": [
+    {
+      "strategy": "でたらめ",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        5,
+        3
+      ],
+      "ratio": [
+        172,
+        126,
+        108,
+        62
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.27,
+      "feverShare": 0.01,
+      "blockedSecs": 4,
+      "trips": 4.41
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        6,
+        4
+      ],
+      "ratio": [
+        164,
+        150,
+        116,
+        112
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.18,
+      "feverShare": 0,
+      "blockedSecs": 6,
+      "trips": 5.44
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        5,
+        2
+      ],
+      "ratio": [
+        170,
+        112,
+        118,
+        108
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.34,
+      "bestInputShare": 0.34,
+      "feverShare": 0.02,
+      "blockedSecs": 3,
+      "trips": 4.31
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        6,
+        2
+      ],
+      "ratio": [
+        196,
+        136,
+        93,
+        65
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.17,
+      "bestInputShare": 0.17,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 4.13
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        182,
+        223,
+        124,
+        140
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.17,
+      "bestInputShare": 0.17,
+      "feverShare": 0.07,
+      "blockedSecs": 3,
+      "trips": 4.72
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        4,
+        2
+      ],
+      "ratio": [
+        169,
+        120,
+        95,
+        61
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.4,
+      "bestInputShare": 0.4,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 3.78
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        7,
+        3
+      ],
+      "ratio": [
+        183,
+        174,
+        109,
+        92
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.17,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 5.34
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        333,
+        253,
+        174,
+        107
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.02,
+      "blockedSecs": 2,
+      "trips": 4.59
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        7,
+        6
+      ],
+      "ratio": [
+        319,
+        248,
+        236,
+        224
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.2,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 5.47
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        7,
+        7
+      ],
+      "ratio": [
+        351,
+        476,
+        360,
+        333
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.08,
+      "bestInputShare": 0.12,
+      "feverShare": 0.04,
+      "blockedSecs": 1,
+      "trips": 4.47
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        7,
+        6
+      ],
+      "ratio": [
+        310,
+        229,
+        177,
+        179
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.12,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 4.28
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        7,
+        7
+      ],
+      "ratio": [
+        337,
+        255,
+        170,
+        206
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.05,
+      "blockedSecs": 1,
+      "trips": 4.34
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        351,
+        203,
+        176,
+        170
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.23,
+      "bestInputShare": 0.23,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 4.13
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "初回",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        432,
+        328,
+        223,
+        181
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.14,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 5.31
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        4,
+        0
+      ],
+      "ratio": [
+        162,
+        113,
+        52,
+        38
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.18,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 4.03
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        182,
+        192,
+        190,
+        181
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.29,
+      "feverShare": 0.01,
+      "blockedSecs": 5,
+      "trips": 5.38
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        3,
+        1
+      ],
+      "ratio": [
+        136,
+        93,
+        88,
+        96
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.22,
+      "bestInputShare": 0.22,
+      "feverShare": 0.09,
+      "blockedSecs": 3,
+      "trips": 4.34
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        7,
+        6
+      ],
+      "ratio": [
+        182,
+        168,
+        212,
+        167
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.17,
+      "bestInputShare": 0.21,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 4.28
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        5,
+        4
+      ],
+      "ratio": [
+        168,
+        172,
+        123,
+        157
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.13,
+      "feverShare": 0.06,
+      "blockedSecs": 3,
+      "trips": 4.53
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        5,
+        4
+      ],
+      "ratio": [
+        153,
+        143,
+        148,
+        97
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.36,
+      "bestInputShare": 0.36,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 2.63
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        2
+      ],
+      "ratio": [
+        166,
+        132,
+        120,
+        75
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.21,
+      "feverShare": 0,
+      "blockedSecs": 6,
+      "trips": 4.84
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        299,
+        193,
+        140,
+        103
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0.06,
+      "blockedSecs": 2,
+      "trips": 4.41
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        320,
+        268,
+        274,
+        253
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.26,
+      "feverShare": 0.01,
+      "blockedSecs": 2,
+      "trips": 5.34
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        288,
+        278,
+        260,
+        302
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0.15,
+      "blockedSecs": 1,
+      "trips": 4.47
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        346,
+        365,
+        387,
+        259
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.15,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 4.56
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        6,
+        4
+      ],
+      "ratio": [
+        306,
+        254,
+        155,
+        192
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.07,
+      "blockedSecs": 1,
+      "trips": 4.44
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        316,
+        235,
+        225,
+        193
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.21,
+      "bestInputShare": 0.21,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 3.22
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        378,
+        266,
+        213,
+        158
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 4.91
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        348,
+        305,
+        233,
+        174
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.06,
+      "blockedSecs": 1,
+      "trips": 4.84
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        346,
+        311,
+        312,
+        307
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.17,
+      "feverShare": 0.01,
+      "blockedSecs": 0,
+      "trips": 5.16
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        360,
+        413,
+        356,
+        598
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.16,
+      "blockedSecs": 0,
+      "trips": 4.31
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        390,
+        415,
+        450,
+        414
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.12,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 4.34
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        6,
+        5
+      ],
+      "ratio": [
+        327,
+        278,
+        167,
+        182
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.08,
+      "blockedSecs": 0,
+      "trips": 4.22
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        367,
+        336,
+        298,
+        285
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.15,
+      "feverShare": 0,
+      "blockedSecs": 0,
+      "trips": 3.47
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 1,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        497,
+        354,
+        287,
+        230
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.08,
+      "bestInputShare": 0.11,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 5.03
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        1,
+        0
+      ],
+      "ratio": [
+        147,
+        81,
+        41,
+        29
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0.02,
+      "blockedSecs": 5,
+      "trips": 4.44
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        7,
+        5
+      ],
+      "ratio": [
+        157,
+        164,
+        129,
+        125
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.28,
+      "feverShare": 0,
+      "blockedSecs": 6,
+      "trips": 5.41
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        0,
+        0
+      ],
+      "ratio": [
+        151,
+        67,
+        81,
+        67
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0.08,
+      "blockedSecs": 5,
+      "trips": 4.44
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        8,
+        5
+      ],
+      "ratio": [
+        196,
+        172,
+        136,
+        129
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.31,
+      "bestInputShare": 0.31,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 4.25
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 3,
+      "reached": [
+        8,
+        8,
+        5,
+        4
+      ],
+      "ratio": [
+        165,
+        155,
+        98,
+        133
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0.06,
+      "blockedSecs": 3,
+      "trips": 4.63
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        5,
+        2
+      ],
+      "ratio": [
+        142,
+        115,
+        109,
+        79
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.3,
+      "bestInputShare": 0.3,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 2.56
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        4,
+        1
+      ],
+      "ratio": [
+        162,
+        116,
+        87,
+        65
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.17,
+      "feverShare": 0,
+      "blockedSecs": 6,
+      "trips": 4.97
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        7,
+        3
+      ],
+      "ratio": [
+        275,
+        167,
+        105,
+        59
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.15,
+      "feverShare": 0.01,
+      "blockedSecs": 2,
+      "trips": 4.91
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        309,
+        257,
+        251,
+        232
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.2,
+      "feverShare": 0.01,
+      "blockedSecs": 3,
+      "trips": 5.34
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        345,
+        212,
+        226,
+        193
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.14,
+      "feverShare": 0.16,
+      "blockedSecs": 1,
+      "trips": 4.44
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        374,
+        333,
+        288,
+        241
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.18,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 4.5
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        5,
+        4
+      ],
+      "ratio": [
+        311,
+        237,
+        136,
+        167
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.08,
+      "blockedSecs": 1,
+      "trips": 4.38
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        330,
+        240,
+        175,
+        162
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.18,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 3.25
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        393,
+        261,
+        165,
+        120
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.13,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 5.09
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        361,
+        336,
+        202,
+        132
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.09,
+      "blockedSecs": 1,
+      "trips": 4.91
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        347,
+        301,
+        278,
+        251
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.08,
+      "bestInputShare": 0.14,
+      "feverShare": 0.01,
+      "blockedSecs": 1,
+      "trips": 5.31
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        367,
+        412,
+        301,
+        425
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.12,
+      "feverShare": 0.17,
+      "blockedSecs": 0,
+      "trips": 4.53
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        408,
+        404,
+        424,
+        377
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.12,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 4.56
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        6,
+        5
+      ],
+      "ratio": [
+        339,
+        252,
+        137,
+        153
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.12,
+      "feverShare": 0.08,
+      "blockedSecs": 1,
+      "trips": 4.34
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        392,
+        358,
+        277,
+        257
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 0,
+      "trips": 3.56
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 3,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        485,
+        349,
+        241,
+        181
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 5.19
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        5,
+        1,
+        0
+      ],
+      "ratio": [
+        107,
+        69,
+        32,
+        27
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.17,
+      "bestInputShare": 0.17,
+      "feverShare": 0.01,
+      "blockedSecs": 5,
+      "trips": 4.09
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        5,
+        1
+      ],
+      "ratio": [
+        131,
+        100,
+        77,
+        75
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.19,
+      "bestInputShare": 0.26,
+      "feverShare": 0,
+      "blockedSecs": 6,
+      "trips": 5.25
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        3,
+        0,
+        0
+      ],
+      "ratio": [
+        95,
+        52,
+        41,
+        32
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.15,
+      "feverShare": 0.06,
+      "blockedSecs": 5,
+      "trips": 4.47
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        5,
+        1
+      ],
+      "ratio": [
+        139,
+        121,
+        78,
+        92
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.22,
+      "bestInputShare": 0.22,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 4.31
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        3,
+        2,
+        0
+      ],
+      "ratio": [
+        111,
+        116,
+        59,
+        100
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.17,
+      "bestInputShare": 0.17,
+      "feverShare": 0.05,
+      "blockedSecs": 4,
+      "trips": 4.53
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        6,
+        1,
+        0
+      ],
+      "ratio": [
+        109,
+        74,
+        50,
+        48
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.29,
+      "bestInputShare": 0.29,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 2.63
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        6,
+        1,
+        0
+      ],
+      "ratio": [
+        113,
+        78,
+        51,
+        42
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.19,
+      "bestInputShare": 0.21,
+      "feverShare": 0,
+      "blockedSecs": 7,
+      "trips": 4.88
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        0
+      ],
+      "ratio": [
+        179,
+        119,
+        55,
+        43
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 4.53
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        207,
+        188,
+        153,
+        137
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.16,
+      "feverShare": 0.01,
+      "blockedSecs": 3,
+      "trips": 5.31
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        7,
+        5
+      ],
+      "ratio": [
+        239,
+        133,
+        151,
+        132
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0.14,
+      "blockedSecs": 2,
+      "trips": 4.5
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        237,
+        210,
+        188,
+        145
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 4.53
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        6,
+        3
+      ],
+      "ratio": [
+        221,
+        170,
+        98,
+        114
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.08,
+      "blockedSecs": 1,
+      "trips": 4.34
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 3,
+      "reached": [
+        8,
+        8,
+        8,
+        5
+      ],
+      "ratio": [
+        209,
+        163,
+        120,
+        98
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.24,
+      "bestInputShare": 0.24,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 3.09
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        5,
+        3
+      ],
+      "ratio": [
+        228,
+        150,
+        112,
+        87
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.12,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 5
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 3,
+      "reached": [
+        8,
+        8,
+        8,
+        4
+      ],
+      "ratio": [
+        261,
+        244,
+        141,
+        136
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.19,
+      "bestInputShare": 0.19,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 4.69
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        268,
+        237,
+        181,
+        166
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.17,
+      "feverShare": 0.01,
+      "blockedSecs": 1,
+      "trips": 5.38
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        311,
+        313,
+        224,
+        310
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.18,
+      "blockedSecs": 1,
+      "trips": 4.63
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 8,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        318,
+        362,
+        285,
+        244
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.12,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 4.5
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        6,
+        4
+      ],
+      "ratio": [
+        277,
+        199,
+        108,
+        126
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.08,
+      "blockedSecs": 0,
+      "trips": 4.41
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        290,
+        251,
+        158,
+        125
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.19,
+      "bestInputShare": 0.19,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 3.72
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 5,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        344,
+        257,
+        147,
+        111
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.13,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 5.31
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        4,
+        0,
+        0
+      ],
+      "ratio": [
+        97,
+        60,
+        30,
+        19
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.21,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 4.09
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        6,
+        5,
+        2
+      ],
+      "ratio": [
+        119,
+        121,
+        76,
+        80
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.21,
+      "bestInputShare": 0.25,
+      "feverShare": 0,
+      "blockedSecs": 7,
+      "trips": 5.59
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        1,
+        0,
+        0
+      ],
+      "ratio": [
+        85,
+        45,
+        36,
+        19
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.18,
+      "feverShare": 0.05,
+      "blockedSecs": 5,
+      "trips": 4.25
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        7,
+        6,
+        2
+      ],
+      "ratio": [
+        124,
+        113,
+        87,
+        80
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.2,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 4.25
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        4,
+        2,
+        0
+      ],
+      "ratio": [
+        111,
+        113,
+        56,
+        78
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0.05,
+      "blockedSecs": 5,
+      "trips": 4.44
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        2,
+        1,
+        0
+      ],
+      "ratio": [
+        95,
+        66,
+        48,
+        48
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.24,
+      "bestInputShare": 0.24,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 2.63
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 4.5,
+      "miss": 0.06,
+      "think": 0.5,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        5,
+        2,
+        1
+      ],
+      "ratio": [
+        113,
+        73,
+        50,
+        38
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.17,
+      "bestInputShare": 0.2,
+      "feverShare": 0,
+      "blockedSecs": 7,
+      "trips": 4.75
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        5,
+        1
+      ],
+      "ratio": [
+        175,
+        114,
+        60,
+        45
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.13,
+      "feverShare": 0.01,
+      "blockedSecs": 4,
+      "trips": 5.03
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        7,
+        6
+      ],
+      "ratio": [
+        187,
+        174,
+        147,
+        132
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.17,
+      "feverShare": 0.01,
+      "blockedSecs": 4,
+      "trips": 5.75
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        6,
+        4
+      ],
+      "ratio": [
+        217,
+        130,
+        116,
+        113
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.22,
+      "bestInputShare": 0.22,
+      "feverShare": 0.14,
+      "blockedSecs": 3,
+      "trips": 4.53
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        220,
+        206,
+        151,
+        130
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.15,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 4.47
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        6,
+        3
+      ],
+      "ratio": [
+        215,
+        156,
+        86,
+        99
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0.08,
+      "blockedSecs": 2,
+      "trips": 4.5
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        7,
+        2
+      ],
+      "ratio": [
+        195,
+        140,
+        93,
+        81
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 3.31
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 6.5,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        5,
+        2
+      ],
+      "ratio": [
+        214,
+        143,
+        99,
+        71
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 4.94
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        8,
+        2
+      ],
+      "ratio": [
+        269,
+        210,
+        105,
+        90
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.09,
+      "bestInputShare": 0.15,
+      "feverShare": 0.01,
+      "blockedSecs": 2,
+      "trips": 5.22
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        7,
+        5
+      ],
+      "ratio": [
+        255,
+        219,
+        188,
+        150
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.14,
+      "feverShare": 0.01,
+      "blockedSecs": 2,
+      "trips": 5.59
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        308,
+        295,
+        220,
+        290
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.18,
+      "blockedSecs": 1,
+      "trips": 4.75
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        319,
+        337,
+        256,
+        199
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 4.63
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        6,
+        2
+      ],
+      "ratio": [
+        269,
+        183,
+        90,
+        110
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.08,
+      "blockedSecs": 1,
+      "trips": 4.47
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        277,
+        241,
+        176,
+        124
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.19,
+      "bestInputShare": 0.19,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 4.09
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 6,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        358,
+        233,
+        133,
+        111
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.09,
+      "bestInputShare": 0.15,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 5.38
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        0,
+        0
+      ],
+      "ratio": [
+        138,
+        65,
+        28,
+        21
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.01,
+      "blockedSecs": 4,
+      "trips": 4.91
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        7,
+        2
+      ],
+      "ratio": [
+        143,
+        128,
+        94,
+        70
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.23,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 6.5
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        2,
+        0
+      ],
+      "ratio": [
+        159,
+        75,
+        56,
+        47
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.15,
+      "feverShare": 0.12,
+      "blockedSecs": 4,
+      "trips": 5.13
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        8,
+        3
+      ],
+      "ratio": [
+        167,
+        142,
+        104,
+        96
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 4.78
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        5,
+        0
+      ],
+      "ratio": [
+        157,
+        117,
+        59,
+        65
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.08,
+      "blockedSecs": 3,
+      "trips": 5.03
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        4,
+        0
+      ],
+      "ratio": [
+        151,
+        100,
+        60,
+        61
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.18,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 3.5
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        4,
+        0
+      ],
+      "ratio": [
+        157,
+        106,
+        56,
+        46
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.13,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 5.69
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        7,
+        0
+      ],
+      "ratio": [
+        237,
+        153,
+        61,
+        40
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.09,
+      "bestInputShare": 0.09,
+      "feverShare": 0.01,
+      "blockedSecs": 3,
+      "trips": 5.59
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        5
+      ],
+      "ratio": [
+        227,
+        173,
+        117,
+        102
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.19,
+      "feverShare": 0.01,
+      "blockedSecs": 2,
+      "trips": 6.28
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 3,
+      "reached": [
+        8,
+        8,
+        8,
+        5
+      ],
+      "ratio": [
+        259,
+        205,
+        127,
+        152
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.21,
+      "bestInputShare": 0.21,
+      "feverShare": 0.18,
+      "blockedSecs": 2,
+      "trips": 5.66
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        8,
+        5
+      ],
+      "ratio": [
+        278,
+        250,
+        157,
+        137
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 5.16
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        0
+      ],
+      "ratio": [
+        223,
+        133,
+        62,
+        74
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.1,
+      "blockedSecs": 1,
+      "trips": 5.06
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        8,
+        4
+      ],
+      "ratio": [
+        255,
+        159,
+        104,
+        77
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 4.19
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        7,
+        3
+      ],
+      "ratio": [
+        285,
+        164,
+        87,
+        67
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.22,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 5.97
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        8,
+        2
+      ],
+      "ratio": [
+        267,
+        206,
+        84,
+        104
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.24,
+      "bestInputShare": 0.24,
+      "feverShare": 0.06,
+      "blockedSecs": 2,
+      "trips": 6.34
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        8,
+        5
+      ],
+      "ratio": [
+        260,
+        189,
+        118,
+        113
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.09,
+      "bestInputShare": 0.16,
+      "feverShare": 0.01,
+      "blockedSecs": 1,
+      "trips": 6.53
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        308,
+        342,
+        217,
+        265
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.07,
+      "bestInputShare": 0.07,
+      "feverShare": 0.2,
+      "blockedSecs": 1,
+      "trips": 6.06
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "ratio": [
+        370,
+        375,
+        261,
+        214
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 5.78
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        0
+      ],
+      "ratio": [
+        261,
+        154,
+        68,
+        81
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.09,
+      "blockedSecs": 1,
+      "trips": 5.75
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 5,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        279,
+        232,
+        126,
+        134
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.13,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 4.81
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 10,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 3,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        335,
+        216,
+        124,
+        90
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.08,
+      "bestInputShare": 0.1,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 6.59
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        0,
+        0
+      ],
+      "ratio": [
+        120,
+        56,
+        23,
+        17
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.01,
+      "blockedSecs": 4,
+      "trips": 4.91
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        7,
+        4,
+        1
+      ],
+      "ratio": [
+        125,
+        110,
+        77,
+        58
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.23,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 6.5
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        1,
+        0
+      ],
+      "ratio": [
+        138,
+        65,
+        46,
+        39
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.15,
+      "feverShare": 0.12,
+      "blockedSecs": 4,
+      "trips": 5.13
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        6,
+        3
+      ],
+      "ratio": [
+        146,
+        123,
+        86,
+        79
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 4.78
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        4,
+        0
+      ],
+      "ratio": [
+        137,
+        101,
+        49,
+        53
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.08,
+      "blockedSecs": 3,
+      "trips": 5.03
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        2,
+        0
+      ],
+      "ratio": [
+        132,
+        86,
+        49,
+        50
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.18,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 3.5
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        7,
+        4,
+        0
+      ],
+      "ratio": [
+        137,
+        91,
+        46,
+        38
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.13,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 5.69
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        5,
+        0
+      ],
+      "ratio": [
+        207,
+        132,
+        50,
+        33
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.09,
+      "bestInputShare": 0.09,
+      "feverShare": 0.01,
+      "blockedSecs": 3,
+      "trips": 5.59
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        8,
+        2
+      ],
+      "ratio": [
+        198,
+        149,
+        96,
+        83
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.19,
+      "feverShare": 0.01,
+      "blockedSecs": 2,
+      "trips": 6.28
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        8,
+        3
+      ],
+      "ratio": [
+        227,
+        176,
+        104,
+        124
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.21,
+      "bestInputShare": 0.21,
+      "feverShare": 0.18,
+      "blockedSecs": 2,
+      "trips": 5.66
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 4,
+      "reached": [
+        8,
+        8,
+        8,
+        5
+      ],
+      "ratio": [
+        243,
+        216,
+        129,
+        112
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 5.16
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        0
+      ],
+      "ratio": [
+        195,
+        114,
+        51,
+        60
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.1,
+      "blockedSecs": 1,
+      "trips": 5.06
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        2
+      ],
+      "ratio": [
+        223,
+        137,
+        85,
+        63
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 4.19
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        1
+      ],
+      "ratio": [
+        249,
+        142,
+        71,
+        55
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.22,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 5.97
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        7,
+        1
+      ],
+      "ratio": [
+        233,
+        177,
+        69,
+        85
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.24,
+      "bestInputShare": 0.24,
+      "feverShare": 0.06,
+      "blockedSecs": 2,
+      "trips": 6.34
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        8,
+        3
+      ],
+      "ratio": [
+        227,
+        163,
+        97,
+        93
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.09,
+      "bestInputShare": 0.16,
+      "feverShare": 0.01,
+      "blockedSecs": 1,
+      "trips": 6.53
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        269,
+        294,
+        178,
+        217
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.07,
+      "bestInputShare": 0.07,
+      "feverShare": 0.2,
+      "blockedSecs": 1,
+      "trips": 6.06
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 7,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        323,
+        323,
+        214,
+        175
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 5.78
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        5,
+        0
+      ],
+      "ratio": [
+        228,
+        133,
+        56,
+        66
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.09,
+      "blockedSecs": 1,
+      "trips": 5.75
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        8,
+        5
+      ],
+      "ratio": [
+        244,
+        200,
+        104,
+        110
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.13,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 4.81
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 15,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        7,
+        4
+      ],
+      "ratio": [
+        293,
+        186,
+        102,
+        73
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.08,
+      "bestInputShare": 0.1,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 6.59
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        3,
+        0,
+        0
+      ],
+      "ratio": [
+        108,
+        49,
+        19,
+        14
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.01,
+      "blockedSecs": 4,
+      "trips": 4.91
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        6,
+        3,
+        1
+      ],
+      "ratio": [
+        111,
+        97,
+        65,
+        49
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.12,
+      "bestInputShare": 0.23,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 6.5
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        6,
+        1,
+        0
+      ],
+      "ratio": [
+        124,
+        57,
+        39,
+        33
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.15,
+      "bestInputShare": 0.15,
+      "feverShare": 0.12,
+      "blockedSecs": 4,
+      "trips": 5.13
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        4,
+        2
+      ],
+      "ratio": [
+        130,
+        108,
+        72,
+        67
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 4,
+      "trips": 4.78
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        6,
+        3,
+        0
+      ],
+      "ratio": [
+        122,
+        88,
+        41,
+        45
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.08,
+      "blockedSecs": 3,
+      "trips": 5.03
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        6,
+        1,
+        0
+      ],
+      "ratio": [
+        118,
+        76,
+        41,
+        42
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.18,
+      "bestInputShare": 0.18,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 3.5
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 7,
+      "miss": 0.04,
+      "think": 0.35,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        5,
+        2,
+        0
+      ],
+      "ratio": [
+        123,
+        80,
+        39,
+        32
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.13,
+      "feverShare": 0,
+      "blockedSecs": 5,
+      "trips": 5.69
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        3,
+        0
+      ],
+      "ratio": [
+        185,
+        116,
+        43,
+        28
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.09,
+      "bestInputShare": 0.09,
+      "feverShare": 0.01,
+      "blockedSecs": 3,
+      "trips": 5.59
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        1
+      ],
+      "ratio": [
+        177,
+        131,
+        81,
+        71
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.19,
+      "feverShare": 0.01,
+      "blockedSecs": 2,
+      "trips": 6.28
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 2,
+      "reached": [
+        8,
+        8,
+        8,
+        2
+      ],
+      "ratio": [
+        202,
+        155,
+        88,
+        105
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.21,
+      "bestInputShare": 0.21,
+      "feverShare": 0.18,
+      "blockedSecs": 2,
+      "trips": 5.66
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 3,
+      "reached": [
+        8,
+        8,
+        7,
+        4
+      ],
+      "ratio": [
+        217,
+        189,
+        109,
+        95
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 5.16
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        4,
+        0
+      ],
+      "ratio": [
+        174,
+        100,
+        43,
+        51
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.11,
+      "bestInputShare": 0.11,
+      "feverShare": 0.1,
+      "blockedSecs": 1,
+      "trips": 5.06
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        5,
+        2
+      ],
+      "ratio": [
+        199,
+        120,
+        72,
+        53
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.16,
+      "bestInputShare": 0.16,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 4.19
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 9,
+      "miss": 0.03,
+      "think": 0.25,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        4,
+        0
+      ],
+      "ratio": [
+        222,
+        124,
+        61,
+        47
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.22,
+      "feverShare": 0,
+      "blockedSecs": 3,
+      "trips": 5.97
+    },
+    {
+      "strategy": "でたらめ",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        6,
+        0
+      ],
+      "ratio": [
+        208,
+        156,
+        58,
+        72
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.24,
+      "bestInputShare": 0.24,
+      "feverShare": 0.06,
+      "blockedSecs": 2,
+      "trips": 6.34
+    },
+    {
+      "strategy": "連鎖の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        8,
+        2
+      ],
+      "ratio": [
+        202,
+        143,
+        82,
+        79
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.09,
+      "bestInputShare": 0.16,
+      "feverShare": 0.01,
+      "blockedSecs": 1,
+      "trips": 6.53
+    },
+    {
+      "strategy": "勢いの店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        6
+      ],
+      "ratio": [
+        240,
+        259,
+        151,
+        184
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.07,
+      "bestInputShare": 0.07,
+      "feverShare": 0.2,
+      "blockedSecs": 1,
+      "trips": 6.06
+    },
+    {
+      "strategy": "調達の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 6,
+      "reached": [
+        8,
+        8,
+        8,
+        7
+      ],
+      "ratio": [
+        289,
+        284,
+        181,
+        149
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.14,
+      "bestInputShare": 0.14,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 5.78
+    },
+    {
+      "strategy": "少人数の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        5,
+        0
+      ],
+      "ratio": [
+        204,
+        117,
+        47,
+        56
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.1,
+      "bestInputShare": 0.1,
+      "feverShare": 0.09,
+      "blockedSecs": 1,
+      "trips": 5.75
+    },
+    {
+      "strategy": "台所の店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 0,
+      "reached": [
+        8,
+        8,
+        8,
+        2
+      ],
+      "ratio": [
+        218,
+        175,
+        88,
+        93
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.13,
+      "bestInputShare": 0.13,
+      "feverShare": 0,
+      "blockedSecs": 1,
+      "trips": 4.81
+    },
+    {
+      "strategy": "おかわりの店",
+      "kps": 12,
+      "miss": 0.02,
+      "think": 0.2,
+      "loop": 20,
+      "state": "解放後",
+      "aim": "urgent",
+      "clear": 1,
+      "reached": [
+        8,
+        8,
+        6,
+        4
+      ],
+      "ratio": [
+        261,
+        164,
+        86,
+        62
+      ],
+      "medianPaid": null,
+      "p95Paid": null,
+      "cappedRate": null,
+      "bestServeShare": 0.08,
+      "bestInputShare": 0.1,
+      "feverShare": 0,
+      "blockedSecs": 2,
+      "trips": 6.59
+    }
+  ]
+}

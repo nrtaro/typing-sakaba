@@ -3,17 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { emptyMeta, type RunMeta } from '../src/core/run';
-import { botRun, prefer, NONE, RANDOM, type Strategy } from './runBot';
+import { botRun, allMeta, BUILDS, NONE, RANDOM, type Strategy } from './runBot';
 
-export const BUILDS: Strategy[] = [
-  prefer('連鎖の店', ['matome', 'mouippai', 'betsubara', 'yobikomi', 'tairyo', 'makanai', 'nushi']),
-  prefer('勢いの店', ['ryoshusho', 'ooiri', 'sekkachi', 'yobikomi', 'shikomi', 'matome']),
-  prefer('調達の店', ['nushi', 'tairyo', 'oomori', 'makanai', 'shikomi', 'mie']),
-  prefer('少人数の店', ['yoyaku', 'omotenashi', 'aiso', 'ryoshusho', 'ooiri', 'betsubara']),
-  prefer('台所の店', ['mie', 'makanai', 'shikomi', 'mouippai', 'oomori', 'tairyo']),
-  prefer('おかわりの店', ['betsubara', 'mouippai', 'aiso', 'matome', 'tairyo', 'yobikomi']),
-];
-const allMeta = () => { const m = emptyMeta(); m.policies = ['oomori', 'ooiri', 'makanai']; m.daysCleared = 24; return m; };
 const SEEDS = [11, 23, 37, 41, 59, 67, 83, 97, 109, 127, 149, 163];
 const avg = (a: number[]) => Math.round(a.reduce((x, y) => x + y, 0) / a.length);
 

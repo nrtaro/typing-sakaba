@@ -38,7 +38,31 @@ export const RANDOM: Strategy = {
 };
 export const NONE: Strategy = { name: '方針なし', pick: () => null };
 
-export interface BotRun { cleared: boolean; day: number; days: { sales: number; goal: number; served: number; angry: number; maxCombo: number; maxChain: number; trips: number; lack: number; seconds: number }[]; meta: RunMeta; run: RunState; keys: number; rerollsUsed: number; picks: number }
+/** バランス確認に使う6通りの組み方（run.sim と policy.sim で共有） */
+export const BUILDS: Strategy[] = [
+  prefer('連鎖の店', ['matome', 'mouippai', 'betsubara', 'yobikomi', 'tairyo', 'makanai', 'nushi']),
+  prefer('勢いの店', ['ryoshusho', 'ooiri', 'sekkachi', 'yobikomi', 'shikomi', 'matome']),
+  prefer('調達の店', ['nushi', 'tairyo', 'oomori', 'makanai', 'shikomi', 'mie']),
+  prefer('少人数の店', ['yoyaku', 'omotenashi', 'aiso', 'ryoshusho', 'ooiri', 'betsubara']),
+  prefer('台所の店', ['mie', 'makanai', 'shikomi', 'mouippai', 'oomori', 'tairyo']),
+  prefer('おかわりの店', ['betsubara', 'mouippai', 'aiso', 'matome', 'tairyo', 'yobikomi']),
+];
+/** 解放が要る方針をすべて解放した記録 */
+export const allMeta = () => { const m = emptyMeta(); m.policies = ['oomori', 'ooiri', 'makanai']; m.daysCleared = 24; return m; };
+
+/** ボットが日ごとに数えるもの */
+export interface BotDay {
+  sales: number; goal: number; served: number; angry: number; maxCombo: number; maxChain: number; trips: number; lack: number; seconds: number;
+  /** 1皿の最高額／1回の入力で出た皿の合計の最高（まとめ出しがなければ1皿の額） */
+  bestServe: number; bestInput: number;
+  /** 大入りだった秒数／待っているお客はいるのに、作れる皿が1つもない秒数（調達中は数えない） */
+  feverSecs: number; blockedSecs: number;
+  /** 方針ごとに効いた回数（buildStats.fired の写し） */
+  fired: Partial<Record<PolicyId, number>>;
+  /** 出した皿ごとの、実際に払われた倍率／上限で止まった皿の数（新しい会計で入る） */
+  paid: number[]; capped: number;
+}
+export interface BotRun { cleared: boolean; day: number; days: BotDay[]; meta: RunMeta; run: RunState; keys: number; rerollsUsed: number; picks: number }
 
 /** 所持方針との相性と目標の軽さで、実際に提示された営業から選ぶ。 */
 function suitableRoad(ids: RoadId[], run: RunState): RoadId {
@@ -51,7 +75,11 @@ function suitableRoad(ids: RoadId[], run: RunState): RoadId {
 }
 
 /** 1回の挑戦を最後まで（目標に届かなくても forceAll なら4日間続けて、日ごとの売上を見る） */
-export function botRun(seed: number, strat: Strategy, kps: number, missRate: number, loop = 1, meta: RunMeta = emptyMeta(), forceAll = false, think = 0.4): BotRun {
+/**
+ * aim：狙う皿の選び方。urgent＝作れる皿のうち、いちばん急ぐ皿。quote＝札の予告で高い皿（新しい会計で使う）
+ */
+export function botRun(seed: number, strat: Strategy, kps: number, missRate: number, loop = 1, meta: RunMeta = emptyMeta(), forceAll = false, think = 0.4, aim: 'urgent' | 'quote' = 'urgent'): BotRun {
+  if (aim === 'quote') throw new Error('予告で選ぶ作戦は、新しい会計（Shop.quote）ができてから使う');
   meta.loop = loop;
   meta.pick = loop;
   const run = newRun(meta, seed, `bot-${seed}`);
@@ -90,10 +118,23 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
     let aim: string | null = null;
     let lastDone = 0;
     let pause = 0;
+    let bestServe = 0;
+    let bestInput = 0;
+    let feverSecs = 0;
+    let blockedSecs = 0;
+    const paid: number[] = [];
+    let capped = 0;
     while (!s.finished) {
       s.tick();
+      if (s.shop.fever) feverSecs += 1 / 60;
+      if (!s.trip) {
+        const waiting = s.shop.seats.filter((g) => g?.state === 'wait');
+        if (waiting.length && waiting.every((g) => s.shop.canMake(g!.dish).length)) blockedSecs += 1 / 60;
+      }
       for (const e of s.drain()) {
         if (e.src === 'shop' && e.ev.type === 'lack') lack++;
+        if (e.src === 'shop' && e.ev.type === 'serve') { bestServe = Math.max(bestServe, e.ev.gain); bestInput = Math.max(bestInput, e.ev.gain); }
+        if (e.src === 'shop' && e.ev.type === 'chain') bestInput = Math.max(bestInput, e.ev.total);
         if (e.src === 'shop' && e.ev.type === 'phase' && slot < PICKS_PER_DAY) pendingSlot = slot++;
       }
       if (pendingSlot !== null && !s.trip && !s.finished) {
@@ -137,7 +178,7 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
     }
     const st = s.shop.stats;
     const b = s.shop.buildStats;
-    days.push({ sales: s.shop.score, goal: plan.goal, served: st.served, angry: st.angry, maxCombo: st.maxCombo, maxChain: b.maxChain, trips: st.trips, lack, seconds: s.elapsed });
+    days.push({ sales: s.shop.score, goal: plan.goal, served: st.served, angry: st.angry, maxCombo: st.maxCombo, maxChain: b.maxChain, trips: st.trips, lack, seconds: s.elapsed, bestServe, bestInput, feverSecs, blockedSecs, fired: { ...b.fired }, paid, capped });
     const day = run.day;
     const copy = forceAll ? { ...run, days: [...run.days], owned: run.owned.map((o) => ({ ...o })), yen: { ...run.yen }, pairs: [...run.pairs] } : run;
     const out = closeDay(copy, meta, { sales: s.shop.score, served: st.served, maxCombo: st.maxCombo, angry: st.angry, build: b });

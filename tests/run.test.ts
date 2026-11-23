@@ -653,6 +653,18 @@ describe('進行', () => {
     expect(result.rerollsUsed).toBeLessThanOrEqual(5);
   });
 
+  it('ボット：日ごとに、1皿・1回の入力の最高額、大入りの秒数、手が止まった秒数を数える', () => {
+    const r = botRun(11, prefer('連鎖', ['matome', 'mouippai', 'betsubara']), 6.5, 0.04, 1, emptyMeta(), true);
+    const d = r.days[0];
+    expect(d.bestServe).toBeGreaterThan(0);
+    expect(d.bestInput).toBeGreaterThanOrEqual(d.bestServe);
+    expect(d.feverSecs).toBe(0);
+    expect(d.blockedSecs).toBeGreaterThanOrEqual(0);
+    expect(d.fired.matome ?? 0).toBeGreaterThan(0);
+    expect(d.paid).toEqual([]);
+    expect(d.capped).toBe(0);
+  });
+
   it('ボット：方針なしは4日もたない。考えた構成は、でたらめより先まで進む', () => {
     const none = [11, 23, 37].map((s) => botRun(s, NONE, 4.5, 0.06, 1, undefined, false, 0.5));
     expect(none.every((r) => !r.cleared)).toBe(true);
