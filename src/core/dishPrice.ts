@@ -26,3 +26,12 @@ export function priceOf(base: number, factors: Factor[]): Price {
   const paid = Math.min(raw, MULT_CAP);
   return { base, factors: used, raw, paid, capped: raw > MULT_CAP, gain: Math.round(base * paid) };
 }
+
+/** 【銀の枠の倍率】【金の枠の倍率】注文の札の枠で、出したら何倍になるかを予告する段階 */
+export const PREVIEW_SILVER = 3;
+export const PREVIEW_GOLD = 10;
+export type PreviewTier = 'none' | 'silver' | 'gold';
+/** 実際に払われる倍率（上限で止めたあと）から、札の枠の段階を決める */
+export function previewTier(paid: number): PreviewTier {
+  return paid >= PREVIEW_GOLD ? 'gold' : paid >= PREVIEW_SILVER ? 'silver' : 'none';
+}

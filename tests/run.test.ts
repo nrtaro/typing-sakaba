@@ -733,6 +733,42 @@ describe('進行', () => {
     expect(readMeta({ loop: 'a' }).loop).toBe(1);
   });
 
+  it('見積もりは、何回呼んでも営業の結果を変えない', () => {
+    const meta = emptyMeta();
+    const run = newRun(meta, 778, 'q');
+    run.owned = [{ id: 'matome', lv: 2 }, { id: 'netsu', lv: 2 }, { id: 'makanai', lv: 2 }, { id: 'mie', lv: 1 }];
+    const plan = dayPlan(run, meta);
+    const play = (peek: boolean) => {
+      const s = new PlaySession(plan.seed, plan.difficulty, plan.rules, null, plan.mods);
+      for (let i = 0; i < 60 * 40; i++) {
+        s.tick();
+        if (peek) for (let k = 0; k < s.shop.seats.length; k++) s.shop.quote(k, { chain: 0, clean: true, saved: false });
+        if (i % 9 === 0) { const t = s.shop.targets()[0]; const live = s.shop.input.active[0]; if (live || t) s.input((live?.matcher ?? new RomajiMatcher(t.kana)).remaining[0]); }
+      }
+      return [s.shop.score, s.shop.stats.served, s.record.length, JSON.stringify(s.shop.buildStats), s.shop.heat];
+    };
+    const plain = play(false);
+    expect(plain[1]).toBeGreaterThan(0);
+    expect(play(true)).toEqual(plain);
+  });
+
+  it('見積もりは、空いた席・歩いている客・食べている客・調達中・方針のない営業では null', () => {
+    const s = shopWith([{ id: 'ippatsu', lv: 1 }], [null, 'grilledFish', 'vegSoup', 'jerky']);
+    const ctx = { chain: 0, clean: true, saved: false };
+    s.seats[2]!.state = 'walk';
+    s.seats[3]!.state = 'eat';
+    expect(s.quote(0, ctx)).toBeNull();
+    expect(s.quote(1, ctx)).not.toBeNull();
+    expect(s.quote(2, ctx)).toBeNull();
+    expect(s.quote(3, ctx)).toBeNull();
+    expect(s.quote(99, ctx)).toBeNull();
+    s.away = { id: 'fishing', text: '', kana: 'つり', who: 'wife', act: '', place: '', gives: ['fish'], minimum: { fish: 4 } };
+    expect(s.quote(1, ctx)).toBeNull();
+    const plain = new Shop(new Rng(1), DIFFICULTIES[1]);
+    plain.seats[0] = guest('grilledFish');
+    expect(plain.quote(0, ctx)).toBeNull();
+  });
+
   it('同じ種・同じ入力なら、方針つきの営業も同じ結果になる', () => {
     const meta = emptyMeta();
     const run = newRun(meta, 777, 'd');

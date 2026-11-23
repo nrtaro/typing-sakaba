@@ -14,6 +14,7 @@ import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/l
 import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
 import { setOf } from '../core/build';
+import { previewTier } from '../core/dishPrice';
 import { FAMILY_COLOR, HEAT_GAP, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
@@ -50,6 +51,8 @@ export function runHud(day: number, loop: number, goal: number, owned: Owned[]):
   return { day, loop, goal, owned, fired: {}, count: {}, goalAt: -1 };
 }
 const CHAIN_COL = FAMILY_COLOR.chain;
+/** 繁盛記：注文の札の予告の枠の色（銀＝×3以上、金＝×10以上） */
+const PREVIEW_COL = { silver: '#dce4ee', gold: C.gold } as const;
 
 /** 営業画面の見た目の状態（演出用。ゲームの計算には影響しない） */
 export class ShopView {
@@ -160,7 +163,9 @@ export class ShopView {
         const pairs = ev.pairs ?? 0;
         const tint = pairs > 0 ? '#ffe27a' : tags.length ? FAMILY_COLOR[policyOf(tags[0]).family] : C.gold;
         this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tint, big: true });
-        if (tags.length) this.pop(`tags${ev.seat}`, { x: seat.x, y: seat.ty - 6, t: -delay, text: (ev.sets ?? 0) > 0 ? '型！' : pairs > 0 ? 'かけ合わせ！' : tags.slice(0, 3).map((t) => POLICY_SEAL[t]).join('・'), col: (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint });
+        // 判子は席の幅（64px）に収まるよう最大3つ。上限で止まったら最後を「上限」にする。ついでの皿は金額だけ
+        const seals = tags.slice(0, ev.capped ? 2 : 3).map((t) => POLICY_SEAL[t]).join('') + (ev.capped ? '上限' : '');
+        if ((ev.chain ?? 0) === 0 && seals) this.pop(`tags${ev.seat}`, { x: seat.x, y: seat.ty - 6, t: -delay, text: seals, col: (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint });
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, tint, Math.round((light ? 5 : 10) * this.fxScale), 80);
         for (const t of tags) {
           this.run.fired[t] = this.time + delay;
@@ -699,12 +704,23 @@ export class ShopView {
     const y = bottom - bh - (live ? 2 : 0);
     const cx = x + bw / 2;
     const short = Object.entries(gst.dish.need).some(([id, n]) => shop.stock[id as IngredientId] < n!);
-    const edge = also ? CHAIN_COL : second ? C.cream2 : live ? C.gold : short ? (Math.sin(this.time * 8) > 0 ? '#ff5a4a' : C.red2) : C.wood4;
+    // 繁盛記：今この皿を出したら何倍か（店の状態は変えない見積もり）。ほかの枠の色が先に勝つ
+    const tier = this.run && !also && !second && !live && !short ? previewTier(shop.quote(i, { chain: 0, clean: true, saved: false })?.paid ?? 0) : 'none';
+    const edge = also ? CHAIN_COL : second ? C.cream2 : live ? C.gold : short ? (Math.sin(this.time * 8) > 0 ? '#ff5a4a' : C.red2) : tier !== 'none' ? PREVIEW_COL[tier] : C.wood4;
     const a = dim ? 0.5 : 1;
     if (live) sc.PR(x + 1, y + 3, bw, bh, '#0c0604', 0.45);
     if (live) sc.glow(x, y, bw, bh, second ? C.cream2 : C.gold);
     if (also) sc.glow(x, y, bw, bh, CHAIN_COL, 0.55 + 0.3 * Math.sin(this.time * 10));
     sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
+    if (tier !== 'none') {
+      // 色が見分けにくい人のため、太さ（銀1px・金2px）と、金は四隅の飾りでも分かるようにする
+      const t = tier === 'gold' ? 2 : 1;
+      sc.PR(x - t, y - t, bw + t * 2, t, edge, a);
+      sc.PR(x - t, y + bh, bw + t * 2, t, edge, a);
+      sc.PR(x - t, y, t, bh, edge, a);
+      sc.PR(x + bw, y, t, bh, edge, a);
+      if (tier === 'gold') for (const [cx2, cy2] of [[x - 3, y - 3], [x + bw + 1, y - 3], [x - 3, y + bh + 1], [x + bw + 1, y + bh + 1]] as const) sc.PR(cx2, cy2, 2, 2, C.cream, a);
+    }
     sc.PR(seat.x - 2, bottom, 4, 2, edge, a);
     sc.PR(seat.x - 1, bottom + 2, 2, 1, edge, a);
     const nameSize = sc.fitSize(gst.dish.text, (this.art ? 10 : 10) * k, bw - 6);

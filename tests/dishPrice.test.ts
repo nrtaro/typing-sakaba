@@ -1,6 +1,6 @@
 // 繁盛記：1皿の倍率の掛け算と上限
 import { describe, expect, it } from 'vitest';
-import { MULT_CAP, priceOf } from '../src/core/dishPrice';
+import { MULT_CAP, PREVIEW_GOLD, PREVIEW_SILVER, previewTier, priceOf } from '../src/core/dishPrice';
 
 describe('1皿の倍率', () => {
   it('倍率はぜんぶ掛け算で、×30 で止まる。ちょうど×30 は止まった扱いにしない', () => {
@@ -15,5 +15,13 @@ describe('1皿の倍率', () => {
     const p = priceOf(101, [{ id: 'ippatsu', mult: 0.8 }, { id: 'combo', mult: 1.5 }]);
     expect(p.raw).toBeCloseTo(1.2);
     expect(p.gain).toBe(121);
+  });
+});
+
+describe('札の予告', () => {
+  it('予告の段階：×3未満はなし、×3から銀、×10から金', () => {
+    expect(PREVIEW_SILVER).toBe(3);
+    expect(PREVIEW_GOLD).toBe(10);
+    expect([2.99, 3, 9.99, 10, 30].map(previewTier)).toEqual(['none', 'silver', 'silver', 'gold', 'gold']);
   });
 });
