@@ -71,15 +71,15 @@ const COMBO_CAP = L(2.5, 3, 3.5);
 const FRESH_SECS = L(14, 18, 24);
 const FRESH_MULT = L(1.5, 1.8, 2.2);
 const TRIP_MULT = L(1.4, 1.7, 2.0);
-const LOW_MULT = L(2.0, 2.5, 3.0);
+const LOW_MULT = L(2.5, 3.0, 3.5);
 /** 【たっぷりの皿の倍率】大漁旗：主素材が PLENTY_AT 個以上ある皿 */
 const PLENTY_MULT = L(1.3, 1.5, 1.8);
 /** 【朝の皿の倍率】朝市 */
 const MORNING_MULT = L(1.5, 1.8, 2.2);
 /** 【減らなかった皿の倍率】まかない名人 */
-const SAVE_MULT = L(1.2, 1.4, 1.6);
+const SAVE_MULT = L(1.5, 1.8, 2.2);
 /** 【仕込みたての倍率】こまめな仕込み：時間帯のはじめ PREP_SECS 秒の全部の皿 */
-const PREP_MULT = L(1.3, 1.5, 1.8);
+const PREP_MULT = L(1.5, 1.8, 2.2);
 /** 【早く出した皿の倍率】待たせない店 */
 const QUICK_MULT = L(1.5, 1.8, 2.2);
 /** 【予約のみの倍率】全部の皿 */
@@ -89,7 +89,7 @@ const ALE_MULT = L(1.3, 1.5, 1.8);
 /** 【満席の倍率】呼び込み上手：8席が埋まっているあいだの全部の皿 */
 const FULL_MULT = L(1.2, 1.3, 1.5);
 /** 【遅れて出す皿の倍率】看板娘の愛想 */
-const LATE_MULT = L(1.5, 1.8, 2.2);
+const LATE_MULT = L(1.8, 2.2, 2.6);
 const BIG_CHANCE = L(0.3, 0.45, 0.6);
 const BIG_MULT = L(2.4, 2.8, 3.3);
 const GUESTS = L(0.15, 0.25, 0.4);

@@ -15,8 +15,8 @@ export interface SimRow {
   reached: number[]; ratio: number[];
   /** 皿の倍率の中央値・上位5%・上限に届いた割合（新しい会計でだけ出る） */
   medianPaid: number | null; p95Paid: number | null; cappedRate: number | null;
-  /** 1皿・1回の入力の最高額が、その日の売上に占める割合の最大 */
-  bestServeShare: number; bestInputShare: number;
+  /** 1皿・1回の入力の最高額が、その日の売上に占める割合の最大と中央値（目標の3割以上を売った日だけで数える） */
+  bestServeShare: number; bestInputShare: number; bestServeShareMid: number; bestInputShareMid: number;
   /** 大入りだった時間の割合の平均／手が止まった秒数の平均／調達の回数の平均 */
   feverShare: number; blockedSecs: number; trips: number;
 }
@@ -34,6 +34,8 @@ function row(strat: Strategy, [kps, miss, think]: readonly [number, number, numb
   const days: BotDay[] = full.flatMap((r) => r.days);
   const paid = days.flatMap((d) => d.paid);
   const served = days.reduce((n, d) => n + d.served, 0);
+  // 1皿の割合は、目標の3割以上を売った日だけで数える（売上の小さい日で割合がふくらまないように）
+  const counted = days.filter((d) => d.sales >= d.goal * 0.3 && d.sales > 0);
   return {
     strategy: strat.name, kps, miss, think, loop, state, aim,
     clear: real.filter((r) => r.cleared).length,
@@ -42,8 +44,10 @@ function row(strat: Strategy, [kps, miss, think]: readonly [number, number, numb
     medianPaid: paid.length ? r2(quantile(paid, 0.5)) : null,
     p95Paid: paid.length ? r2(quantile(paid, 0.95)) : null,
     cappedRate: paid.length ? r2(days.reduce((n, d) => n + d.capped, 0) / Math.max(1, served)) : null,
-    bestServeShare: r2(Math.max(...days.map((d) => (d.sales > 0 ? d.bestServe / d.sales : 0)))),
-    bestInputShare: r2(Math.max(...days.map((d) => (d.sales > 0 ? d.bestInput / d.sales : 0)))),
+    bestServeShare: r2(Math.max(0, ...counted.map((d) => d.bestServe / d.sales))),
+    bestInputShare: r2(Math.max(0, ...counted.map((d) => d.bestInput / d.sales))),
+    bestServeShareMid: counted.length ? r2(quantile(counted.map((d) => d.bestServe / d.sales), 0.5)) : 0,
+    bestInputShareMid: counted.length ? r2(quantile(counted.map((d) => d.bestInput / d.sales), 0.5)) : 0,
     feverShare: r2(avg(days.map((d) => d.feverSecs / Math.max(1, d.seconds)))),
     blockedSecs: Math.round(avg(days.map((d) => d.blockedSecs))),
     trips: r2(avg(days.map((d) => d.trips))),
@@ -60,7 +64,7 @@ export function runSim(label: string, aims: SimRow['aim'][]) {
   const rows: SimRow[] = [];
   const add = (r: SimRow) => {
     rows.push(r);
-    console.log(`${r.state} のれん${r.loop} ${r.kps}打/秒 ${r.aim} ${r.strategy} クリア${r.clear}/${SIM_SEEDS.length} 到達${r.reached.join('/')} 達成率${r.ratio.join('/')}% 倍率 中央${r.medianPaid ?? '-'} 上位5%${r.p95Paid ?? '-'} 上限${r.cappedRate ?? '-'} 最高皿${r.bestServeShare} 最高入力${r.bestInputShare} 大入り${r.feverShare} 停止${r.blockedSecs}秒 調達${r.trips}`);
+    console.log(`${r.state} のれん${r.loop} ${r.kps}打/秒 ${r.aim} ${r.strategy} クリア${r.clear}/${SIM_SEEDS.length} 到達${r.reached.join('/')} 達成率${r.ratio.join('/')}% 倍率 中央${r.medianPaid ?? '-'} 上位5%${r.p95Paid ?? '-'} 上限${r.cappedRate ?? '-'} 最高皿${r.bestServeShare}(中${r.bestServeShareMid}) 最高入力${r.bestInputShare}(中${r.bestInputShareMid}) 大入り${r.feverShare} 停止${r.blockedSecs}秒 調達${r.trips}`);
   };
   const strats = [RANDOM, ...BUILDS];
   for (const aim of aims) {

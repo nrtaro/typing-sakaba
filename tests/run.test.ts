@@ -249,18 +249,18 @@ describe('作り直した方針', () => {
     expect(s.quote(0, ctx)!.factors.some((f) => f.id === 'asaichi')).toBe(false);
   });
 
-  it('おやじの見栄：残っている素材のうち一番少ない素材の皿が×2.5（Lv2）。0個の素材は数えない', () => {
+  it('おやじの見栄：残っている素材のうち一番少ない素材の皿が×3.0（Lv2）。0個の素材は数えない', () => {
     const s = shopWith([{ id: 'mie', lv: 2 }], ['jerky']);
     for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 10;
     s.stock.fish = 0;
     s.stock.meat = 2;
     expect(s.scarcest()).toEqual(['meat']);
-    expect(s.quote(0, { chain: 0, clean: true, saved: false })!.factors).toContainEqual({ id: 'mie', mult: 2.5 });
+    expect(s.quote(0, { chain: 0, clean: true, saved: false })!.factors).toContainEqual({ id: 'mie', mult: 3 });
     for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 0;
     expect(s.scarcest()).toEqual([]);
   });
 
-  it('まかない名人：素材が減らなかった皿が×1.4（Lv2）。予告には付かない', () => {
+  it('まかない名人：素材が減らなかった皿が×1.8（Lv2）。予告には付かない', () => {
     const mods = modsFor([{ id: 'makanai', lv: 2 }]);
     mods.saveChance = 1;
     const s = new Shop(new Rng(1), DIFFICULTIES[1], NORMAL_RULES, mods);
@@ -269,14 +269,14 @@ describe('作り直した方針', () => {
     expect(s.quote(0, { chain: 0, clean: true, saved: false })!.factors.some((f) => f.id === 'makanai')).toBe(false);
     const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
     if (ev.type !== 'serve') throw new Error('serve');
-    expect(ev.factors).toContainEqual({ id: 'makanai', mult: 1.4 });
+    expect(ev.factors).toContainEqual({ id: 'makanai', mult: 1.8 });
     expect(s.stock.fish).toBe(30);
   });
 
-  it('こまめな仕込み：時間帯のはじめの15秒、全部の皿が×1.5（Lv2）。昼のはじめからも数える', () => {
+  it('こまめな仕込み：時間帯のはじめの15秒、全部の皿が×1.8（Lv2）。昼のはじめからも数える', () => {
     const s = shopWith([{ id: 'shikomi', lv: 2 }], ['grilledFish']);
     const ctx = { chain: 0, clean: true, saved: false };
-    const has = () => s.quote(0, ctx)!.factors.some((f) => f.id === 'shikomi' && f.mult === 1.5);
+    const has = () => s.quote(0, ctx)!.factors.some((f) => f.id === 'shikomi' && f.mult === 1.8);
     s.clock = 10;
     expect(has()).toBe(true);
     s.clock = 20;
@@ -382,12 +382,12 @@ describe('作り直した方針', () => {
     expect(open.quote(0, { chain: 0, clean: true, saved: false })!.factors.some((f) => f.id === 'yobikomi')).toBe(false);
   });
 
-  it('看板娘：待ち時間が半分を切ったお客の皿が×1.8（Lv2）', () => {
+  it('看板娘：待ち時間が半分を切ったお客の皿が×2.2（Lv2）', () => {
     const s = shopWith([{ id: 'aiso', lv: 2 }], ['grilledFish', 'vegSoup']);
     s.seats[0]!.wait = 14;
     s.seats[1]!.wait = 16;
     const ctx = { chain: 0, clean: true, saved: false };
-    expect(s.quote(0, ctx)!.factors).toContainEqual({ id: 'aiso', mult: 1.8 });
+    expect(s.quote(0, ctx)!.factors).toContainEqual({ id: 'aiso', mult: 2.2 });
     expect(s.quote(1, ctx)!.factors.some((f) => f.id === 'aiso')).toBe(false);
   });
 
@@ -1006,6 +1006,9 @@ describe('進行', () => {
     expect(b.days[0].sales).not.toBe(a.days[0].sales);
     expect(Math.max(...b.days[0].paid)).toBeLessThanOrEqual(30);
     expect(b.days[0].capped).toBeGreaterThanOrEqual(0);
+    // 予告で選ぶと、倍率の高い皿を先に打つので、皿の倍率の中央値は急ぐ順以上になる
+    const mid = (x: number[]) => [...x].sort((p, q) => p - q)[Math.floor(x.length / 2)];
+    expect(mid(b.days[0].paid)).toBeGreaterThanOrEqual(mid(a.days[0].paid));
   });
 
   it('ボット：方針なしは4日もたない。考えた構成は、でたらめより先まで進む', () => {
@@ -1014,8 +1017,7 @@ describe('進行', () => {
     const built = [11, 23, 37].map((s) => botRun(s, prefer('調達', ['nushi', 'tairyo', 'mie', 'makanai', 'shikomi', 'mouippai']), 6.5, 0.04, 1, undefined, false, 0.35));
     expect(built.filter((r) => r.cleared).length).toBeGreaterThanOrEqual(2);
     const random = [11, 23, 37].map((s) => botRun(s, RANDOM, 6.5, 0.04, 1, undefined, false, 0.35));
-    // 第1段の途中（17の方針は書き直し前）なので「でたらめ以上」。数値の調整（次の計画）で「でたらめより先」に戻す
-    expect(built.filter((r) => r.cleared).length).toBeGreaterThanOrEqual(random.filter((r) => r.cleared).length);
+    expect(built.filter((r) => r.cleared).length).toBeGreaterThan(random.filter((r) => r.cleared).length);
   }, 120000);
 });
 

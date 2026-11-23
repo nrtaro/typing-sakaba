@@ -173,8 +173,9 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
         if (live) { s.input(miss ? 'q' : live.matcher.remaining[0]); continue; }
         const waiting = shop.seats.map((g, i) => ({ g, i })).filter((x) => x.g?.state === 'wait');
         const makeable = waiting.filter((x) => !shop.canMake(x.g!.dish).length).sort((a, b) => a.g!.wait - b.g!.wait);
-        // 予告で選ぶ：待ち時間に余裕のある皿のうち、今出したらいちばん高い皿。なければいちばん急ぐ皿
-        const worth = (i: number) => shop.quote(i, { chain: 0, clean: true, saved: false })?.gain ?? 0;
+        // 予告で選ぶ：待ち時間に余裕のある皿のうち、今出したら倍率がいちばん高い皿。なければいちばん急ぐ皿
+        // 倍率（paid）の高い皿を先に。同じ倍率なら金額の高い皿
+        const worth = (i: number) => { const q = shop.quote(i, { chain: 0, clean: true, saved: false }); return q ? q.paid * 1e6 + q.gain : 0; };
         const roomy = pickBy === 'quote' ? makeable.filter((x) => x.g!.wait >= QUOTE_MARGIN).sort((a, b) => worth(b.i) - worth(a.i)) : [];
         const ok = roomy[0] ?? makeable[0];
         const blocked = waiting.find((x) => shop.canMake(x.g!.dish).length);
