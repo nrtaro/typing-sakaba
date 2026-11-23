@@ -112,7 +112,7 @@ const EXTEND = L(10, 15, 20);
 /** 【延長の倍率】延長営業のあいだの全部の皿 */
 const EXTEND_MULT = L(1.5, 1.8, 2.2);
 /** 【長い読みの倍率】早口自慢 */
-const LONG_MULT = L(1.5, 2.0, 2.5);
+const LONG_MULT = L(2.0, 2.5, 3.0);
 /** 【手間ひまの倍率】2種類の素材の皿／3種類以上の皿 */
 const TEMA2_MULT = L(1.5, 1.8, 2.2);
 const TEMA3_MULT = L(2.0, 2.5, 3.0);
@@ -120,7 +120,7 @@ const TEMA3_MULT = L(2.0, 2.5, 3.0);
 const BOLD_MULT = L(1.2, 1.35, 1.5);
 const BOLD_WAIT = L(0.15, 0.2, 0.25);
 /** 【夜の皿の倍率】宵っ張り */
-const NIGHT_MULT = L(1.5, 1.8, 2.2);
+const NIGHT_MULT = L(1.4, 1.6, 1.8);
 /** 【景気づけの数】10皿ごとに、よく使った素材2種類それぞれに足す数 */
 const KEIKI_GAIN = L(2, 3, 4);
 const pct = (v: number) => `${Math.round(v * 100)}%`;

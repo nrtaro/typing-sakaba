@@ -1127,14 +1127,14 @@ describe('第3段：皿に倍率が付く新しい方針', () => {
   const CTX = { chain: 0, clean: true, saved: false };
   const mult = (q: { factors: { id: string; mult: number }[] } | null, id: string) => q?.factors.find((f) => f.id === id)?.mult;
 
-  it('早口自慢：読み7文字以上の料理を打って出した皿だけ ×1.5→2.0→2.5', () => {
+  it('早口自慢：読み7文字以上の料理を打って出した皿だけ ×2.0→2.5→3.0', () => {
     const s = shopWith([{ id: 'hayakuchi', lv: 3 }], ['vegSoup', 'grilledFish']);
     const long = type(s, 'おんやさいもり').find((e) => e.type === 'serve')!;
     if (long.type !== 'serve') throw new Error('serve');
-    expect(long.factors!.find((f) => f.id === 'hayakuchi')?.mult).toBe(2.5);
+    expect(long.factors!.find((f) => f.id === 'hayakuchi')?.mult).toBe(3.0);
     expect(long.tags).toContain('hayakuchi');
     expect(mult(s.quote(1, CTX), 'hayakuchi')).toBeUndefined();
-    expect(mult(shopWith([{ id: 'hayakuchi', lv: 1 }], ['vegSoup']).quote(0, CTX), 'hayakuchi')).toBe(1.5);
+    expect(mult(shopWith([{ id: 'hayakuchi', lv: 1 }], ['vegSoup']).quote(0, CTX), 'hayakuchi')).toBe(2.0);
     // まとめ出しのついでの皿（8字）には付かない
     const c = shopWith([{ id: 'hayakuchi', lv: 3 }, { id: 'matome', lv: 1 }], ['grilledFish', 'spicyPot']);
     const evs = type(c, 'やきざかな').filter((e) => e.type === 'serve');
@@ -1169,7 +1169,7 @@ describe('第3段：皿に倍率が付く新しい方針', () => {
     expect(s.quote(0, CTX)!.tags).toContain('tsuyoki');
   });
 
-  it('宵っ張り：夜の皿 ×1.5→1.8→2.2、朝昼の皿は ×0.9（判子なし）、延長のあいだも夜', () => {
+  it('宵っ張り：夜の皿 ×1.4→1.6→1.8、朝昼の皿は ×0.9（判子なし）、延長のあいだも夜', () => {
     const s = shopWith([{ id: 'yoippari', lv: 3 }], ['grilledFish']);
     for (const t of [0, 60]) {
       s.clock = t;
@@ -1178,11 +1178,11 @@ describe('第3段：皿に倍率が付く新しい方針', () => {
       expect(q.tags).not.toContain('yoippari');
     }
     s.clock = 120;
-    expect(mult(s.quote(0, CTX), 'yoippari')).toBe(2.2);
+    expect(mult(s.quote(0, CTX), 'yoippari')).toBe(1.8);
     expect(s.quote(0, CTX)!.tags).toContain('yoippari');
     s.extra = 15;
     s.clock = DAY_LENGTH + 3;
-    expect(mult(s.quote(0, CTX), 'yoippari')).toBe(2.2);
+    expect(mult(s.quote(0, CTX), 'yoippari')).toBe(1.8);
     expect(mult(shopWith([], ['grilledFish']).quote(0, CTX), 'yoippari')).toBeUndefined();
     expect(mult(shopWith([{ id: 'yoippari', lv: 1 }], ['grilledFish']).quote(0, CTX), 'yoippari')).toBe(0.9);
   });
