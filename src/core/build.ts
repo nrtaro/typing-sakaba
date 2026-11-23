@@ -39,8 +39,9 @@ export const QUICK_RATIO = 0.7;
 /** 大入り袋：何コンボごとに大入りになるか */
 export const FEVER_EVERY = 10;
 /** おもてなし：前の皿からの間を、何秒ぶんまで数えるか／何秒あいたら効いたと数えるか */
-export const IDLE_MAX = 8;
 export const IDLE_MIN = 2;
+/** 看板娘の愛想：待ち時間の残りがこの割合を切ったお客の皿に効く */
+export const LATE_RATIO = 0.5;
 /** 大盛り：素材の倍率と、方針がないとき（営業条件だけのとき）の売上の倍率 */
 export const BIG_NEED = 2;
 export const BIG_BASE_MULT = 2;
@@ -68,7 +69,12 @@ const FRESH_MULT = L(1.6, 2.1, 2.7);
 const TRIP_MULT = L(1.4, 1.7, 2.0);
 const LOW_MULT = L(1.6, 2.1, 2.8);
 const QUICK_TIP = L(3, 5, 8);
-const ALE_ADD = L(90, 150, 230);
+/** 【もう一杯の倍率】酒を付けた皿 */
+const ALE_MULT = L(1.3, 1.5, 1.8);
+/** 【満席の倍率】呼び込み上手：8席が埋まっているあいだの全部の皿 */
+const FULL_MULT = L(1.2, 1.3, 1.5);
+/** 【遅れて出す皿の倍率】看板娘の愛想 */
+const LATE_MULT = L(1.5, 1.8, 2.2);
 const BIG_CHANCE = L(0.3, 0.45, 0.6);
 const BIG_MULT = L(2.4, 2.8, 3.3);
 const GUESTS = L(0.15, 0.25, 0.4);
@@ -79,7 +85,8 @@ const WAIT = L(0.3, 0.5, 0.7);
 const STOCK = L(2, 3, 5);
 const FEWER = L(0.3, 0.4, 0.5);
 const COMBO_PLUS = L(1, 2, 3);
-const IDLE_TIP = L(30, 45, 65);
+/** 【間をあけた皿の倍率】おもてなし */
+const IDLE_MULT = L(1.6, 2.0, 2.5);
 const IPPATSU = L(1.4, 1.7, 2.0);
 const HEAT_CAP = L(1.5, 1.8, 2.1);
 const MORNING_TRIP = L(2.5, 3.0, 3.5);
@@ -135,8 +142,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'mouippai', name: 'とりあえずもう一杯', kana: 'もういっぱい', family: 'guest', fires: true, starter: true,
     quip: '「頼んでないけど、飲む」',
-    text: '酒以外の料理を出すたび、酒を1杯付けて+{0}円（酒を1つ使う。コンボの倍率も乗る）',
-    vals: v1(ALE_ADD, s),
+    text: '酒以外の料理に酒を1杯付けた皿は売上×{0}（酒を1つ使う）',
+    vals: v1(ALE_MULT, s),
   },
   {
     id: 'oomori', name: '大盛り上等', kana: 'おおもり', family: 'stock', fires: true, starter: false, unlock: '2日目の目標を突破する',
@@ -147,8 +154,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'yobikomi', name: '呼び込み上手', kana: 'よびこみ', family: 'guest', fires: false, starter: true,
     quip: '「通りすがりも、気づけば座ってる」',
-    text: 'お客が{0}多く来る',
-    vals: v1(GUESTS, pct),
+    text: 'お客が{0}多く来る。8席が埋まっているあいだは全部の皿が売上×{1}',
+    vals: v2(GUESTS, FULL_MULT, pct, s),
   },
   {
     id: 'makanai', name: 'まかない名人', kana: 'まかない', family: 'stock', fires: true, starter: false, unlock: 'かけ合わせを3種類見つける',
@@ -165,8 +172,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'aiso', name: '看板娘の愛想', kana: 'あいそ', family: 'guest', fires: false, starter: true,
     quip: '「怒る気が、どこかへ行った」',
-    text: 'お客が{0}長く待ってくれる。怒って帰っても{1}',
-    vals: L([pct(WAIT[0]), '減点なし'], [pct(WAIT[1]), '減点なし'], [pct(WAIT[2]), '減点なし・コンボも続く']),
+    text: 'お客が{0}長く待ち、怒って帰っても{1}。待ち時間が半分を切ったお客の皿は売上×{2}',
+    vals: L([pct(WAIT[0]), '減点なし', s(LATE_MULT[0])], [pct(WAIT[1]), '減点なし', s(LATE_MULT[1])], [pct(WAIT[2]), '減点なし・コンボも続く', s(LATE_MULT[2])]),
   },
   {
     id: 'shikomi', name: 'こまめな仕込み', kana: 'しこみ', family: 'stock', fires: false, starter: true,
@@ -183,8 +190,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'omotenashi', name: 'おもてなし', kana: 'おもてなし', family: 'guest', fires: true, starter: true,
     quip: '「ごゆっくり。ほんとうに、ごゆっくり」',
-    text: `前の皿から${IDLE_MIN}秒以上あけて打って出すとチップ増加。1秒につき+{0}円（${IDLE_MAX}秒ぶんまで。ついでの皿には付かない）`,
-    vals: v1(IDLE_TIP, s),
+    text: `前の皿から${IDLE_MIN}秒以上あけて打った皿は売上×{0}（ついでの皿には付かない）`,
+    vals: v1(IDLE_MULT, s),
   },
   {
     id: 'ippatsu', name: '一発勝負', kana: 'いっぱつ', family: 'combo', fires: true, starter: true,
@@ -355,7 +362,12 @@ export interface BuildMods {
   /** おやじの見栄：一番少ない素材を使う皿の倍率 */
   lowMult: number;
   quickTip: number;
-  aleAdd: number;
+  /** もう一杯：酒を付けた皿の倍率（1 は持っていない） */
+  aleMult: number;
+  /** 呼び込み上手：満席のあいだの倍率／看板娘：遅れて出した皿の倍率／おもてなし：間をあけた皿の倍率 */
+  fullMult: number;
+  lateMult: number;
+  idleMult: number;
   /** 大盛りをたのむお客の割合と、大盛りの売上の倍率 */
   bigChance: number;
   bigMult: number;
@@ -373,8 +385,6 @@ export interface BuildMods {
   phaseStock: number;
   /** 予約のみ：1皿でよけいに進むコンボ */
   comboPlus: number;
-  /** おもてなし：前の皿からの1秒あたりのチップ */
-  idleTip: number;
   /** 営業条件：チップの倍率 */
   tipMult: number;
   /** のれんの試練：お客の歩く速さ／料理が何時間帯ぶん早く出るか／せっかちなお客の割合／怒って帰ったときの減点の倍率 */
@@ -400,9 +410,9 @@ export interface BuildMods {
 export function emptyMods(): BuildMods {
   return {
     chain: 0, refillChance: 0, refillMult: 1, comboCap: 2, missAllowance: 0, freshSecs: 0, freshMult: 1,
-    tripMult: 1, lowMult: 1, quickTip: 1, aleAdd: 0, bigChance: 0, bigMult: BIG_BASE_MULT, everyMult: 1, saveChance: 0,
+    tripMult: 1, lowMult: 1, quickTip: 1, aleMult: 1, fullMult: 1, lateMult: 1, idleMult: 1, bigChance: 0, bigMult: BIG_BASE_MULT, everyMult: 1, saveChance: 0,
     feverSecs: 0, feverMult: 1, waitMult: 1, noAngryPenalty: false, keepCombo: false, startStock: 0, phaseStock: 0,
-    comboPlus: 0, idleTip: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, passive: [], levels: {},
+    comboPlus: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, passive: [], levels: {},
     ippatsuMult: 1, heatCap: 1, morningTrip: 1, laterTrip: 1, extendSecs: 0,
   };
 }
@@ -422,15 +432,15 @@ export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMod
       case 'tairyo': m.tripMult *= TRIP_MULT[i]; break;
       case 'mie': m.lowMult = LOW_MULT[i]; break;
       case 'sekkachi': m.quickTip = QUICK_TIP[i]; break;
-      case 'mouippai': m.aleAdd = ALE_ADD[i]; break;
+      case 'mouippai': m.aleMult = ALE_MULT[i]; break;
       case 'oomori': m.bigChance += BIG_CHANCE[i]; m.bigMult = BIG_MULT[i]; break;
-      case 'yobikomi': m.everyMult /= 1 + GUESTS[i]; break;
+      case 'yobikomi': m.everyMult /= 1 + GUESTS[i]; m.fullMult = FULL_MULT[i]; break;
       case 'makanai': m.saveChance = SAVE[i]; break;
       case 'ooiri': m.feverSecs = FEVER_SECS[i]; m.feverMult = FEVER_MULT[i]; break;
-      case 'aiso': m.waitMult *= 1 + WAIT[i]; m.noAngryPenalty = true; m.keepCombo = i >= 2; break;
+      case 'aiso': m.waitMult *= 1 + WAIT[i]; m.noAngryPenalty = true; m.keepCombo = i >= 2; m.lateMult = LATE_MULT[i]; break;
       case 'shikomi': m.phaseStock += STOCK[i]; break;
       case 'yoyaku': m.everyMult /= 1 - FEWER[i]; m.comboPlus = COMBO_PLUS[i]; break;
-      case 'omotenashi': m.idleTip = IDLE_TIP[i]; break;
+      case 'omotenashi': m.idleMult = IDLE_MULT[i]; break;
       case 'ippatsu': m.ippatsuMult = IPPATSU[i]; break;
       case 'netsu': m.heatCap = HEAT_CAP[i]; break;
       case 'asaichi': m.morningTrip = MORNING_TRIP[i]; m.laterTrip = LATE_TRIP; break;

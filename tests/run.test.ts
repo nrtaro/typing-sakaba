@@ -73,8 +73,9 @@ describe('方針のはたらき', () => {
     if (g1.type !== 'serve' || g2.type !== 'serve') throw new Error('serve');
     expect(g2.pairs).toBe(1);
     expect(g2.pair).toBe(pairKey('matome', 'mouippai'));
-    expect(g2.gain).toBe(g1.gain + 90);
-    expect(g2.paid).toBe(g1.paid);
+    // もう一杯（×1.3）だけが掛かる。かけ合わせの分は足されない
+    expect(g2.paid).toBeCloseTo(g1.paid! * 1.3);
+    expect(g2.gain).toBe(Math.round(g2.base! * g2.paid!));
     expect(two.stock.ale).toBe(28);
     expect(two.buildStats.pairs).toEqual([pairKey('matome', 'mouippai')]);
   });
@@ -85,9 +86,9 @@ describe('方針のはたらき', () => {
     s.clock = 5;
     const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
     if (ev.type !== 'serve') throw new Error('serve');
-    expect(ev.factors).toEqual([{ id: 'ippatsu', mult: 2 }, { id: 'combo', mult: 1.5 }]);
-    expect(ev.paid).toBeCloseTo(3);
-    expect(ev.gain).toBe(Math.round(ev.base! * 3));
+    expect(ev.factors).toEqual([{ id: 'omotenashi', mult: 1.6 }, { id: 'ippatsu', mult: 2 }, { id: 'combo', mult: 1.5 }]);
+    expect(ev.paid).toBeCloseTo(4.8);
+    expect(ev.gain).toBe(Math.round(ev.base! * ev.paid!));
     expect(ev.pair).toBe(pairKey('ippatsu', 'omotenashi'));
   });
 
@@ -286,6 +287,59 @@ describe('作り直した方針', () => {
     const i = s.seats.findIndex((g) => g?.state === 'wait');
     s.build = modsFor([{ id: 'oomori', lv: 3 }], { bigChance: 1 });
     expect(s.quote(i, { chain: 0, clean: true, saved: false })!.factors).toContainEqual({ id: 'oomori', mult: 2.4 });
+  });
+
+  it('もう一杯：酒以外の料理に酒を付けた皿が×1.5（Lv2）。酒が0個・酒の料理には付かない', () => {
+    const s = shopWith([{ id: 'mouippai', lv: 2 }], ['grilledFish', 'ale']);
+    const a = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (a.type !== 'serve') throw new Error('serve');
+    expect(a.factors).toContainEqual({ id: 'mouippai', mult: 1.5 });
+    expect(s.stock.ale).toBe(29);
+    const b = type(s, 'えーる').find((e) => e.type === 'serve')!;
+    if (b.type !== 'serve') throw new Error('serve');
+    expect(b.factors!.some((f) => f.id === 'mouippai')).toBe(false);
+    const dry = shopWith([{ id: 'mouippai', lv: 2 }], ['grilledFish']);
+    dry.stock.ale = 0;
+    const c = type(dry, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (c.type !== 'serve') throw new Error('serve');
+    expect(c.factors!.some((f) => f.id === 'mouippai')).toBe(false);
+  });
+
+  it('もう一杯：まとめ出しのついでの皿でも、その皿で酒を1つ使って付く', () => {
+    const s = shopWith([{ id: 'matome', lv: 1 }, { id: 'mouippai', lv: 1 }], ['grilledFish', 'driedFish']);
+    const serves = type(s, 'やきざかな').filter((e) => e.type === 'serve');
+    expect(serves).toHaveLength(2);
+    for (const e of serves) if (e.type === 'serve') expect(e.factors).toContainEqual({ id: 'mouippai', mult: 1.3 });
+    expect(s.stock.ale).toBe(28);
+  });
+
+  it('呼び込み：8席が埋まっているあいだ、全部の皿が×1.3（Lv2）', () => {
+    const full = shopWith([{ id: 'yobikomi', lv: 2 }], ['grilledFish', 'vegSoup', 'jerky', 'mushSaute', 'stirFry', 'karaage', 'fishFry', 'herbFish']);
+    for (let i = 1; i < 8; i++) full.seats[i]!.state = 'walk';
+    expect(full.quote(0, { chain: 0, clean: true, saved: false })!.factors).toContainEqual({ id: 'yobikomi', mult: 1.3 });
+    const open = shopWith([{ id: 'yobikomi', lv: 2 }], ['grilledFish', 'vegSoup']);
+    expect(open.quote(0, { chain: 0, clean: true, saved: false })!.factors.some((f) => f.id === 'yobikomi')).toBe(false);
+  });
+
+  it('看板娘：待ち時間が半分を切ったお客の皿が×1.8（Lv2）', () => {
+    const s = shopWith([{ id: 'aiso', lv: 2 }], ['grilledFish', 'vegSoup']);
+    s.seats[0]!.wait = 14;
+    s.seats[1]!.wait = 16;
+    const ctx = { chain: 0, clean: true, saved: false };
+    expect(s.quote(0, ctx)!.factors).toContainEqual({ id: 'aiso', mult: 1.8 });
+    expect(s.quote(1, ctx)!.factors.some((f) => f.id === 'aiso')).toBe(false);
+  });
+
+  it('おもてなし：前の皿から2秒以上あけて打った皿が×2.0（Lv2）。ついでの皿には付かない', () => {
+    const s = shopWith([{ id: 'omotenashi', lv: 2 }, { id: 'matome', lv: 1 }], ['grilledFish', 'driedFish']);
+    s.clock = 5;
+    const [a, b] = type(s, 'やきざかな').filter((e) => e.type === 'serve');
+    if (a.type !== 'serve' || b.type !== 'serve') throw new Error('serve');
+    expect(a.factors).toContainEqual({ id: 'omotenashi', mult: 2 });
+    expect(b.factors!.some((f) => f.id === 'omotenashi')).toBe(false);
+    const soon = shopWith([{ id: 'omotenashi', lv: 2 }], ['grilledFish']);
+    soon.clock = 1.5;
+    expect(soon.quote(0, { chain: 0, clean: true, saved: false })!.factors.some((f) => f.id === 'omotenashi')).toBe(false);
   });
 
   it('予約のみ：1皿でコンボがよけいに進む／おもてなし：間があくほどチップが増える', () => {

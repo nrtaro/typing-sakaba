@@ -2,7 +2,7 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
-import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MAX, IDLE_MIN, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
 import { priceOf, type Factor, type Price } from './dishPrice';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
@@ -483,7 +483,6 @@ export class Shop {
     const factors: Factor[] = [];
     const tip = Math.round((g.wait / g.maxWait) * SHOP.tipMax);
     let tipB = tip * b.tipMult;
-    let add = 0;
     let heat: number | undefined;
     const nextCombo = this.combo + 1 + b.comboPlus;
     // まとめ出しのついでの皿：割り引かず、その皿の条件で計算する（打った腕前の倍率は付かない）
@@ -494,14 +493,17 @@ export class Shop {
     // おやじの見栄：素材を使う前の「一番少ない素材」で決める
     if (b.lowMult > 1 && this.scarcest().some((id) => g.dish.need[id])) { tags.push('mie'); factors.push({ id: 'mie', mult: b.lowMult }); }
     if (b.quickTip > 1 && g.wait / g.maxWait >= QUICK_RATIO) { tags.push('sekkachi'); tipB *= b.quickTip; }
-    if (b.aleAdd > 0 && !g.dish.need.ale && this.stock.ale > 0) { add = b.aleAdd; tags.push('mouippai'); }
+    if (b.aleMult > 1 && !g.dish.need.ale && this.stock.ale > 0) { tags.push('mouippai'); factors.push({ id: 'mouippai', mult: b.aleMult }); }
+    // 呼び込み上手：8席が埋まっているあいだ
+    if (b.fullMult > 1 && this.seats.every((x) => x)) { tags.push('yobikomi'); factors.push({ id: 'yobikomi', mult: b.fullMult }); }
+    // 看板娘の愛想：待ち時間が半分を切ったお客
+    if (b.lateMult > 1 && g.wait / g.maxWait < LATE_RATIO) { tags.push('aiso'); factors.push({ id: 'aiso', mult: b.lateMult }); }
     if (g.big && g.bigMult) {
       if (g.bigFrom === 'policy') { tags.push('oomori'); factors.push({ id: 'oomori', mult: g.bigMult }); }
       else factors.push({ id: 'big', mult: g.bigMult });
     }
-    // おもてなし：前の皿からあいた秒数ぶん、チップが増える（まとめ出しのついでの皿には付かない）
-    const idle = Math.min(IDLE_MAX, this.clock - this.lastServeAt);
-    if (b.idleTip > 0 && chain === 0 && idle >= IDLE_MIN) { tags.push('omotenashi'); tipB += Math.round(idle * b.idleTip) * b.tipMult; }
+    // おもてなし：前の皿から間をあけて打った皿（まとめ出しのついでの皿には付かない）
+    if (b.idleMult > 1 && chain === 0 && this.clock - this.lastServeAt >= IDLE_MIN) { tags.push('omotenashi'); factors.push({ id: 'omotenashi', mult: b.idleMult }); }
     if (saved) tags.push('makanai');
     if (this.fever && b.feverMult > 1) { tags.push('ooiri'); factors.push({ id: 'ooiri', mult: b.feverMult }); }
     // 一発勝負・連打の熱：打った皿だけ（まとめ出しのついでの皿には付かない）
@@ -516,7 +518,7 @@ export class Shop {
     factors.push({ id: 'combo', mult: this.comboMultAt(nextCombo) });
     if (this.hidenArmed) factors.push({ id: 'hiden', mult: HIDEN_MULT });
     if (g.banquet) factors.push({ id: 'banquet', mult: BANQUET_MULT });
-    return { ...priceOf(g.dish.price + tipB + add, factors), tags, heat };
+    return { ...priceOf(g.dish.price + tipB, factors), tags, heat };
   }
 
   /** 1皿を出して、積んだ serve イベントを返す。chain はまとめ出しの何皿目か（0 は打った皿）。発見の記録は serve() が行う */
