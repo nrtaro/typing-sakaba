@@ -338,6 +338,7 @@ export class Shop {
       if (this.combo > 0 && ++this.comboMistakes > this.comboMissAllowance) {
         this.combo = 0;
         this.comboMistakes = 0;
+        this.feverCount = 0;
         this.events.push({ type: 'comboBreak' });
       }
       this.events.push({ type: 'key', ok: false, count: 0 });
@@ -492,7 +493,10 @@ export class Shop {
     if (this.fresh > 0 && b.freshMult > 1) { tags.push('nushi'); factors.push({ id: 'nushi', mult: b.freshMult }); }
     // おやじの見栄：素材を使う前の「一番少ない素材」で決める
     if (b.lowMult > 1 && this.scarcest().some((id) => g.dish.need[id])) { tags.push('mie'); factors.push({ id: 'mie', mult: b.lowMult }); }
-    if (b.quickTip > 1 && g.wait / g.maxWait >= QUICK_RATIO) { tags.push('sekkachi'); tipB *= b.quickTip; }
+    if (b.quickMult > 1 && g.wait / g.maxWait >= QUICK_RATIO) { tags.push('sekkachi'); factors.push({ id: 'sekkachi', mult: b.quickMult }); }
+    if (b.yoyakuMult > 1) { tags.push('yoyaku'); factors.push({ id: 'yoyaku', mult: b.yoyakuMult }); }
+    // 延長営業：閉店時刻を過ぎた延長のあいだ
+    if (b.extendMult > 1 && this.extra > 0 && this.clock >= DAY_LENGTH) { tags.push('encho'); factors.push({ id: 'encho', mult: b.extendMult }); }
     if (b.aleMult > 1 && !g.dish.need.ale && this.stock.ale > 0) { tags.push('mouippai'); factors.push({ id: 'mouippai', mult: b.aleMult }); }
     // 呼び込み上手：8席が埋まっているあいだ
     if (b.fullMult > 1 && this.seats.every((x) => x)) { tags.push('yobikomi'); factors.push({ id: 'yobikomi', mult: b.fullMult }); }
@@ -529,7 +533,6 @@ export class Shop {
     // 繁盛記：素材を使う前・コンボが進む前の状態で見積もり、その額で確定する
     const q = b ? this.price(seat, { chain, clean: this.wordMisses === 0, saved }) : null;
     if (!saved) for (const [id, n] of Object.entries(g.dish.need)) this.takeStock(id as IngredientId, n!);
-    const comboBefore = this.combo;
     this.combo += 1 + (b?.comboPlus ?? 0);
     this.comboMistakes = 0;
     this.stats.maxCombo = Math.max(this.stats.maxCombo, this.combo);
@@ -582,8 +585,9 @@ export class Shop {
     if (!b || !q) this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
     else {
       this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, dish, clean, heat: heatNow, base: q.base, raw: q.raw, paid: q.paid, capped: q.capped, factors: q.factors });
-      // 大入り袋：10コンボごとに大入り（最中に届いたら延ばす）
-      if (b.feverSecs > 0 && Math.floor(this.combo / FEVER_EVERY) > Math.floor(comboBefore / FEVER_EVERY)) {
+      // 大入り袋：コンボを切らさずに FEVER_EVERY 皿出したら大入り（最中に届いたら延ばす）
+      if (b.feverSecs > 0 && ++this.feverCount >= FEVER_EVERY) {
+        this.feverCount = 0;
         this.feverUntil = this.clock + b.feverSecs;
         this.feverOn = true;
         this.buildStats.fevers++;
@@ -617,6 +621,8 @@ export class Shop {
     for (const x of setsHit) if (!st.sets.includes(setKey(x))) { st.sets.push(setKey(x)); ev.set ??= setKey(x); }
   }
   private feverOn = false;
+  /** 大入り袋：コンボを切らさずに出した皿の数（コンボが切れたら 0） */
+  feverCount = 0;
 
   /** ミスで素材をこぼす：打っている料理の素材から。打っていなければ一番多い素材から */
   private spill() {
@@ -807,6 +813,7 @@ export class Shop {
           if (!this.build?.keepCombo) {
             this.combo = 0;
             this.comboMistakes = 0;
+            this.feverCount = 0;
           }
           if (!this.build?.noAngryPenalty) this.score = Math.max(0, this.score - SHOP.angryPenalty * (this.build?.angryMult ?? 1) * this.rules.angryPenaltyMult * (g.banquet ? BANQUET_PENALTY_MULT : 1));
           this.events.push({ type: 'angry', seat: i });

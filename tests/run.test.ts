@@ -125,9 +125,10 @@ describe('方針のはたらき', () => {
     expect(q.tags).toEqual(expect.arrayContaining(['mie', 'mouippai', 'ippatsu']));
   });
 
-  it('領収書はいらない：コンボ倍率の上限が上がる／大入り袋：10コンボごとに大入り', () => {
+  it('領収書はいらない：コンボ倍率の上限が上がる／大入り袋：コンボを切らさずに10皿で大入り', () => {
     const s = shopWith([{ id: 'ryoshusho', lv: 3 }, { id: 'ooiri', lv: 1 }], []);
     s.combo = 69;
+    s.feverCount = 9;
     expect(s.multiplier).toBe(3.5);
     s.seats[0] = guest('grilledFish');
     const evs = type(s, 'やきざかな');
@@ -342,6 +343,69 @@ describe('作り直した方針', () => {
     expect(soon.quote(0, { chain: 0, clean: true, saved: false })!.factors.some((f) => f.id === 'omotenashi')).toBe(false);
   });
 
+  it('待たせない店：待ち時間が7割以上残っているお客の皿が×1.8（Lv2）。チップは倍にならない', () => {
+    const s = shopWith([{ id: 'sekkachi', lv: 2 }], ['grilledFish', 'vegSoup']);
+    s.seats[0]!.wait = 21;
+    s.seats[1]!.wait = 20;
+    const ctx = { chain: 0, clean: true, saved: false };
+    const a = s.quote(0, ctx)!;
+    expect(a.factors).toContainEqual({ id: 'sekkachi', mult: 1.8 });
+    expect(a.base).toBe(dish('grilledFish').price + Math.round((21 / 30) * 60));
+    expect(s.quote(1, ctx)!.factors.some((f) => f.id === 'sekkachi')).toBe(false);
+  });
+
+  it('予約のみ：全部の皿が×1.6（Lv2）。1皿でコンボが3進む', () => {
+    const s = shopWith([{ id: 'yoyaku', lv: 2 }], ['grilledFish']);
+    const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.factors).toContainEqual({ id: 'yoyaku', mult: 1.6 });
+    expect(s.combo).toBe(3);
+  });
+
+  it('大入り袋：コンボを切らさずに10皿出すと大入り。予約のみでコンボが速く進んでも、皿の数で数える', () => {
+    const s = shopWith([{ id: 'yoyaku', lv: 3 }, { id: 'ooiri', lv: 1 }], []);
+    for (let n = 0; n < 9; n++) { s.seats[0] = guest('grilledFish'); type(s, 'やきざかな'); }
+    expect(s.combo).toBe(36);
+    expect(s.fever).toBe(false);
+    s.seats[0] = guest('grilledFish');
+    expect(type(s, 'やきざかな').some((e) => e.type === 'fever' && e.on)).toBe(true);
+    s.seats[0] = guest('grilledFish');
+    const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.factors).toContainEqual({ id: 'ooiri', mult: 1.3 });
+  });
+
+  it('大入り袋：ミスや怒って帰ってコンボが切れたら数え直す。看板娘Lv3でコンボが続くときは数え直さない', () => {
+    const s = shopWith([{ id: 'ooiri', lv: 1 }], []);
+    for (let n = 0; n < 5; n++) { s.seats[0] = guest('grilledFish'); type(s, 'やきざかな'); }
+    expect(s.feverCount).toBe(5);
+    for (let n = 0; n < 4; n++) s.key('q');
+    expect(s.combo).toBe(0);
+    expect(s.feverCount).toBe(0);
+    for (let n = 0; n < 3; n++) { s.seats[0] = guest('grilledFish'); type(s, 'やきざかな'); }
+    s.seats[1] = guest('vegSoup', 0.01);
+    s.update(0.05);
+    expect(s.feverCount).toBe(0);
+    const keep = shopWith([{ id: 'ooiri', lv: 1 }, { id: 'aiso', lv: 3 }], []);
+    for (let n = 0; n < 3; n++) { keep.seats[0] = guest('grilledFish'); type(keep, 'やきざかな'); }
+    keep.seats[1] = guest('vegSoup', 0.01);
+    keep.update(0.05);
+    expect(keep.stats.angry).toBe(1);
+    expect(keep.feverCount).toBe(3);
+  });
+
+  it('延長営業：延長のあいだだけ、全部の皿が×1.8（Lv2）', () => {
+    const s = shopWith([{ id: 'encho', lv: 2 }], ['grilledFish']);
+    const ctx = { chain: 0, clean: true, saved: false };
+    s.clock = 179.9;
+    s.combo = 30;
+    expect(s.quote(0, ctx)!.factors.some((f) => f.id === 'encho')).toBe(false);
+    s.update(0.2);
+    expect(s.extra).toBe(15);
+    s.seats[0]!.wait = 20;
+    expect(s.quote(0, ctx)!.factors).toContainEqual({ id: 'encho', mult: 1.8 });
+  });
+
   it('予約のみ：1皿でコンボがよけいに進む／おもてなし：間があくほどチップが増える', () => {
     const s = shopWith([{ id: 'yoyaku', lv: 3 }, { id: 'omotenashi', lv: 1 }], ['grilledFish', 'vegSoup']);
     s.clock = 20;
@@ -485,8 +549,8 @@ describe('一発勝負・連打の熱・朝市・延長営業と、型', () => {
     if (ev.type !== 'serve') throw new Error('serve');
     expect(ev.sets).toBe(1);
     expect(ev.set).toBe(setKey(SETS[0]));
-    // 熱（×1.5）と大入り（×1.3）だけが掛かる。かけ合わせ・型の分は足されない
-    expect(ev.paid).toBeCloseTo(1.5 * 1.3);
+    // 熱（×1.5）・大入り（×1.3）・待たせない店（×1.5）だけが掛かる。かけ合わせ・型の分は足されない
+    expect(ev.paid).toBeCloseTo(1.5 * 1.3 * 1.5);
     expect(ev.gain).toBe(Math.round(ev.base! * ev.paid!));
     expect(s.buildStats.sets).toEqual([setKey(SETS[0])]);
   });

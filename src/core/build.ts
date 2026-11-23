@@ -36,7 +36,7 @@ export const MAX_SLOTS = 5;
 export const MAX_LEVEL = 3;
 /** 待たせない店：待ち時間がこの割合以上残っている客が対象 */
 export const QUICK_RATIO = 0.7;
-/** 大入り袋：何コンボごとに大入りになるか */
+/** 大入り袋：コンボを切らさずに何皿出すごとに大入りになるか（予約のみでコンボが速く進んでも皿の数で数える） */
 export const FEVER_EVERY = 10;
 /** おもてなし：前の皿からの間を、何秒ぶんまで数えるか／何秒あいたら効いたと数えるか */
 export const IDLE_MIN = 2;
@@ -68,7 +68,10 @@ const FRESH_SECS = L(14, 18, 24);
 const FRESH_MULT = L(1.6, 2.1, 2.7);
 const TRIP_MULT = L(1.4, 1.7, 2.0);
 const LOW_MULT = L(1.6, 2.1, 2.8);
-const QUICK_TIP = L(3, 5, 8);
+/** 【早く出した皿の倍率】待たせない店 */
+const QUICK_MULT = L(1.5, 1.8, 2.2);
+/** 【予約のみの倍率】全部の皿 */
+const YOYAKU_MULT = L(1.4, 1.6, 1.8);
 /** 【もう一杯の倍率】酒を付けた皿 */
 const ALE_MULT = L(1.3, 1.5, 1.8);
 /** 【満席の倍率】呼び込み上手：8席が埋まっているあいだの全部の皿 */
@@ -91,6 +94,8 @@ const IPPATSU = L(1.4, 1.7, 2.0);
 const HEAT_CAP = L(1.5, 1.8, 2.1);
 const MORNING_TRIP = L(2.5, 3.0, 3.5);
 const EXTEND = L(10, 15, 20);
+/** 【延長の倍率】延長営業のあいだの全部の皿 */
+const EXTEND_MULT = L(1.5, 1.8, 2.2);
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const v2 = <A, B>(a: [A, A, A], b: [B, B, B], f: (x: A) => string, g: (x: B) => string) => L([f(a[0]), g(b[0])], [f(a[1]), g(b[1])], [f(a[2]), g(b[2])]);
 const v1 = <A>(a: [A, A, A], f: (x: A) => string) => L([f(a[0])], [f(a[1])], [f(a[2])]);
@@ -136,8 +141,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'sekkachi', name: '待たせない店', kana: 'またせない', family: 'combo', fires: true, starter: true,
     quip: '「座る前に出てきたんだが」',
-    text: '待ち時間が7割以上残っているお客に出すと、チップ（早いほど多い・最大60円）が×{0}',
-    vals: v1(QUICK_TIP, s),
+    text: '待ち時間が7割以上残っているお客の皿は売上×{0}',
+    vals: v1(QUICK_MULT, s),
   },
   {
     id: 'mouippai', name: 'とりあえずもう一杯', kana: 'もういっぱい', family: 'guest', fires: true, starter: true,
@@ -166,7 +171,7 @@ export const POLICIES: Policy[] = [
   {
     id: 'ooiri', name: '大入り袋', kana: 'おおいり', family: 'combo', fires: true, starter: false, unlock: '繁盛記で30コンボを出す',
     quip: '「袋が配りきれん。もう投げろ」',
-    text: '10コンボごとに{0}秒の「大入り」。そのあいだは全部の皿が売上×{1}',
+    text: 'コンボを切らさずに10皿出すごとに{0}秒の「大入り」。そのあいだは全部の皿が売上×{1}',
     vals: v2(FEVER_SECS, FEVER_MULT, s, s),
   },
   {
@@ -184,8 +189,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'yoyaku', name: '予約のみ', kana: 'よやく', family: 'combo', fires: false, starter: true,
     quip: '「本日は、ご予約のお客様だけ」',
-    text: 'お客が{0}減る。かわりに、1皿出すとコンボが{1}進む',
-    vals: v2(FEWER, COMBO_PLUS, pct, (n) => String(n + 1)),
+    text: 'お客が{0}減る。かわりに全部の皿が売上×{1}、1皿出すとコンボが{2}進む',
+    vals: L([pct(FEWER[0]), s(YOYAKU_MULT[0]), String(COMBO_PLUS[0] + 1)], [pct(FEWER[1]), s(YOYAKU_MULT[1]), String(COMBO_PLUS[1] + 1)], [pct(FEWER[2]), s(YOYAKU_MULT[2]), String(COMBO_PLUS[2] + 1)]),
   },
   {
     id: 'omotenashi', name: 'おもてなし', kana: 'おもてなし', family: 'guest', fires: true, starter: true,
@@ -214,8 +219,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'encho', name: '延長営業', kana: 'えんちょう', family: 'combo', fires: false, starter: true,
     quip: '「のれんは、勢いが止まるまで下ろさない」',
-    text: `閉店の時点でコンボが${ENCHO_COMBO}以上なら、営業が{0}秒延びる（1日1回）`,
-    vals: v1(EXTEND, s),
+    text: `閉店の時点でコンボが${ENCHO_COMBO}以上なら、営業が{0}秒延びる（1日1回）。延長のあいだは全部の皿が売上×{1}`,
+    vals: v2(EXTEND, EXTEND_MULT, s, s),
   },
 ];
 
@@ -361,7 +366,10 @@ export interface BuildMods {
   tripMult: number;
   /** おやじの見栄：一番少ない素材を使う皿の倍率 */
   lowMult: number;
-  quickTip: number;
+  /** 待たせない店：早く出した皿の倍率／予約のみ：全部の皿の倍率／延長営業：延長のあいだの倍率（1 は持っていない） */
+  quickMult: number;
+  yoyakuMult: number;
+  extendMult: number;
   /** もう一杯：酒を付けた皿の倍率（1 は持っていない） */
   aleMult: number;
   /** 呼び込み上手：満席のあいだの倍率／看板娘：遅れて出した皿の倍率／おもてなし：間をあけた皿の倍率 */
@@ -410,7 +418,7 @@ export interface BuildMods {
 export function emptyMods(): BuildMods {
   return {
     chain: 0, refillChance: 0, refillMult: 1, comboCap: 2, missAllowance: 0, freshSecs: 0, freshMult: 1,
-    tripMult: 1, lowMult: 1, quickTip: 1, aleMult: 1, fullMult: 1, lateMult: 1, idleMult: 1, bigChance: 0, bigMult: BIG_BASE_MULT, everyMult: 1, saveChance: 0,
+    tripMult: 1, lowMult: 1, quickMult: 1, yoyakuMult: 1, extendMult: 1, aleMult: 1, fullMult: 1, lateMult: 1, idleMult: 1, bigChance: 0, bigMult: BIG_BASE_MULT, everyMult: 1, saveChance: 0,
     feverSecs: 0, feverMult: 1, waitMult: 1, noAngryPenalty: false, keepCombo: false, startStock: 0, phaseStock: 0,
     comboPlus: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, passive: [], levels: {},
     ippatsuMult: 1, heatCap: 1, morningTrip: 1, laterTrip: 1, extendSecs: 0,
@@ -431,7 +439,7 @@ export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMod
       case 'nushi': m.freshSecs = FRESH_SECS[i]; m.freshMult = FRESH_MULT[i]; break;
       case 'tairyo': m.tripMult *= TRIP_MULT[i]; break;
       case 'mie': m.lowMult = LOW_MULT[i]; break;
-      case 'sekkachi': m.quickTip = QUICK_TIP[i]; break;
+      case 'sekkachi': m.quickMult = QUICK_MULT[i]; break;
       case 'mouippai': m.aleMult = ALE_MULT[i]; break;
       case 'oomori': m.bigChance += BIG_CHANCE[i]; m.bigMult = BIG_MULT[i]; break;
       case 'yobikomi': m.everyMult /= 1 + GUESTS[i]; m.fullMult = FULL_MULT[i]; break;
@@ -439,12 +447,12 @@ export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMod
       case 'ooiri': m.feverSecs = FEVER_SECS[i]; m.feverMult = FEVER_MULT[i]; break;
       case 'aiso': m.waitMult *= 1 + WAIT[i]; m.noAngryPenalty = true; m.keepCombo = i >= 2; m.lateMult = LATE_MULT[i]; break;
       case 'shikomi': m.phaseStock += STOCK[i]; break;
-      case 'yoyaku': m.everyMult /= 1 - FEWER[i]; m.comboPlus = COMBO_PLUS[i]; break;
+      case 'yoyaku': m.everyMult /= 1 - FEWER[i]; m.comboPlus = COMBO_PLUS[i]; m.yoyakuMult = YOYAKU_MULT[i]; break;
       case 'omotenashi': m.idleMult = IDLE_MULT[i]; break;
       case 'ippatsu': m.ippatsuMult = IPPATSU[i]; break;
       case 'netsu': m.heatCap = HEAT_CAP[i]; break;
       case 'asaichi': m.morningTrip = MORNING_TRIP[i]; m.laterTrip = LATE_TRIP; break;
-      case 'encho': m.extendSecs = EXTEND[i]; break;
+      case 'encho': m.extendSecs = EXTEND[i]; m.extendMult = EXTEND_MULT[i]; break;
     }
   }
   return m;
