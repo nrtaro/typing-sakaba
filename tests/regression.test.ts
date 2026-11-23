@@ -72,11 +72,22 @@ describe('古い保存データ', () => {
     const meta = emptyMeta();
     // 組が増える前（第3段より前）の34組だけを全部見つけた記録。組が増えても実績は消さない
     meta.discovered = PAIRS.slice(0, 34).map((p) => pairKey(p.a, p.b));
+    // 更新前の保存データには allPairs の項目がない
+    delete (meta.flags as Partial<typeof meta.flags>).allPairs;
     const back = roundTrip(meta);
     expect(back.discovered).toHaveLength(34);
     expect(earnedAchievements(back)).toContain('run-discover-all');
     const short = emptyMeta();
     short.discovered = PAIRS.slice(0, 33).map((p) => pairKey(p.a, p.b));
     expect(earnedAchievements(roundTrip(short))).not.toContain('run-discover-all');
+  });
+
+  it('更新のあとに34組目を見つけた記録（44組中34組）は、読み直しても秘伝の書にならない', () => {
+    const meta = emptyMeta();
+    meta.discovered = PAIRS.slice(0, 34).map((p) => pairKey(p.a, p.b));
+    expect(meta.flags.allPairs).toBe(false);
+    const back = roundTrip(meta);
+    expect(earnedAchievements(back)).not.toContain('run-discover-all');
+    expect(earnedAchievements(roundTrip(back))).not.toContain('run-discover-all');
   });
 });

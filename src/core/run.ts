@@ -285,9 +285,9 @@ export function readMeta(raw: unknown): RunMeta {
   m.sigs = [...new Set(arr(o.sigs).filter(isPolicy))];
   m.policies = [...new Set(arr(o.policies).filter(isPolicy))];
   const f = obj(o.flags);
-  // 第3段より前の34組を全部見つけていた記録も、全部見つけたものとして残す
+  // 第3段より前の保存データ（allPairs の項目がない）で34組を全部見つけていた記録は、全部見つけたものとして残す
   const firstAll = PAIRS.slice(0, FIRST_PAIRS).every((p) => m.discovered.includes(pairKey(p.a, p.b)));
-  m.flags = { noAngry: f.noAngry === true, max3: f.max3 === true, allPairs: f.allPairs === true || firstAll };
+  m.flags = { noAngry: f.noAngry === true, max3: f.max3 === true, allPairs: f.allPairs === true || (f.allPairs === undefined && firstAll) };
   m.active = readRun(o.active);
   const l = obj(o.last);
   if (typeof l.at === 'string') {
