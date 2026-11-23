@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { emptyMeta, type RunMeta } from '../src/core/run';
+import type { PolicyId } from '../src/core/build';
 import { allMeta, botRun, BUILDS, RANDOM, type BotDay, type Strategy } from './runBot';
 
 export const SIM_SEEDS = [11, 23, 37, 41, 59, 67, 83, 97];
@@ -19,6 +20,8 @@ export interface SimRow {
   bestServeShare: number; bestInputShare: number; bestServeShareMid: number; bestInputShareMid: number;
   /** 大入りだった時間の割合の平均／手が止まった秒数の平均／調達の回数の平均 */
   feverShare: number; blockedSecs: number; trips: number;
+  /** 方針ごとに、倍率が乗った皿の数 ÷ 出した皿の数（4日目まで続けた結果） */
+  boostShare: Partial<Record<PolicyId, number>>;
 }
 
 const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
@@ -51,6 +54,9 @@ function row(strat: Strategy, [kps, miss, think]: readonly [number, number, numb
     feverShare: r2(avg(days.map((d) => d.feverSecs / Math.max(1, d.seconds)))),
     blockedSecs: Math.round(avg(days.map((d) => d.blockedSecs))),
     trips: r2(avg(days.map((d) => d.trips))),
+    boostShare: Object.fromEntries(
+      [...new Set(days.flatMap((d) => Object.keys(d.boosted)))].map((id) => [id, r2(days.reduce((n, d) => n + (d.boosted[id as PolicyId] ?? 0), 0) / Math.max(1, served))]),
+    ),
   };
 }
 
