@@ -60,7 +60,6 @@ export const LATE_TRIP = 0.85;
 
 const L = <T>(a: T, b: T, c: T) => [a, b, c] as [T, T, T];
 const CHAIN = L(1, 2, 3);
-const CHAIN_MULT = L(0.6, 0.7, 0.8);
 const REFILL_CHANCE = L(0.35, 0.5, 0.65);
 const REFILL_MULT = L(2.0, 2.8, 4.0);
 const COMBO_CAP = L(2.5, 3, 3.5);
@@ -94,8 +93,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'matome', name: 'まとめ出し', kana: 'まとめだし', family: 'chain', fires: true, starter: true,
     quip: '「ついでだ、そっちの卓も持ってけ」',
-    text: '料理を出すと、同じ主素材（札の左端の素材）の注文も{0}件いっしょに出る。ついでの皿は売上×{1}',
-    vals: v2(CHAIN, CHAIN_MULT, s, s),
+    text: '料理を出すと、同じ主素材（札の左端の素材）の注文も{0}件いっしょに出る。ついでの皿も、その皿の条件で売上を数える（打った腕前の倍率は打った皿だけ）',
+    vals: v1(CHAIN, s),
   },
   {
     id: 'betsubara', name: 'しめは別腹', kana: 'べつばら', family: 'guest', fires: true, starter: true,
@@ -343,9 +342,8 @@ export interface Owned { id: PolicyId; lv: number }
 
 /** 方針と、その日の営業条件・のれんの試練が営業に与える変更。Shop はこれだけを見る */
 export interface BuildMods {
-  /** まとめ出し：いっしょに出す件数／ついでの皿の倍率 */
+  /** まとめ出し：いっしょに出す件数 */
   chain: number;
-  chainMult: number;
   refillChance: number;
   refillMult: number;
   comboCap: number;
@@ -401,7 +399,7 @@ export interface BuildMods {
 
 export function emptyMods(): BuildMods {
   return {
-    chain: 0, chainMult: 1, refillChance: 0, refillMult: 1, comboCap: 2, missAllowance: 0, freshSecs: 0, freshMult: 1,
+    chain: 0, refillChance: 0, refillMult: 1, comboCap: 2, missAllowance: 0, freshSecs: 0, freshMult: 1,
     tripMult: 1, lowMult: 1, quickTip: 1, aleAdd: 0, bigChance: 0, bigMult: BIG_BASE_MULT, everyMult: 1, saveChance: 0,
     feverSecs: 0, feverMult: 1, waitMult: 1, noAngryPenalty: false, keepCombo: false, startStock: 0, phaseStock: 0,
     comboPlus: 0, idleTip: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, passive: [], levels: {},
@@ -417,7 +415,7 @@ export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMod
     m.levels[id] = i + 1;
     if (!policyOf(id).fires) m.passive.push(id);
     switch (id) {
-      case 'matome': m.chain = CHAIN[i]; m.chainMult = CHAIN_MULT[i]; break;
+      case 'matome': m.chain = CHAIN[i]; break;
       case 'betsubara': m.refillChance += REFILL_CHANCE[i]; m.refillMult = REFILL_MULT[i]; break;
       case 'ryoshusho': m.comboCap = COMBO_CAP[i]; m.missAllowance += i >= 1 ? 1 : 0; break;
       case 'nushi': m.freshSecs = FRESH_SECS[i]; m.freshMult = FRESH_MULT[i]; break;

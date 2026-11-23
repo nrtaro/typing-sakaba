@@ -168,11 +168,51 @@ describe('方針のはたらき', () => {
 });
 
 describe('作り直した方針', () => {
-  it('まとめ出し：ついでの皿は割安（単体では稼ぎすぎない）', () => {
-    const s = shopWith([{ id: 'matome', lv: 1 }], ['grilledFish', 'driedFish']);
+  it('まとめ出し：ついでの皿は割り引かず、その皿の条件で計算する。打った腕前は打った皿だけ', () => {
+    const s = shopWith([{ id: 'matome', lv: 2 }, { id: 'ippatsu', lv: 3 }], ['grilledFish', 'driedFish']);
     const [a, b] = type(s, 'やきざかな').filter((e) => e.type === 'serve');
     if (a.type !== 'serve' || b.type !== 'serve') throw new Error('serve');
-    expect(b.gain).toBe(Math.round(a.gain * 0.6));
+    expect(a.chain).toBe(0);
+    expect(a.factors).toContainEqual({ id: 'ippatsu', mult: 2 });
+    expect(b.chain).toBe(1);
+    expect(b.factors!.some((f) => f.id === 'ippatsu')).toBe(false);
+    expect(b.tags).toContain('matome');
+    expect(b.paid).toBe(1);
+    expect(b.gain).toBe(Math.round(b.base!));
+  });
+
+  it('まとめ出し：打った皿で素材を使い切ったら、ついでの皿は出ず、判子も発見も付かない', () => {
+    const s = shopWith([{ id: 'matome', lv: 3 }, { id: 'mouippai', lv: 1 }], ['grilledFish', 'driedFish']);
+    s.stock.fish = 2;
+    const evs = type(s, 'やきざかな');
+    const serves = evs.filter((e) => e.type === 'serve');
+    expect(serves).toHaveLength(1);
+    const a = serves[0];
+    if (a.type !== 'serve') throw new Error('serve');
+    expect(a.tags).not.toContain('matome');
+    expect(evs.some((e) => e.type === 'chain')).toBe(false);
+    expect(s.buildStats.pairs.some((k) => k.includes('matome'))).toBe(false);
+    expect(s.buildStats.fired.matome).toBeUndefined();
+  });
+
+  it('まとめ出し：ついでの皿が実際に出たときだけ、打った皿にまとめ出しの判子と発見が付く', () => {
+    const s = shopWith([{ id: 'matome', lv: 1 }, { id: 'mouippai', lv: 1 }], ['grilledFish', 'driedFish']);
+    const evs = type(s, 'やきざかな');
+    const a = evs.find((e) => e.type === 'serve');
+    if (a?.type !== 'serve') throw new Error('serve');
+    expect(a.tags).toContain('matome');
+    expect(evs.find((e) => e.type === 'chain')).toMatchObject({ count: 2 });
+    expect(s.buildStats.pairs).toContain(pairKey('matome', 'mouippai'));
+    expect(s.buildStats.fired.matome).toBe(2);
+  });
+
+  it('まとめ出し：1皿ずつ確定するので、ついでの皿のコンボは1皿ごとに進む', () => {
+    const s = shopWith([{ id: 'matome', lv: 2 }], ['grilledFish', 'driedFish', 'searedFish']);
+    s.combo = 9;
+    const serves = type(s, 'やきざかな').filter((e) => e.type === 'serve');
+    expect(serves).toHaveLength(3);
+    expect(serves.map((e) => e.type === 'serve' && e.combo)).toEqual([10, 11, 12]);
+    for (const e of serves) if (e.type === 'serve') expect(e.factors).toContainEqual({ id: 'combo', mult: 1.5 });
   });
 
   it('おやじの見栄：いま一番少ない素材を使う皿だけ、売上が上がる', () => {

@@ -102,6 +102,9 @@ export interface QuoteCtx { chain: number; clean: boolean; saved: boolean }
 /** 見積もり：額と倍率の内訳、効く方針、出したあとの連打の熱（熱を持っていなければ undefined） */
 export type Quote = Price & { tags: PolicyId[]; heat?: number };
 
+/** 皿を出したイベント */
+export type ServeEvent = Extract<ShopEvent, { type: 'serve' }>;
+
 export interface ShopStats {
   served: number;
   /** 残り20秒以内（ちょうどを含む）に出した皿の数 */
@@ -428,19 +431,27 @@ export class Shop {
       this.events.push({ type: 'lack', seat, missing });
       return;
     }
-    if (!this.build) { this.serveOne(seat, 0, false); return; }
-    // 繁盛記：先に相手を決めてから出す（打った皿が素材を使ったあと、足りる分だけ続く）
+    if (!this.build) { this.serveOne(seat, 0); return; }
+    // 繁盛記：先に相手を決め、打った皿 → 急ぐ順のついでの皿と1皿ずつ確定する（その時点の在庫で出せる皿だけ続く）
     const others = this.chainSeats(seat);
     const before = this.score;
     const done = [seat];
-    this.serveOne(seat, 0, others.length > 0);
+    const main = this.serveOne(seat, 0, false);
+    const rest: ServeEvent[] = [];
     let idx = 1;
     for (const o of others) {
       const og = this.seats[o];
       if (!og || og.state !== 'wait' || this.canMake(og.dish).length) continue;
-      this.serveOne(o, idx++, true);
+      rest.push(this.serveOne(o, idx++, false));
       done.push(o);
     }
+    // ついでの皿が実際に出たときだけ、打った皿にまとめ出しの判子を付ける。発見は打った皿から順に記録する
+    if (done.length > 1) {
+      main.tags = ['matome', ...(main.tags ?? [])];
+      this.buildStats.fired.matome = (this.buildStats.fired.matome ?? 0) + 1;
+    }
+    this.recordFinds(main, 0);
+    rest.forEach((ev, i) => this.recordFinds(ev, i + 1));
     if (done.length > 1) {
       this.buildStats.maxChain = Math.max(this.buildStats.maxChain, done.length);
       this.buildStats.chainServes += done.length - 1;
@@ -470,7 +481,8 @@ export class Shop {
     let add = 0;
     let heat: number | undefined;
     const nextCombo = this.combo + 1 + b.comboPlus;
-    if (chain > 0) { tags.push('matome'); factors.push({ id: 'matome', mult: b.chainMult }); }
+    // まとめ出しのついでの皿：割り引かず、その皿の条件で計算する（打った腕前の倍率は付かない）
+    if (chain > 0) tags.push('matome');
     if (g.refill && b.refillMult > 1) { tags.push('betsubara'); factors.push({ id: 'betsubara', mult: b.refillMult }); }
     if (this.comboMultAt(nextCombo) > SHOP.comboMaxMult) tags.push('ryoshusho');
     if (this.fresh > 0 && b.freshMult > 1) { tags.push('nushi'); factors.push({ id: 'nushi', mult: b.freshMult }); }
@@ -502,8 +514,8 @@ export class Shop {
     return { ...priceOf(g.dish.price + tipB + add, factors), tags, heat };
   }
 
-  /** 1皿を出す。chain はまとめ出しの何皿目か（0 は打った皿）、chained はまとめ出しが効いたか */
-  private serveOne(seat: number, chain: number, chained: boolean) {
+  /** 1皿を出して、積んだ serve イベントを返す。chain はまとめ出しの何皿目か（0 は打った皿）。record が false なら発見の記録は呼び出し側で行う */
+  private serveOne(seat: number, chain: number, record = true): ServeEvent {
     const g = this.seats[seat]!;
     const b = this.build;
     const saved = !!b && b.saveChance > 0 && this.brng!.next() < b.saveChance;
@@ -520,16 +532,12 @@ export class Shop {
     const special = (hiden ? HIDEN_MULT : 1) * (g.banquet ? BANQUET_MULT : 1);
     let gain: number;
     let poured = false;
-    let pair: string | undefined;
-    let pairCount = 0;
-    let setCount = 0;
-    let set: string | undefined;
     let clean: boolean | undefined;
     let heatNow: number | undefined;
     let tags: PolicyId[] = [];
     if (!b || !q) gain = Math.round((g.dish.price + tip) * this.multiplier * special);
     else {
-      tags = chained && chain === 0 ? ['matome', ...q.tags] : [...q.tags];
+      tags = [...q.tags];
       gain = q.gain;
       if (tags.includes('mouippai')) { this.takeStock('ale', 1); poured = true; }
       if (tags.includes('betsubara')) this.buildStats.refills++;
@@ -540,18 +548,6 @@ export class Shop {
         heatNow = 1 + q.heat;
         this.buildStats.maxHeat = Math.max(this.buildStats.maxHeat, heatNow);
       }
-      // かけ合わせ・型：名前付きの組が同じ皿に効いたら「発見」として記録する（売上は変えない）
-      // 店全体に効く方針（呼び込み・大漁旗など）は、持っているだけで相手になる
-      const found: string[] = [];
-      const hit = (x: PolicyId, y: PolicyId) => { if (pairOf(pairKey(x, y))) found.push(pairKey(x, y)); };
-      for (let i = 0; i < tags.length; i++) {
-        for (let j = i + 1; j < tags.length; j++) hit(tags[i], tags[j]);
-        for (const p of b.passive) hit(tags[i], p);
-      }
-      const on = (id: PolicyId) => tags.includes(id) || b.passive.includes(id);
-      const setsHit = chain === 0 ? SETS.filter((x) => x.ids.every(on)) : [];
-      setCount = setsHit.length;
-      pairCount = found.length;
       // 振り返り用：方針がなかった場合との差を、効いた方針に分ける
       const plain = Math.round((g.dish.price + tip) * Math.min(this.multiplier, SHOP.comboMaxMult) * special);
       const st = this.buildStats;
@@ -562,9 +558,6 @@ export class Shop {
       for (const t of tags) st.fired[t] = (st.fired[t] ?? 0) + 1;
       for (const t of share) st.yen[t] = (st.yen[t] ?? 0) + extra / share.length;
       st.bestServe = Math.max(st.bestServe, gain);
-      st.maxStack = Math.max(st.maxStack, found.length);
-      for (const key of found) if (!st.pairs.includes(key)) { st.pairs.push(key); pair ??= key; }
-      for (const x of setsHit) if (!st.sets.includes(setKey(x))) { st.sets.push(setKey(x)); set ??= setKey(x); }
     }
     this.score += gain;
     this.stats.served++;
@@ -578,9 +571,11 @@ export class Shop {
     g.t = b && g.extra ? REFILL_EAT : SHOP.eatTime;
     this.lastServeAt = this.clock;
     this.crew.assign(seat, g, this.away?.who);
-    if (!b || !q) this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
+    let ev: ServeEvent;
+    if (!b || !q) this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
     else {
-      this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, pair, pairs: pairCount, dish, set, sets: setCount, clean, heat: heatNow, base: q.base, raw: q.raw, paid: q.paid, capped: q.capped, factors: q.factors });
+      this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, dish, clean, heat: heatNow, base: q.base, raw: q.raw, paid: q.paid, capped: q.capped, factors: q.factors });
+      if (record) this.recordFinds(ev, chain);
       // 大入り袋：10コンボごとに大入り（最中に届いたら延ばす）
       if (b.feverSecs > 0 && Math.floor(this.combo / FEVER_EVERY) > Math.floor(comboBefore / FEVER_EVERY)) {
         this.feverUntil = this.clock + b.feverSecs;
@@ -589,6 +584,31 @@ export class Shop {
         this.events.push({ type: 'fever', on: true, secs: b.feverSecs });
       }
     }
+    return ev;
+  }
+
+  /**
+   * かけ合わせ・型：名前付きの組が同じ皿に効いたら「発見」として記録する（売上は変えない）。
+   * 店全体に効く方針（呼び込み・大漁旗など）は、持っているだけで相手になる。型は打った皿だけ。
+   */
+  private recordFinds(ev: ServeEvent, chain: number) {
+    const b = this.build;
+    const tags = ev.tags ?? [];
+    if (!b) return;
+    const found: string[] = [];
+    const hit = (x: PolicyId, y: PolicyId) => { if (pairOf(pairKey(x, y)) && !found.includes(pairKey(x, y))) found.push(pairKey(x, y)); };
+    for (let i = 0; i < tags.length; i++) {
+      for (let j = i + 1; j < tags.length; j++) hit(tags[i], tags[j]);
+      for (const p of b.passive) hit(tags[i], p);
+    }
+    const on = (id: PolicyId) => tags.includes(id) || b.passive.includes(id);
+    const setsHit = chain === 0 ? SETS.filter((x) => x.ids.every(on)) : [];
+    const st = this.buildStats;
+    ev.pairs = found.length;
+    ev.sets = setsHit.length;
+    st.maxStack = Math.max(st.maxStack, found.length);
+    for (const key of found) if (!st.pairs.includes(key)) { st.pairs.push(key); ev.pair ??= key; }
+    for (const x of setsHit) if (!st.sets.includes(setKey(x))) { st.sets.push(setKey(x)); ev.set ??= setKey(x); }
   }
   private feverOn = false;
 
