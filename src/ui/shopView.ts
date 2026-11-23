@@ -52,7 +52,7 @@ export function runHud(day: number, loop: number, goal: number, owned: Owned[]):
 }
 const CHAIN_COL = FAMILY_COLOR.chain;
 /** 繁盛記：注文の札の予告の枠の色（銀＝×3以上、金＝×10以上） */
-const PREVIEW_COL = { silver: '#dce4ee', gold: C.gold } as const;
+const PREVIEW_COL = { silver: '#dce4ee', gold: '#ffe27a' } as const;
 
 /** 営業画面の見た目の状態（演出用。ゲームの計算には影響しない） */
 export class ShopView {

@@ -37,3 +37,14 @@ describe('説明文は新しい決まり（掛け算・かけ合わせは発見�
     for (const lv of [1, 2, 3]) expect([...descOf('matome', lv)].length).toBeLessThanOrEqual(50);
   });
 });
+
+describe('第2段の片付け', () => {
+  it('上限の判定は小数の誤差で止まった扱いにしない', () => {
+    expect(priceOf(100, [{ id: 'combo', mult: 3 }, { id: 'ippatsu', mult: 10.000000000000002 }]).capped).toBe(false);
+  });
+  it('説明文の上限の数字は MULT_CAP から作る', () => {
+    const src = readFileSync('src/ui/runMode.ts', 'utf8');
+    expect(src).not.toContain('×30まで');
+    expect(src).toContain('MULT_CAP');
+  });
+});

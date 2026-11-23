@@ -9,6 +9,7 @@ import { button, drawSignboard } from './screens/common';
 import { wrapText } from './screens/records';
 import { runHud } from './shopView';
 import { drawNameplate } from './nameplate';
+import { MULT_CAP } from '../core/dishPrice';
 import { pairTip, policyTip, setTip, type Tip } from './hover';
 import { RomajiMatcher } from '../core/romaji';
 import { INGREDIENT_ORDER } from '../core/shopConfig';
@@ -614,7 +615,7 @@ export class RunUI {
       ['朝・昼・夜に「方針」を1つ選んで、店を育てる。', C.cream],
       ['毎日の売上目標に届かないと、そこで店じまい。', C.cream],
       ['決まった2つの方針がそろって皿に効くと「かけ合わせ」。', '#ffe9b4'],
-      ['同じ皿に効く方針は、倍率が掛け算で重なる（全部込みで×30まで）。', '#ffe9b4'],
+      [`同じ皿に効く方針は、倍率が掛け算で重なる（全部込みで×${MULT_CAP}まで）。`, '#ffe9b4'],
     ];
     lines.forEach(([t, c], i) => sc.T(t, 28, 53 + i * 12, sc.fitSize(t, 8, 252, 6), c));
     sc.PR(28, 103, 250, 1, '#5a3a1c');

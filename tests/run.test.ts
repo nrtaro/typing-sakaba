@@ -104,6 +104,14 @@ describe('方針のはたらき', () => {
     expect(ev.gain).toBe(Math.round(ev.base! * 30));
   });
 
+  it('会計は調達中でも方針の倍率で数える（表示の見積もりだけが調達中に null）', () => {
+    const s = shopWith([{ id: 'ippatsu', lv: 3 }], ['grilledFish']);
+    s.away = { id: 'fishing', text: '', kana: 'つり', who: 'wife', act: '', place: '', gives: ['fish'], minimum: { fish: 4 } };
+    expect(s.quote(0, { chain: 0, clean: true, saved: false })).toBeNull();
+    const ev = (s as unknown as { serveOne: (seat: number, chain: number) => { factors?: { id: string; mult: number }[] } }).serveOne(0, 0);
+    expect(ev.factors).toContainEqual({ id: 'ippatsu', mult: 2 });
+  });
+
   it('見積もりと会計が1円まで一致する', () => {
     const s = shopWith([{ id: 'ippatsu', lv: 2 }, { id: 'mie', lv: 1 }, { id: 'mouippai', lv: 1 }], ['grilledFish']);
     s.stock.fish = 3;

@@ -24,7 +24,7 @@ export function priceOf(base: number, factors: Factor[]): Price {
   const used = factors.filter((f) => f.mult !== 1);
   const raw = used.reduce((m, f) => m * f.mult, 1);
   const paid = Math.min(raw, MULT_CAP);
-  return { base, factors: used, raw, paid, capped: raw > MULT_CAP, gain: Math.round(base * paid) };
+  return { base, factors: used, raw, paid, capped: raw > MULT_CAP + 1e-9, gain: Math.round(base * paid) };
 }
 
 /** 【銀の枠の倍率】【金の枠の倍率】注文の札の枠で、出したら何倍になるかを予告する段階 */

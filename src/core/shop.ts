@@ -436,13 +436,13 @@ export class Shop {
     const others = this.chainSeats(seat);
     const before = this.score;
     const done = [seat];
-    const main = this.serveOne(seat, 0, false);
+    const main = this.serveOne(seat, 0);
     const rest: ServeEvent[] = [];
     let idx = 1;
     for (const o of others) {
       const og = this.seats[o];
       if (!og || og.state !== 'wait' || this.canMake(og.dish).length) continue;
-      rest.push(this.serveOne(o, idx++, false));
+      rest.push(this.serveOne(o, idx++));
       done.push(o);
     }
     // ついでの皿が実際に出たときだけ、打った皿にまとめ出しの判子を付ける。発見は打った皿から順に記録する
@@ -467,12 +467,17 @@ export class Shop {
   /**
    * 繁盛記：その席の注文を今出したらいくらか。店の状態も乱数も変えない（札の予告と会計の両方が使う）。
    * chain はまとめ出しの何皿目か（0 は打った皿）、clean はミスなしで打ったか、saved はまかないで素材が減らないか。
-   * 出せない席（空き・歩いている・食べている）、調達中、方針がない営業では null
+   * 札の予告に使う。出せない席（空き・歩いている・食べている）、調達中、方針がない営業では null
    */
   quote(seat: number, ctx: QuoteCtx): Quote | null {
+    return this.away ? null : this.price(seat, ctx);
+  }
+
+  /** 会計用の見積もり：調達中かどうかは見ない。出せない席と、方針がない営業では null */
+  private price(seat: number, ctx: QuoteCtx): Quote | null {
     const b = this.build;
     const g = this.seats[seat];
-    if (!b || !g || g.state !== 'wait' || this.away) return null;
+    if (!b || !g || g.state !== 'wait') return null;
     const { chain, clean, saved } = ctx;
     const tags: PolicyId[] = [];
     const factors: Factor[] = [];
@@ -514,13 +519,13 @@ export class Shop {
     return { ...priceOf(g.dish.price + tipB + add, factors), tags, heat };
   }
 
-  /** 1皿を出して、積んだ serve イベントを返す。chain はまとめ出しの何皿目か（0 は打った皿）。record が false なら発見の記録は呼び出し側で行う */
-  private serveOne(seat: number, chain: number, record = true): ServeEvent {
+  /** 1皿を出して、積んだ serve イベントを返す。chain はまとめ出しの何皿目か（0 は打った皿）。発見の記録は serve() が行う */
+  private serveOne(seat: number, chain: number): ServeEvent {
     const g = this.seats[seat]!;
     const b = this.build;
     const saved = !!b && b.saveChance > 0 && this.brng!.next() < b.saveChance;
     // 繁盛記：素材を使う前・コンボが進む前の状態で見積もり、その額で確定する
-    const q = b ? this.quote(seat, { chain, clean: this.wordMisses === 0, saved }) : null;
+    const q = b ? this.price(seat, { chain, clean: this.wordMisses === 0, saved }) : null;
     if (!saved) for (const [id, n] of Object.entries(g.dish.need)) this.takeStock(id as IngredientId, n!);
     const comboBefore = this.combo;
     this.combo += 1 + (b?.comboPlus ?? 0);
@@ -575,7 +580,6 @@ export class Shop {
     if (!b || !q) this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
     else {
       this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, dish, clean, heat: heatNow, base: q.base, raw: q.raw, paid: q.paid, capped: q.capped, factors: q.factors });
-      if (record) this.recordFinds(ev, chain);
       // 大入り袋：10コンボごとに大入り（最中に届いたら延ばす）
       if (b.feverSecs > 0 && Math.floor(this.combo / FEVER_EVERY) > Math.floor(comboBefore / FEVER_EVERY)) {
         this.feverUntil = this.clock + b.feverSecs;
