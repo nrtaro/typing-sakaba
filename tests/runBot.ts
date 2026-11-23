@@ -51,7 +51,7 @@ export const BUILDS: Strategy[] = [
   prefer('おかわりの店', ['betsubara', 'mouippai', 'aiso', 'matome', 'tairyo', 'yobikomi']),
 ];
 /** 解放が要る方針をすべて解放した記録 */
-export const allMeta = () => { const m = emptyMeta(); m.policies = ['oomori', 'ooiri', 'makanai']; m.daysCleared = 24; return m; };
+export const allMeta = () => { const m = emptyMeta(); m.policies = ['oomori', 'ooiri', 'makanai', 'hayakuchi', 'tema', 'yoippari', 'keiki']; m.daysCleared = 24; return m; };
 
 /** ボットが日ごとに数えるもの */
 export interface BotDay {

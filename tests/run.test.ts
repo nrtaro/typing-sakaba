@@ -6,7 +6,7 @@ import { DAY_LENGTH, DISHES, DIFFICULTIES } from '../src/core/shopConfig';
 import { NORMAL_RULES } from '../src/core/daily';
 import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICY_SEAL, POLICIES, REFILL_EAT, SETS, setKey, descDiff, descOf, emptyMods, modsFor, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
-  AIDS, GOAL_BASE, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
+  AIDS, GOAL_BASE, availablePolicies, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
   DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, GOAL_EASE_LOOP, GOAL_LATE_STEP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
   GIFT_CAP_LOOP, GIFT_PER_LOOP, NOREN_RANKS, bestCleared, clampPick, firstClearGift, nextNorenRank, norenRank,
   loopEveryMult, loopGoalMult, loopWaitMult, newRun, offersFor, readMeta, roadOffers, takeRoad, trialMods, trialsFor, walkMult,
@@ -162,7 +162,7 @@ describe('方針のはたらき', () => {
   });
 
   it('方針は20種類。段階ごとの値があり、打つ言葉は互いの頭にならない。どの方針にも、かけ合わせの相手が2つ以上ある', () => {
-    expect(POLICIES).toHaveLength(24);
+    expect(POLICIES).toHaveLength(25);
     for (const p of POLICIES) {
       expect(p.vals).toHaveLength(MAX_LEVEL);
       expect(descOf(p.id, 1)).not.toContain('{');
@@ -1194,5 +1194,86 @@ describe('第3段：皿に倍率が付く新しい方針', () => {
       expect(descOf(id, 3)).toContain('×');
       expect(descOf(id, 3)).not.toContain('{');
     }
+  });
+});
+
+describe('第3段：景気づけ', () => {
+  const KANA: Record<string, string> = { grilledFish: 'やきざかな', vegSoup: 'おんやさいもり', mushSaute: 'きのこそてー', ale: 'えーる' };
+  const serve = (s: Shop, id: string, g: Guest = guest(id)) => { s.seats[0] = g; return type(s, KANA[id]); };
+  const used = (s: Shop) => (s as unknown as { keikiUsed: Record<string, number> }).keikiUsed;
+
+  it('景気づけ：コンボを切らさずに10皿出すと、その10皿で一番多く使った素材2種類が +2→+3→+4', () => {
+    const s = shopWith([{ id: 'keiki', lv: 3 }], []);
+    const evs = [
+      ...Array.from({ length: 6 }, () => 'grilledFish'), ...Array.from({ length: 3 }, () => 'vegSoup'), 'mushSaute',
+    ].flatMap((id) => serve(s, id));
+    const k = evs.filter((e) => e.type === 'keiki');
+    expect(k).toHaveLength(1);
+    expect(k[0].type === 'keiki' && k[0].items).toEqual([{ id: 'fish', n: 4 }, { id: 'veg', n: 4 }]);
+    expect(s.stock.fish).toBe(30 - 12 + 4);
+    expect(s.stock.veg).toBe(30 - 6 + 4);
+    expect(s.stock.mush).toBe(30 - 2);
+    const last = evs.filter((e) => e.type === 'serve').at(-1)!;
+    expect(last.type === 'serve' && last.tags).toContain('keiki');
+    expect(s.buildStats.keiki).toBe(8);
+    expect(s.buildStats.fired.keiki).toBe(1);
+    expect(modsFor([{ id: 'keiki', lv: 1 }]).keikiGain).toBe(2);
+  });
+
+  it('景気づけ：まかないで減らなかった分は数えず、大盛りの倍の分ともう一杯の酒は数える', () => {
+    const m = shopWith([{ id: 'keiki', lv: 1 }, { id: 'makanai', lv: 1 }], []);
+    m.build!.saveChance = 1;
+    serve(m, 'grilledFish');
+    expect(used(m)).toEqual({});
+    const b = shopWith([{ id: 'keiki', lv: 1 }, { id: 'mouippai', lv: 1 }], []);
+    serve(b, 'grilledFish', { ...guest('grilledFish'), dish: { ...dish('grilledFish'), need: { fish: 4 } }, big: true, bigMult: 2, bigFrom: 'road' });
+    expect(used(b)).toEqual({ fish: 4, ale: 1 });
+  });
+
+  it('景気づけ：コンボが切れたら、数えた皿も素材も数え直す', () => {
+    const s = shopWith([{ id: 'keiki', lv: 3 }], []);
+    for (let i = 0; i < 9; i++) serve(s, 'grilledFish');
+    expect(s.feverCount).toBe(9);
+    for (let i = 0; i <= s.comboMissAllowance; i++) s.key('q');
+    expect(s.combo).toBe(0);
+    expect(s.feverCount).toBe(0);
+    expect(used(s)).toEqual({});
+    const evs = Array.from({ length: 9 }, () => 'vegSoup').flatMap((id) => serve(s, id));
+    expect(evs.some((e) => e.type === 'keiki')).toBe(false);
+    const ten = serve(s, 'vegSoup').find((e) => e.type === 'keiki')!;
+    expect(ten.type === 'keiki' && ten.items).toEqual([{ id: 'veg', n: 4 }]);
+  });
+
+  it('景気づけ：使った数が同じなら素材の並び順、1種類だけならその1種類', () => {
+    const s = shopWith([{ id: 'keiki', lv: 2 }], []);
+    const evs = ['mushSaute', 'vegSoup', 'grilledFish', 'mushSaute', 'vegSoup', 'grilledFish', 'mushSaute', 'vegSoup', 'grilledFish', 'ale'].flatMap((id) => serve(s, id));
+    const k = evs.find((e) => e.type === 'keiki')!;
+    expect(k.type === 'keiki' && k.items).toEqual([{ id: 'fish', n: 3 }, { id: 'veg', n: 3 }]);
+  });
+
+  it('大入り袋だけを持つ店の大入りの数え方は変わらない', () => {
+    const s = shopWith([{ id: 'ooiri', lv: 1 }], []);
+    const evs = Array.from({ length: 10 }, () => 'grilledFish').flatMap((id) => serve(s, id));
+    expect(evs.some((e) => e.type === 'fever' && e.on)).toBe(true);
+    expect(evs.some((e) => e.type === 'keiki')).toBe(false);
+  });
+});
+
+describe('第3段：新しい方針の解放', () => {
+  const facts = (sales: number, over: Partial<ReturnType<typeof emptyBuildStats>> = {}, maxCombo = 12) => ({ sales, served: 30, maxCombo, angry: 0, build: { ...emptyBuildStats(), ...over } });
+  const day = (meta: ReturnType<typeof emptyMeta>, f: ReturnType<typeof facts>) => { const run = newRun(meta, 5, 'r1'); meta.active = run; closeDay(run, meta, f); return meta.policies; };
+
+  it('新しい方針の解放：50コンボ・目標5回・延長・大入りで解放する（強気の値付けは最初から）', () => {
+    const avail = availablePolicies(emptyMeta());
+    expect(avail).toContain('tsuyoki');
+    for (const id of ['hayakuchi', 'tema', 'yoippari', 'keiki'] as const) expect(avail).not.toContain(id);
+    expect(day(emptyMeta(), facts(0, {}, 49))).not.toContain('hayakuchi');
+    expect(day(emptyMeta(), facts(0, {}, 50))).toContain('hayakuchi');
+    const four = emptyMeta(); four.daysCleared = 4;
+    expect(day(four, facts(0))).not.toContain('tema');
+    expect(day(four, facts(999999))).toContain('tema');
+    expect(day(emptyMeta(), facts(0, { extended: 15 }))).toContain('yoippari');
+    expect(day(emptyMeta(), facts(0, { fevers: 1 }))).toContain('keiki');
+    expect(day(emptyMeta(), facts(0))).toEqual([]);
   });
 });

@@ -9,7 +9,7 @@ export type PolicyId =
   | 'matome' | 'betsubara' | 'ryoshusho' | 'nushi' | 'tairyo' | 'mie' | 'sekkachi' | 'mouippai'
   | 'oomori' | 'yobikomi' | 'makanai' | 'ooiri' | 'aiso' | 'shikomi' | 'yoyaku' | 'omotenashi'
   | 'ippatsu' | 'netsu' | 'asaichi' | 'encho'
-  | 'hayakuchi' | 'tema' | 'tsuyoki' | 'yoippari';
+  | 'hayakuchi' | 'tema' | 'tsuyoki' | 'yoippari' | 'keiki';
 
 /** 方針の系統（色と音の個性に使う） */
 export type Family = 'chain' | 'combo' | 'trip' | 'stock' | 'guest';
@@ -121,6 +121,8 @@ const BOLD_MULT = L(1.2, 1.35, 1.5);
 const BOLD_WAIT = L(0.15, 0.2, 0.25);
 /** 【夜の皿の倍率】宵っ張り */
 const NIGHT_MULT = L(1.5, 1.8, 2.2);
+/** 【景気づけの数】10皿ごとに、よく使った素材2種類それぞれに足す数 */
+const KEIKI_GAIN = L(2, 3, 4);
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const v2 = <A, B>(a: [A, A, A], b: [B, B, B], f: (x: A) => string, g: (x: B) => string) => L([f(a[0]), g(b[0])], [f(a[1]), g(b[1])], [f(a[2]), g(b[2])]);
 const v1 = <A>(a: [A, A, A], f: (x: A) => string) => L([f(a[0])], [f(a[1])], [f(a[2])]);
@@ -248,13 +250,13 @@ export const POLICIES: Policy[] = [
     vals: v2(EXTEND, EXTEND_MULT, s, s),
   },
   {
-    id: 'hayakuchi', name: '早口自慢', kana: 'はやくち', family: 'combo', starter: true,
+    id: 'hayakuchi', name: '早口自慢', kana: 'はやくち', family: 'combo', starter: false, unlock: '繁盛記で50コンボを出す',
     quip: '「舌がまわるうちは、のれんもまわる」',
     text: `読みが${LONG_KANA}文字以上の料理を打って出した皿は ×{0}`,
     vals: v1(LONG_MULT, s),
   },
   {
-    id: 'tema', name: '手間ひま', kana: 'てまひま', family: 'stock', starter: true,
+    id: 'tema', name: '手間ひま', kana: 'てまひま', family: 'stock', starter: false, unlock: '繁盛記で目標を5回突破する',
     quip: '「手を抜いた皿は、客にばれる」',
     text: '2種類の素材を使う皿は ×{0}、3種類以上の皿は ×{1}',
     vals: v2(TEMA2_MULT, TEMA3_MULT, s, s),
@@ -266,10 +268,16 @@ export const POLICIES: Policy[] = [
     vals: v2(BOLD_MULT, BOLD_WAIT, s, pct),
   },
   {
-    id: 'yoippari', name: '宵っ張り', kana: 'よいっぱり', family: 'guest', starter: true,
+    id: 'yoippari', name: '宵っ張り', kana: 'よいっぱり', family: 'guest', starter: false, unlock: '延長営業で営業を延ばす',
     quip: '「この店は、日が暮れてからが本番だ」',
     text: `夜の皿（延長のあいだも）は ×{0}。そのかわり、朝と昼の皿は ×${YOI_DAY}`,
     vals: v1(NIGHT_MULT, s),
+  },
+  {
+    id: 'keiki', name: '景気づけ', kana: 'けいきづけ', family: 'combo', starter: false, unlock: '大入り袋で大入りを出す',
+    quip: '「景気のいい店には、品物が集まる」',
+    text: `コンボを切らさずに${FEVER_EVERY}皿出すごとに、その${FEVER_EVERY}皿で一番多く使った素材2種類が +{0}ずつ増える`,
+    vals: v1(KEIKI_GAIN, s),
   },
 ];
 
@@ -316,7 +324,7 @@ export const POLICY_SEAL: Record<PolicyId, string> = {
   matome: 'まと', betsubara: '別腹', ryoshusho: '領収', nushi: 'ヌシ', tairyo: '大漁', mie: '見栄', sekkachi: '即出', mouippai: '一杯',
   oomori: '大盛', yobikomi: '呼込', makanai: '賄い', ooiri: '大入', aiso: '愛想', shikomi: '仕込', yoyaku: '予約', omotenashi: 'もて',
   ippatsu: '一発', netsu: '熱', asaichi: '朝市', encho: '延長',
-  hayakuchi: '早口', tema: '手間', tsuyoki: '強気', yoippari: '宵',
+  hayakuchi: '早口', tema: '手間', tsuyoki: '強気', yoippari: '宵', keiki: '景気',
 };
 export const FAMILY_NAME: Record<Family, string> = { chain: '連鎖', combo: '勢い', trip: '調達', stock: '台所', guest: '客あしらい' };
 
@@ -370,6 +378,8 @@ export const PAIRS: Pair[] = [
   { a: 'tsuyoki', b: 'yoyaku', name: '格式の店' },
   { a: 'encho', b: 'yoippari', name: '夜通し' },
   { a: 'hayakuchi', b: 'yoippari', name: '夜の早口' },
+  { a: 'keiki', b: 'matome', name: '大盤振る舞い' },
+  { a: 'keiki', b: 'shikomi', name: '蔵いっぱい' },
 ];
 
 /**
@@ -477,6 +487,8 @@ export interface BuildMods {
   tema3Mult: number;
   boldMult: number;
   nightMult: number;
+  /** 景気づけ：10皿ごとに足す素材の数（0 は持っていない） */
+  keikiGain: number;
 }
 
 export function emptyMods(): BuildMods {
@@ -486,7 +498,7 @@ export function emptyMods(): BuildMods {
     feverSecs: 0, feverMult: 1, waitMult: 1, noAngryPenalty: false, keepCombo: false, startStock: 0, phaseStock: 0,
     comboPlus: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, levels: {},
     ippatsuMult: 1, heatCap: 1, morningTrip: 1, laterTrip: 1, extendSecs: 0,
-    longMult: 1, tema2Mult: 1, tema3Mult: 1, boldMult: 1, nightMult: 1,
+    longMult: 1, tema2Mult: 1, tema3Mult: 1, boldMult: 1, nightMult: 1, keikiGain: 0,
   };
 }
 
@@ -521,6 +533,7 @@ export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMod
       case 'tema': m.tema2Mult = TEMA2_MULT[i]; m.tema3Mult = TEMA3_MULT[i]; break;
       case 'tsuyoki': m.boldMult = BOLD_MULT[i]; m.waitMult *= 1 - BOLD_WAIT[i]; break;
       case 'yoippari': m.nightMult = NIGHT_MULT[i]; break;
+      case 'keiki': m.keikiGain = KEIKI_GAIN[i]; break;
     }
   }
   return m;
@@ -554,9 +567,11 @@ export interface BuildStats {
   /** 連打の熱の最高倍率／延長営業で延びた秒数 */
   maxHeat: number;
   extended: number;
+  /** 景気づけで増えた素材の合計の個数（円には換えない） */
+  keiki: number;
   /** 1皿に重なったかけ合わせの最大数 */
   maxStack: number;
 }
 export function emptyBuildStats(): BuildStats {
-  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0 };
+  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0, keiki: 0 };
 }

@@ -197,6 +197,10 @@ export class ShopView {
           }
         }
         break;
+      case 'keiki':
+        // 景気づけ：10皿目に増えた素材を一度だけ見せる（大入りの帯と重ならないよう、帯の下に出す）
+        this.pop('keiki', { x: LW / 2, y: 172, t: 0, text: `景気づけ！ ${ev.items.map((x) => `${INGREDIENT_NAME[x.id]}+${x.n}`).join(' ')}`, col: '#ffd25c', big: true });
+        break;
       case 'extend':
         this.banner = { text: `延長営業！ 閉店まで+${ev.secs}秒`, t: 2.2, col: '#ffe27a' };
         this.callout = { text: '延長！', t: 0, col: '#ffe27a', level: 8 };

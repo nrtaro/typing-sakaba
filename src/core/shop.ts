@@ -67,6 +67,8 @@ export type ShopEvent =
   | { type: 'chain'; count: number; total: number; seats: number[] }
   /** 繁盛記：大入りが始まった／終わった */
   | { type: 'fever'; on: boolean; secs: number }
+  /** 景気づけ：10皿目に増えた素材 */
+  | { type: 'keiki'; items: { id: IngredientId; n: number }[] }
   /** 繁盛記：とれたての皿が用意できた */
   | { type: 'fresh'; n: number }
   /** 繁盛記：こまめな仕込みで素材が増えた */
@@ -339,6 +341,7 @@ export class Shop {
         this.combo = 0;
         this.comboMistakes = 0;
         this.feverCount = 0;
+        this.keikiUsed = {};
         this.events.push({ type: 'comboBreak' });
       }
       this.events.push({ type: 'key', ok: false, count: 0 });
@@ -558,7 +561,7 @@ export class Shop {
     const saved = !!b && b.saveChance > 0 && this.brng!.next() < b.saveChance;
     // 繁盛記：素材を使う前・コンボが進む前の状態で見積もり、その額で確定する
     const q = b ? this.price(seat, { chain, clean: this.wordMisses === 0, saved }) : null;
-    if (!saved) for (const [id, n] of Object.entries(g.dish.need)) this.takeStock(id as IngredientId, n!);
+    if (!saved) for (const [id, n] of Object.entries(g.dish.need)) { this.takeStock(id as IngredientId, n!); this.countUse(id as IngredientId, n!); }
     this.combo += 1 + (b?.comboPlus ?? 0);
     this.comboMistakes = 0;
     this.stats.maxCombo = Math.max(this.stats.maxCombo, this.combo);
@@ -575,7 +578,7 @@ export class Shop {
     else {
       tags = [...q.tags];
       gain = q.gain;
-      if (tags.includes('mouippai')) { this.takeStock('ale', 1); poured = true; }
+      if (tags.includes('mouippai')) { this.takeStock('ale', 1); this.countUse('ale', 1); poured = true; }
       if (tags.includes('betsubara')) this.buildStats.refills++;
       if (chain === 0 && b.ippatsuMult > 1) clean = this.wordMisses === 0;
       if (q.heat !== undefined) {
@@ -613,13 +616,17 @@ export class Shop {
     if (!b || !q) this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
     else {
       this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, dish, clean, heat: heatNow, base: q.base, raw: q.raw, paid: q.paid, capped: q.capped, factors: q.factors });
-      // 大入り袋：コンボを切らさずに FEVER_EVERY 皿出したら大入り（最中に届いたら延ばす）
-      if (b.feverSecs > 0 && ++this.feverCount >= FEVER_EVERY) {
+      // 大入り袋・景気づけ：コンボを切らさずに FEVER_EVERY 皿出したら（大入りは最中に届いたら延ばす）
+      if ((b.feverSecs > 0 || b.keikiGain > 0) && ++this.feverCount >= FEVER_EVERY) {
         this.feverCount = 0;
-        this.feverUntil = this.clock + b.feverSecs;
-        this.feverOn = true;
-        this.buildStats.fevers++;
-        this.events.push({ type: 'fever', on: true, secs: b.feverSecs });
+        if (b.feverSecs > 0) {
+          this.feverUntil = this.clock + b.feverSecs;
+          this.feverOn = true;
+          this.buildStats.fevers++;
+          this.events.push({ type: 'fever', on: true, secs: b.feverSecs });
+        }
+        if (b.keikiGain > 0) this.keikiBoost(b.keikiGain, tags);
+        this.keikiUsed = {};
       }
     }
     return ev;
@@ -646,6 +653,24 @@ export class Shop {
     st.maxStack = Math.max(st.maxStack, found.length);
     for (const key of found) if (!st.pairs.includes(key)) { st.pairs.push(key); ev.pair ??= key; }
     for (const x of setsHit) if (!st.sets.includes(setKey(x))) { st.sets.push(setKey(x)); ev.set ??= setKey(x); }
+  }
+  /** 景気づけ：この10皿で実際に倉庫から減らした素材の数 */
+  private keikiUsed: Partial<Record<IngredientId, number>> = {};
+  private countUse(id: IngredientId, n: number) {
+    if (this.build && this.build.keikiGain > 0) this.keikiUsed[id] = (this.keikiUsed[id] ?? 0) + n;
+  }
+  /** 景気づけ：よく使った素材2種類（同じ数なら素材の並び順）を増やし、10皿目の皿に判子を付ける */
+  private keikiBoost(gain: number, tags: PolicyId[]) {
+    const top = INGREDIENT_ORDER.filter((id) => (this.keikiUsed[id] ?? 0) > 0)
+      .sort((a, b) => (this.keikiUsed[b] ?? 0) - (this.keikiUsed[a] ?? 0) || INGREDIENT_ORDER.indexOf(a) - INGREDIENT_ORDER.indexOf(b))
+      .slice(0, 2);
+    if (!top.length) return;
+    for (const id of top) this.addStock(id, gain);
+    tags.push('keiki');
+    const st = this.buildStats;
+    st.fired.keiki = (st.fired.keiki ?? 0) + 1;
+    st.keiki += gain * top.length;
+    this.events.push({ type: 'keiki', items: top.map((id) => ({ id, n: gain })) });
   }
   private feverOn = false;
   /** 大入り袋：コンボを切らさずに出した皿の数（コンボが切れたら 0） */
@@ -841,6 +866,7 @@ export class Shop {
             this.combo = 0;
             this.comboMistakes = 0;
             this.feverCount = 0;
+            this.keikiUsed = {};
           }
           if (!this.build?.noAngryPenalty) this.score = Math.max(0, this.score - SHOP.angryPenalty * (this.build?.angryMult ?? 1) * this.rules.angryPenaltyMult * (g.banquet ? BANQUET_PENALTY_MULT : 1));
           this.events.push({ type: 'angry', seat: i });

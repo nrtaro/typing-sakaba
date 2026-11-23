@@ -519,6 +519,10 @@ export function closeDay(run: RunState, meta: RunMeta, f: DayFacts, now = new Da
   if (passed && run.day >= 1) meta.policies.push('oomori');
   if (b.combo >= 30) meta.policies.push('ooiri');
   if (meta.discovered.length >= 3) meta.policies.push('makanai');
+  if (b.combo >= 50) meta.policies.push('hayakuchi');
+  if (meta.daysCleared >= 5) meta.policies.push('tema');
+  if (f.build.extended > 0) meta.policies.push('yoippari');
+  if (f.build.fevers > 0) meta.policies.push('keiki');
   meta.policies = [...new Set(meta.policies)];
   const newPolicies = meta.policies.filter((p) => !before.has(p));
   let summary: RunSummary | null = null;
