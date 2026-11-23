@@ -4,7 +4,7 @@ import { Shop, type Guest } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
 import { DAY_LENGTH, DISHES, DIFFICULTIES } from '../src/core/shopConfig';
 import { NORMAL_RULES } from '../src/core/daily';
-import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICY_SEAL, POLICIES, REFILL_EAT, SETS, setKey, descDiff, descOf, emptyMods, modsFor, pairKey, partnersOf, policyOf } from '../src/core/build';
+import { type PolicyId, MAX_LEVEL, MAX_SLOTS, PAIRS, POLICY_SEAL, POLICIES, REFILL_EAT, SETS, setKey, descDiff, descOf, emptyMods, modsFor, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
   AIDS, GOAL_BASE, availablePolicies, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
   DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, GOAL_EASE_LOOP, GOAL_LATE_STEP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
@@ -1275,5 +1275,48 @@ describe('第3段：新しい方針の解放', () => {
     expect(day(emptyMeta(), facts(0, { extended: 15 }))).toContain('yoippari');
     expect(day(emptyMeta(), facts(0, { fevers: 1 }))).toContain('keiki');
     expect(day(emptyMeta(), facts(0))).toEqual([]);
+  });
+});
+
+describe('第3段：新しいかけ合わせ', () => {
+  it('同時に起きない条件の2つは、かけ合わせ・型に入れない', () => {
+    const EXCLUSIVE: [PolicyId, PolicyId][] = [['asaichi', 'yoippari'], ['sekkachi', 'aiso']];
+    for (const [x, y] of EXCLUSIVE) {
+      for (const p of PAIRS) expect([p.a, p.b].includes(x) && [p.a, p.b].includes(y)).toBe(false);
+      for (const s of SETS) expect(s.ids.includes(x) && s.ids.includes(y)).toBe(false);
+    }
+  });
+
+  it('組は44で、新しい10組は末尾にある（古い34組の並びは変えない）', () => {
+    expect(PAIRS).toHaveLength(44);
+    expect(PAIRS[33].name).toBe('伝票が終わらない');
+  });
+
+  type Setup = { owned: PolicyId[]; seats: (string | Guest)[]; kana: string; prep?: (s: Shop) => void };
+  const at = (t: number) => (s: Shop) => { s.clock = t; };
+  const CASES: Record<string, Setup> = {
+    立て板に水: { owned: ['hayakuchi', 'ippatsu'], seats: ['vegSoup'], kana: 'おんやさいもり' },
+    早口言葉: { owned: ['hayakuchi', 'netsu'], seats: ['vegSoup'], kana: 'おんやさいもり', prep: (s) => { s.heat = 0.3; (s as unknown as { lastTypedAt: number }).lastTypedAt = s.clock; } },
+    特上の大皿: { owned: ['oomori', 'tema'], seats: [{ ...guest('stirFry'), big: true, bigMult: 3.3, bigFrom: 'policy' }], kana: 'にくやさいいため' },
+    夜の御膳: { owned: ['tema', 'yoippari'], seats: ['stirFry'], kana: 'にくやさいいため', prep: at(125) },
+    強気の看板: { owned: ['tsuyoki', 'aiso'], seats: [guest('grilledFish', 10)], kana: 'やきざかな' },
+    格式の店: { owned: ['tsuyoki', 'yoyaku'], seats: ['grilledFish'], kana: 'やきざかな' },
+    夜通し: { owned: ['yoippari', 'encho'], seats: ['grilledFish'], kana: 'やきざかな', prep: (s) => { s.extra = 15; s.clock = DAY_LENGTH + 3; } },
+    夜の早口: { owned: ['hayakuchi', 'yoippari'], seats: ['vegSoup'], kana: 'おんやさいもり', prep: at(125) },
+    大盤振る舞い: { owned: ['keiki', 'matome'], seats: ['grilledFish', 'driedFish'], kana: 'やきざかな', prep: (s) => { s.feverCount = 9; } },
+    蔵いっぱい: { owned: ['keiki', 'shikomi'], seats: ['grilledFish'], kana: 'やきざかな', prep: (s) => { s.feverCount = 9; } },
+  };
+
+  it('新しいかけ合わせは、実際に同じ皿で発見できる', () => {
+    for (const p of PAIRS.slice(34)) {
+      const c = CASES[p.name];
+      expect(c, p.name).toBeDefined();
+      expect([...c.owned].sort(), p.name).toEqual([p.a, p.b].sort());
+      const s = shopWith(c.owned.map((id) => ({ id, lv: 1 })), []);
+      c.seats.forEach((x, i) => { s.seats[i] = typeof x === 'string' ? guest(x) : x; });
+      c.prep?.(s);
+      type(s, c.kana);
+      expect(s.buildStats.pairs, p.name).toContain(pairKey(p.a, p.b));
+    }
   });
 });
