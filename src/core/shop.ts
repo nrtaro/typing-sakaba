@@ -2,7 +2,7 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
-import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, PLENTY_AT, PREP_SECS, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, isPolicy, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, LONG_KANA, YOI_DAY, PLENTY_AT, PREP_SECS, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, isPolicy, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
 import { priceOf, type Factor, type Price } from './dishPrice';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
@@ -524,6 +524,16 @@ export class Shop {
     // こまめな仕込み：時間帯のはじめの仕込みたて
     if (b.prepMult > 1 && this.clock - this.phaseStart < PREP_SECS) { tags.push('shikomi'); factors.push({ id: 'shikomi', mult: b.prepMult }); }
     if (this.fever && b.feverMult > 1) { tags.push('ooiri'); factors.push({ id: 'ooiri', mult: b.feverMult }); }
+    // 手間ひま：料理そのものの素材の種類（大盛りで個数が増えても種類は同じ）
+    const kinds = Object.keys(g.dish.need).length;
+    if (b.tema3Mult > 1 && kinds >= 3) { tags.push('tema'); factors.push({ id: 'tema', mult: b.tema3Mult }); }
+    else if (b.tema2Mult > 1 && kinds === 2) { tags.push('tema'); factors.push({ id: 'tema', mult: b.tema2Mult }); }
+    if (b.boldMult > 1) { tags.push('tsuyoki'); factors.push({ id: 'tsuyoki', mult: b.boldMult }); }
+    // 宵っ張り：夜（延長のあいだも夜）。朝と昼は引き換えの倍率だけ（判子なし）
+    if (b.nightMult > 1) {
+      if (this.phaseIndex === 2) { tags.push('yoippari'); factors.push({ id: 'yoippari', mult: b.nightMult }); }
+      else factors.push({ id: 'yoippari', mult: YOI_DAY });
+    }
     // 一発勝負・連打の熱：打った皿だけ（まとめ出しのついでの皿には付かない）
     if (chain === 0 && b.ippatsuMult > 1) {
       if (clean) tags.push('ippatsu');
@@ -533,6 +543,8 @@ export class Shop {
       heat = this.clock - this.lastTypedAt <= HEAT_GAP ? Math.min(b.heatCap - 1, this.heat + HEAT_STEP) : 0;
       if (heat > 0) { tags.push('netsu'); factors.push({ id: 'netsu', mult: 1 + heat }); }
     }
+    // 早口自慢：長い読みの料理を打って出した皿だけ（仮名の数で数える）
+    if (chain === 0 && b.longMult > 1 && g.dish.kana.length >= LONG_KANA) { tags.push('hayakuchi'); factors.push({ id: 'hayakuchi', mult: b.longMult }); }
     factors.push({ id: 'combo', mult: this.comboMultAt(nextCombo) });
     if (this.hidenArmed) factors.push({ id: 'hiden', mult: HIDEN_MULT });
     if (g.banquet) factors.push({ id: 'banquet', mult: BANQUET_MULT });

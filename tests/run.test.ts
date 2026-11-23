@@ -2,9 +2,9 @@
 import { describe, expect, it } from 'vitest';
 import { Shop, type Guest } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
-import { DISHES, DIFFICULTIES } from '../src/core/shopConfig';
+import { DAY_LENGTH, DISHES, DIFFICULTIES } from '../src/core/shopConfig';
 import { NORMAL_RULES } from '../src/core/daily';
-import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, REFILL_EAT, SETS, setKey, descDiff, descOf, emptyMods, modsFor, pairKey, partnersOf, policyOf } from '../src/core/build';
+import { MAX_LEVEL, MAX_SLOTS, PAIRS, POLICY_SEAL, POLICIES, REFILL_EAT, SETS, setKey, descDiff, descOf, emptyMods, modsFor, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
   AIDS, GOAL_BASE, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
   DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, GOAL_EASE_LOOP, GOAL_LATE_STEP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
@@ -162,7 +162,7 @@ describe('方針のはたらき', () => {
   });
 
   it('方針は20種類。段階ごとの値があり、打つ言葉は互いの頭にならない。どの方針にも、かけ合わせの相手が2つ以上ある', () => {
-    expect(POLICIES).toHaveLength(20);
+    expect(POLICIES).toHaveLength(24);
     for (const p of POLICIES) {
       expect(p.vals).toHaveLength(MAX_LEVEL);
       expect(descOf(p.id, 1)).not.toContain('{');
@@ -1120,5 +1120,79 @@ describe('第3段：かけ合わせは効いた皿だけ', () => {
     type(m, 'やきざかな');
     expect(m.buildStats.fired.makanai).toBe(1);
     expect(m.buildStats.boosted.makanai).toBe(1);
+  });
+});
+
+describe('第3段：皿に倍率が付く新しい方針', () => {
+  const CTX = { chain: 0, clean: true, saved: false };
+  const mult = (q: { factors: { id: string; mult: number }[] } | null, id: string) => q?.factors.find((f) => f.id === id)?.mult;
+
+  it('早口自慢：読み7文字以上の料理を打って出した皿だけ ×1.5→2.0→2.5', () => {
+    const s = shopWith([{ id: 'hayakuchi', lv: 3 }], ['vegSoup', 'grilledFish']);
+    const long = type(s, 'おんやさいもり').find((e) => e.type === 'serve')!;
+    if (long.type !== 'serve') throw new Error('serve');
+    expect(long.factors!.find((f) => f.id === 'hayakuchi')?.mult).toBe(2.5);
+    expect(long.tags).toContain('hayakuchi');
+    expect(mult(s.quote(1, CTX), 'hayakuchi')).toBeUndefined();
+    expect(mult(shopWith([{ id: 'hayakuchi', lv: 1 }], ['vegSoup']).quote(0, CTX), 'hayakuchi')).toBe(1.5);
+    // まとめ出しのついでの皿（8字）には付かない
+    const c = shopWith([{ id: 'hayakuchi', lv: 3 }, { id: 'matome', lv: 1 }], ['grilledFish', 'spicyPot']);
+    const evs = type(c, 'やきざかな').filter((e) => e.type === 'serve');
+    expect(evs).toHaveLength(2);
+    const extra = evs[1];
+    if (extra.type !== 'serve') throw new Error('serve');
+    expect(extra.tags).not.toContain('hayakuchi');
+  });
+
+  it('手間ひま：2種類の皿 ×1.5→1.8→2.2、3種類以上の皿 ×2.0→2.5→3.0（ついでの皿にも効く）', () => {
+    const s = shopWith([{ id: 'tema', lv: 2 }], ['grilledFish', 'stirFry', 'spicyPot']);
+    expect(mult(s.quote(0, CTX), 'tema')).toBeUndefined();
+    expect(mult(s.quote(1, CTX), 'tema')).toBe(1.8);
+    expect(mult(s.quote(2, CTX), 'tema')).toBe(2.5);
+    expect(mult(shopWith([{ id: 'tema', lv: 3 }], ['spicyPot']).quote(0, CTX), 'tema')).toBe(3.0);
+    const c = shopWith([{ id: 'tema', lv: 3 }, { id: 'matome', lv: 1 }], ['grilledFish', 'spicyPot']);
+    const evs = type(c, 'やきざかな').filter((e) => e.type === 'serve');
+    const extra = evs[1];
+    if (extra?.type !== 'serve') throw new Error('serve');
+    expect(extra.factors!.find((f) => f.id === 'tema')?.mult).toBe(3.0);
+    expect(extra.tags).toContain('tema');
+  });
+
+  it('強気の値付け：全部の皿 ×1.2→1.35→1.5、お客の待ち時間が 15→20→25% 短い', () => {
+    const m = modsFor([{ id: 'tsuyoki', lv: 3 }]);
+    expect(m.boldMult).toBe(1.5);
+    expect(m.waitMult).toBeCloseTo(0.75);
+    expect(modsFor([{ id: 'tsuyoki', lv: 1 }]).waitMult).toBeCloseTo(0.85);
+    expect(modsFor([{ id: 'tsuyoki', lv: 3 }, { id: 'aiso', lv: 3 }]).waitMult).toBeCloseTo(1.7 * 0.75);
+    const s = shopWith([{ id: 'tsuyoki', lv: 2 }], ['grilledFish']);
+    expect(mult(s.quote(0, CTX), 'tsuyoki')).toBe(1.35);
+    expect(s.quote(0, CTX)!.tags).toContain('tsuyoki');
+  });
+
+  it('宵っ張り：夜の皿 ×1.5→1.8→2.2、朝昼の皿は ×0.9（判子なし）、延長のあいだも夜', () => {
+    const s = shopWith([{ id: 'yoippari', lv: 3 }], ['grilledFish']);
+    for (const t of [0, 60]) {
+      s.clock = t;
+      const q = s.quote(0, CTX)!;
+      expect(mult(q, 'yoippari')).toBe(0.9);
+      expect(q.tags).not.toContain('yoippari');
+    }
+    s.clock = 120;
+    expect(mult(s.quote(0, CTX), 'yoippari')).toBe(2.2);
+    expect(s.quote(0, CTX)!.tags).toContain('yoippari');
+    s.extra = 15;
+    s.clock = DAY_LENGTH + 3;
+    expect(mult(s.quote(0, CTX), 'yoippari')).toBe(2.2);
+    expect(mult(shopWith([], ['grilledFish']).quote(0, CTX), 'yoippari')).toBeUndefined();
+    expect(mult(shopWith([{ id: 'yoippari', lv: 1 }], ['grilledFish']).quote(0, CTX), 'yoippari')).toBe(0.9);
+  });
+
+  it('新しい方針にも判子と効果の文がある', () => {
+    for (const id of ['hayakuchi', 'tema', 'tsuyoki', 'yoippari'] as const) {
+      expect(POLICY_SEAL[id].length).toBeGreaterThanOrEqual(1);
+      expect(POLICY_SEAL[id].length).toBeLessThanOrEqual(2);
+      expect(descOf(id, 3)).toContain('×');
+      expect(descOf(id, 3)).not.toContain('{');
+    }
   });
 });

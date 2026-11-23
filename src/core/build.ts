@@ -8,7 +8,8 @@
 export type PolicyId =
   | 'matome' | 'betsubara' | 'ryoshusho' | 'nushi' | 'tairyo' | 'mie' | 'sekkachi' | 'mouippai'
   | 'oomori' | 'yobikomi' | 'makanai' | 'ooiri' | 'aiso' | 'shikomi' | 'yoyaku' | 'omotenashi'
-  | 'ippatsu' | 'netsu' | 'asaichi' | 'encho';
+  | 'ippatsu' | 'netsu' | 'asaichi' | 'encho'
+  | 'hayakuchi' | 'tema' | 'tsuyoki' | 'yoippari';
 
 /** 方針の系統（色と音の個性に使う） */
 export type Family = 'chain' | 'combo' | 'trip' | 'stock' | 'guest';
@@ -58,6 +59,10 @@ export const HEAT_STEP = 0.1;
 export const HEAT_MISS_KEEP = 0.5;
 /** 延長営業：閉店の時点で、このコンボ以上なら延長する */
 export const ENCHO_COMBO = 30;
+/** 【長い読みの文字数】早口自慢：読み（仮名の数）がこの数以上の料理 */
+export const LONG_KANA = 7;
+/** 宵っ張り：朝と昼の皿の倍率（引き換え） */
+export const YOI_DAY = 0.9;
 /** 朝市：昼と夜の調達で持ち帰る素材の倍率 */
 export const LATE_TRIP = 0.85;
 
@@ -106,6 +111,16 @@ const MORNING_TRIP = L(2.5, 3.0, 3.5);
 const EXTEND = L(10, 15, 20);
 /** 【延長の倍率】延長営業のあいだの全部の皿 */
 const EXTEND_MULT = L(1.5, 1.8, 2.2);
+/** 【長い読みの倍率】早口自慢 */
+const LONG_MULT = L(1.5, 2.0, 2.5);
+/** 【手間ひまの倍率】2種類の素材の皿／3種類以上の皿 */
+const TEMA2_MULT = L(1.5, 1.8, 2.2);
+const TEMA3_MULT = L(2.0, 2.5, 3.0);
+/** 【強気の倍率】全部の皿／お客の待ち時間が短くなる割合 */
+const BOLD_MULT = L(1.2, 1.35, 1.5);
+const BOLD_WAIT = L(0.15, 0.2, 0.25);
+/** 【夜の皿の倍率】宵っ張り */
+const NIGHT_MULT = L(1.5, 1.8, 2.2);
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const v2 = <A, B>(a: [A, A, A], b: [B, B, B], f: (x: A) => string, g: (x: B) => string) => L([f(a[0]), g(b[0])], [f(a[1]), g(b[1])], [f(a[2]), g(b[2])]);
 const v1 = <A>(a: [A, A, A], f: (x: A) => string) => L([f(a[0])], [f(a[1])], [f(a[2])]);
@@ -232,6 +247,30 @@ export const POLICIES: Policy[] = [
     text: `閉店の時点でコンボが${ENCHO_COMBO}以上なら、営業が{0}秒延びる（1日1回）。延長のあいだは全部の皿が売上×{1}`,
     vals: v2(EXTEND, EXTEND_MULT, s, s),
   },
+  {
+    id: 'hayakuchi', name: '早口自慢', kana: 'はやくち', family: 'combo', starter: true,
+    quip: '「舌がまわるうちは、のれんもまわる」',
+    text: `読みが${LONG_KANA}文字以上の料理を打って出した皿は ×{0}`,
+    vals: v1(LONG_MULT, s),
+  },
+  {
+    id: 'tema', name: '手間ひま', kana: 'てまひま', family: 'stock', starter: true,
+    quip: '「手を抜いた皿は、客にばれる」',
+    text: '2種類の素材を使う皿は ×{0}、3種類以上の皿は ×{1}',
+    vals: v2(TEMA2_MULT, TEMA3_MULT, s, s),
+  },
+  {
+    id: 'tsuyoki', name: '強気の値付け', kana: 'つよき', family: 'guest', starter: true,
+    quip: '「うちの味に、値切りはきかないよ」',
+    text: '全部の皿は ×{0}。そのかわり、お客の待ち時間が{1}短くなる',
+    vals: v2(BOLD_MULT, BOLD_WAIT, s, pct),
+  },
+  {
+    id: 'yoippari', name: '宵っ張り', kana: 'よいっぱり', family: 'guest', starter: true,
+    quip: '「この店は、日が暮れてからが本番だ」',
+    text: `夜の皿（延長のあいだも）は ×{0}。そのかわり、朝と昼の皿は ×${YOI_DAY}`,
+    vals: v1(NIGHT_MULT, s),
+  },
 ];
 
 const BY_ID = new Map(POLICIES.map((p) => [p.id, p]));
@@ -277,6 +316,7 @@ export const POLICY_SEAL: Record<PolicyId, string> = {
   matome: 'まと', betsubara: '別腹', ryoshusho: '領収', nushi: 'ヌシ', tairyo: '大漁', mie: '見栄', sekkachi: '即出', mouippai: '一杯',
   oomori: '大盛', yobikomi: '呼込', makanai: '賄い', ooiri: '大入', aiso: '愛想', shikomi: '仕込', yoyaku: '予約', omotenashi: 'もて',
   ippatsu: '一発', netsu: '熱', asaichi: '朝市', encho: '延長',
+  hayakuchi: '早口', tema: '手間', tsuyoki: '強気', yoippari: '宵',
 };
 export const FAMILY_NAME: Record<Family, string> = { chain: '連鎖', combo: '勢い', trip: '調達', stock: '台所', guest: '客あしらい' };
 
@@ -321,6 +361,15 @@ export const PAIRS: Pair[] = [
   { a: 'encho', b: 'ooiri', name: '大入りの延長戦' },
   { a: 'encho', b: 'netsu', name: '閉店まぎわの追い込み' },
   { a: 'encho', b: 'ryoshusho', name: '伝票が終わらない' },
+  // 第3段で足した組（古い保存データの発見をそのまま使うため、末尾に足す）
+  { a: 'hayakuchi', b: 'ippatsu', name: '立て板に水' },
+  { a: 'hayakuchi', b: 'netsu', name: '早口言葉' },
+  { a: 'oomori', b: 'tema', name: '特上の大皿' },
+  { a: 'tema', b: 'yoippari', name: '夜の御膳' },
+  { a: 'aiso', b: 'tsuyoki', name: '強気の看板' },
+  { a: 'tsuyoki', b: 'yoyaku', name: '格式の店' },
+  { a: 'encho', b: 'yoippari', name: '夜通し' },
+  { a: 'hayakuchi', b: 'yoippari', name: '夜の早口' },
 ];
 
 /**
@@ -422,6 +471,12 @@ export interface BuildMods {
   laterTrip: number;
   /** 延長営業：延びる秒数（0 は持っていない） */
   extendSecs: number;
+  /** 早口自慢：長い読みの皿／手間ひま：2種類・3種類以上の皿／強気の値付け：全部の皿／宵っ張り：夜の皿（1 は持っていない） */
+  longMult: number;
+  tema2Mult: number;
+  tema3Mult: number;
+  boldMult: number;
+  nightMult: number;
 }
 
 export function emptyMods(): BuildMods {
@@ -431,6 +486,7 @@ export function emptyMods(): BuildMods {
     feverSecs: 0, feverMult: 1, waitMult: 1, noAngryPenalty: false, keepCombo: false, startStock: 0, phaseStock: 0,
     comboPlus: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, levels: {},
     ippatsuMult: 1, heatCap: 1, morningTrip: 1, laterTrip: 1, extendSecs: 0,
+    longMult: 1, tema2Mult: 1, tema3Mult: 1, boldMult: 1, nightMult: 1,
   };
 }
 
@@ -461,6 +517,10 @@ export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMod
       case 'netsu': m.heatCap = HEAT_CAP[i]; break;
       case 'asaichi': m.morningTrip = MORNING_TRIP[i]; m.laterTrip = LATE_TRIP; m.morningMult = MORNING_MULT[i]; break;
       case 'encho': m.extendSecs = EXTEND[i]; m.extendMult = EXTEND_MULT[i]; break;
+      case 'hayakuchi': m.longMult = LONG_MULT[i]; break;
+      case 'tema': m.tema2Mult = TEMA2_MULT[i]; m.tema3Mult = TEMA3_MULT[i]; break;
+      case 'tsuyoki': m.boldMult = BOLD_MULT[i]; m.waitMult *= 1 - BOLD_WAIT[i]; break;
+      case 'yoippari': m.nightMult = NIGHT_MULT[i]; break;
     }
   }
   return m;

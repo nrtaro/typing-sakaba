@@ -213,7 +213,8 @@ export interface RunMeta {
   sigs: PolicyId[];
   /** 解放した方針 */
   policies: PolicyId[];
-  flags: { noAngry: boolean; max3: boolean };
+  /** allPairs：かけ合わせを全部見つけた記録（あとで組が増えても秘伝の書を消さない） */
+  flags: { noAngry: boolean; max3: boolean; allPairs: boolean };
   active: RunState | null;
   last: RunSummary | null;
   /** 貯金箱へ足し終えたランのID */
@@ -226,7 +227,7 @@ export function emptyMeta(): RunMeta {
   return {
     v: 1, loop: 1, pick: 1, clears: 0, runs: 0, daysCleared: 0,
     best: { total: 0, day: 0, combo: 0, chain: 0, serve: 0, ratio: 0, stack: 0 },
-    discovered: [], sets: [], sigs: [], policies: [], flags: { noAngry: false, max3: false }, active: null, last: null, paid: [], losses: 0,
+    discovered: [], sets: [], sigs: [], policies: [], flags: { noAngry: false, max3: false, allPairs: false }, active: null, last: null, paid: [], losses: 0,
   };
 }
 
@@ -284,7 +285,9 @@ export function readMeta(raw: unknown): RunMeta {
   m.sigs = [...new Set(arr(o.sigs).filter(isPolicy))];
   m.policies = [...new Set(arr(o.policies).filter(isPolicy))];
   const f = obj(o.flags);
-  m.flags = { noAngry: f.noAngry === true, max3: f.max3 === true };
+  // 第3段より前の34組を全部見つけていた記録も、全部見つけたものとして残す
+  const firstAll = PAIRS.slice(0, FIRST_PAIRS).every((p) => m.discovered.includes(pairKey(p.a, p.b)));
+  m.flags = { noAngry: f.noAngry === true, max3: f.max3 === true, allPairs: f.allPairs === true || firstAll };
   m.active = readRun(o.active);
   const l = obj(o.last);
   if (typeof l.at === 'string') {
@@ -367,6 +370,9 @@ export interface Offer {
   /** 名前付きのかけ合わせになる相手を持っているか */
   hot: boolean;
 }
+
+/** 第3段（組を足す前）のかけ合わせの数。PAIRS の先頭からこの数が、古い保存データの組 */
+const FIRST_PAIRS = 34;
 
 /** 支える側の方針：何を助けるか */
 const SUPPORT: Partial<Record<PolicyId, { with: PolicyId[]; text: string }>> = {
@@ -492,6 +498,7 @@ export function closeDay(run: RunState, meta: RunMeta, f: DayFacts, now = new Da
   const newPairs = f.build.pairs.filter((p) => pairOf(p) && !meta.discovered.includes(p));
   for (const p of f.build.pairs) if (pairOf(p) && !run.pairs.includes(p)) run.pairs.push(p);
   meta.discovered.push(...newPairs);
+  if (PAIRS.every((p) => meta.discovered.includes(pairKey(p.a, p.b)))) meta.flags.allPairs = true;
   const newSets = f.build.sets.filter((k) => setOf(k) && !meta.sets.includes(k));
   meta.sets.push(...newSets);
   const passed = result.sales >= goal;
@@ -604,7 +611,7 @@ export const RUN_ACHIEVEMENTS: RunAchievement[] = [
   { id: 'run-bigserve', title: '一皿五千円', condition: '1皿で5,000円以上を売り上げる', progress: (m) => ({ now: m.best.serve, goal: 5000 }) },
   { id: 'run-double', title: '倍返し', condition: '目標の2倍の売上で1日を終える', progress: (m) => ({ now: m.best.ratio, goal: 200 }) },
   { id: 'run-discover5', title: '仕掛け人', condition: 'かけ合わせを8種類見つける', progress: (m) => ({ now: m.discovered.length, goal: 8 }) },
-  { id: 'run-discover-all', title: '秘伝の書', condition: `かけ合わせを${PAIRS.length}種類すべて見つける`, progress: (m) => ({ now: m.discovered.length, goal: PAIRS.length }) },
+  { id: 'run-discover-all', title: '秘伝の書', condition: `かけ合わせを${PAIRS.length}種類すべて見つける`, progress: (m) => ({ now: m.flags.allPairs ? PAIRS.length : m.discovered.length, goal: PAIRS.length }) },
   { id: 'run-two-builds', title: '変幻自在', condition: '主力の方針がちがう2つの構成でクリアする', progress: (m) => ({ now: m.sigs.length, goal: 2 }) },
   { id: 'run-no-angry', title: 'もてなし上手', condition: '3日目か4日目を、誰も怒らせずに突破する', progress: (m) => flag(m.flags.noAngry) },
   { id: 'run-max3', title: '三本柱', condition: '方針3つを最大まで育ててクリアする', progress: (m) => flag(m.flags.max3) },

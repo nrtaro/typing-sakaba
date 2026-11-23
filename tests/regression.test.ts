@@ -70,9 +70,13 @@ describe('古い保存データ', () => {
 
   it('34組を全部見つけた記録は、読み直しても残り、「秘伝の書」が取れている', () => {
     const meta = emptyMeta();
-    meta.discovered = PAIRS.map((p) => pairKey(p.a, p.b));
+    // 組が増える前（第3段より前）の34組だけを全部見つけた記録。組が増えても実績は消さない
+    meta.discovered = PAIRS.slice(0, 34).map((p) => pairKey(p.a, p.b));
     const back = roundTrip(meta);
     expect(back.discovered).toHaveLength(34);
     expect(earnedAchievements(back)).toContain('run-discover-all');
+    const short = emptyMeta();
+    short.discovered = PAIRS.slice(0, 33).map((p) => pairKey(p.a, p.b));
+    expect(earnedAchievements(roundTrip(short))).not.toContain('run-discover-all');
   });
 });
