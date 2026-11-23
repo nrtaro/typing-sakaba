@@ -187,22 +187,57 @@ describe('作り直した方針', () => {
     expect(veg.type === 'serve' && veg.tags).not.toContain('mie');
   });
 
-  it('大盛り上等：素材を2倍使い、売上が上がる。大漁旗を持っていると、かけ合わせになる', () => {
-    const s = new Shop(new Rng(3), DIFFICULTIES[1], NORMAL_RULES, modsFor([{ id: 'oomori', lv: 3 }, { id: 'tairyo', lv: 3 }], { bigChance: 1 }));
+  it('大盛り：値段は書き換えず、倍率として掛かる。おかわりの2品目は普通の量と値段', () => {
+    const s = new Shop(new Rng(3), DIFFICULTIES[1], NORMAL_RULES, modsFor([{ id: 'oomori', lv: 3 }, { id: 'betsubara', lv: 3 }], { bigChance: 1, refillChance: 1 }));
     for (let i = 0; i < 400 && !s.seats.some((g) => g?.state === 'wait'); i++) s.update(0.1);
     const i = s.seats.findIndex((g) => g?.state === 'wait');
     const g = s.seats[i]!;
-    expect(g.big).toBe(true);
     const base = DISHES.find((d) => d.id === g.dish.id)!;
-    expect(g.dish.price).toBe(Math.round(base.price * 3.3));
+    expect(g.big).toBe(true);
+    expect(g.bigMult).toBe(3.3);
+    expect(g.bigFrom).toBe('policy');
+    expect(g.dish.price).toBe(base.price);
     for (const [k, n] of Object.entries(base.need)) expect(g.dish.need[k as keyof typeof base.need]).toBe(n! * 2);
     for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 30;
     s.drainEvents();
     const ev = type(s, g.dish.kana).find((e) => e.type === 'serve')!;
     if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.factors).toContainEqual({ id: 'oomori', mult: 3.3 });
     expect(ev.tags).toContain('oomori');
-    expect(ev.pair).toBe(pairKey('oomori', 'tairyo'));
-    expect(ev.paid).toBe(1);
+    for (let k = 0; k < 100 && !(g.state === 'wait' && g.refill); k++) s.update(0.1);
+    expect(g.refill).toBe(true);
+    expect(g.big).toBeFalsy();
+    expect(g.bigMult).toBeUndefined();
+    const second = DISHES.find((d) => d.id === g.dish.id)!;
+    expect(g.dish.need).toEqual(second.need);
+    for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 30;
+    s.drainEvents();
+    const ev2 = type(s, g.dish.kana).find((e) => e.type === 'serve')!;
+    if (ev2.type !== 'serve') throw new Error('serve');
+    expect(ev2.factors!.some((f) => f.id === 'oomori')).toBe(false);
+    expect(ev2.tags).not.toContain('oomori');
+  });
+
+  it('大食いの日の大盛りは会計に入るが、持っていない大盛り上等の判子は付かない', () => {
+    const s = new Shop(new Rng(3), DIFFICULTIES[1], NORMAL_RULES, modsFor([], { bigChance: 1 }));
+    for (let i = 0; i < 400 && !s.seats.some((g) => g?.state === 'wait'); i++) s.update(0.1);
+    const g = s.seats.find((x) => x?.state === 'wait')!;
+    expect(g.bigFrom).toBe('road');
+    for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 30;
+    s.drainEvents();
+    const ev = type(s, g.dish.kana).find((e) => e.type === 'serve')!;
+    if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.factors).toContainEqual({ id: 'big', mult: 2 });
+    expect(ev.tags).not.toContain('oomori');
+    expect(s.buildStats.fired.oomori).toBeUndefined();
+  });
+
+  it('方針を入れ替えても、すでに出ている大盛りの注文は約束した倍率のまま', () => {
+    const s = new Shop(new Rng(3), DIFFICULTIES[1], NORMAL_RULES, modsFor([{ id: 'oomori', lv: 1 }], { bigChance: 1 }));
+    for (let i = 0; i < 400 && !s.seats.some((g) => g?.state === 'wait'); i++) s.update(0.1);
+    const i = s.seats.findIndex((g) => g?.state === 'wait');
+    s.build = modsFor([{ id: 'oomori', lv: 3 }], { bigChance: 1 });
+    expect(s.quote(i, { chain: 0, clean: true, saved: false })!.factors).toContainEqual({ id: 'oomori', mult: 2.4 });
   });
 
   it('予約のみ：1皿でコンボがよけいに進む／おもてなし：間があくほどチップが増える', () => {

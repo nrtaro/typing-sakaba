@@ -38,6 +38,9 @@ export interface Guest {
   banquet?: boolean;
   /** 繁盛記：大盛りの注文（素材2倍・売上アップ）／せっかちなお客（待ち時間が短い） */
   big?: boolean;
+  /** 繁盛記：注文のときに約束した大盛りの倍率と、その出どころ（大盛り上等か、営業条件の「大食いの日」か） */
+  bigMult?: number;
+  bigFrom?: 'policy' | 'road';
   hasty?: boolean;
 }
 
@@ -475,7 +478,10 @@ export class Shop {
     if (b.lowMult > 1 && this.scarcest().some((id) => g.dish.need[id])) { tags.push('mie'); factors.push({ id: 'mie', mult: b.lowMult }); }
     if (b.quickTip > 1 && g.wait / g.maxWait >= QUICK_RATIO) { tags.push('sekkachi'); tipB *= b.quickTip; }
     if (b.aleAdd > 0 && !g.dish.need.ale && this.stock.ale > 0) { add = b.aleAdd; tags.push('mouippai'); }
-    if (g.big) tags.push('oomori');
+    if (g.big && g.bigMult) {
+      if (g.bigFrom === 'policy') { tags.push('oomori'); factors.push({ id: 'oomori', mult: g.bigMult }); }
+      else factors.push({ id: 'big', mult: g.bigMult });
+    }
     // おもてなし：前の皿からあいた秒数ぶん、チップが増える（まとめ出しのついでの皿には付かない）
     const idle = Math.min(IDLE_MAX, this.clock - this.lastServeAt);
     if (b.idleTip > 0 && chain === 0 && idle >= IDLE_MIN) { tags.push('omotenashi'); tipB += Math.round(idle * b.idleTip) * b.tipMult; }
@@ -786,6 +792,10 @@ export class Shop {
           // おかわり：食べ終わったら、見せていたもう1品をたのむ
           g.dish = g.extra;
           g.extra = undefined;
+          // 2品目は別の注文：大盛りの約束は引き継がない
+          g.big = undefined;
+          g.bigMult = undefined;
+          g.bigFrom = undefined;
           g.refill = true;
           g.state = 'wait';
           g.wait = g.maxWait;
@@ -808,11 +818,12 @@ export class Shop {
     const b = this.build;
     // 繁盛記：大盛り（素材2倍・売上アップ）と、せっかちなお客（待ち時間が短い）。方針用の乱数で決める
     const big = !!b && b.bigChance > 0 && this.brng!.next() < b.bigChance;
-    if (big) dish = { ...dish, group: dishGroup(dish), need: Object.fromEntries(Object.entries(dish.need).map(([k, n]) => [k, n! * BIG_NEED])), price: Math.round(dish.price * b!.bigMult) };
+    // 大盛りは素材だけ2倍にした写し。値段は書き換えず、会計で倍率として掛ける
+    if (big) dish = { ...dish, group: dishGroup(dish), need: Object.fromEntries(Object.entries(dish.need).map(([k, n]) => [k, n! * BIG_NEED])) };
     const hasty = !!b && b.impatient > 0 && this.brng!.next() < b.impatient;
     if (hasty) maxWait *= 0.6;
     const guest: Guest = { id: this.nextId++, dish, look: this.rng.int(0, LOOK_COUNT - 1), wait: maxWait, maxWait, state: 'walk', t: 0, lack: 0 };
-    if (big) guest.big = true;
+    if (big) { guest.big = true; guest.bigMult = b!.bigMult; guest.bigFrom = b!.levels.oomori ? 'policy' : 'road'; }
     if (hasty) guest.hasty = true;
     // おかわり注文の日だけ乱数を使う（通常営業のお客の並びは変えない）
     if (this.rules.refillChance > 0 && this.rng.next() < this.rules.refillChance) guest.extra = this.pickDish(new Set([...taken, dish.id]));
