@@ -14,7 +14,7 @@ import { RomajiMatcher } from '../core/romaji';
 import { INGREDIENT_ORDER } from '../core/shopConfig';
 import { achievementItem, itemById, type Item } from '../core/collection';
 import {
-  FAMILY_COLOR, FAMILY_NAME, MAX_LEVEL, MAX_SLOTS, PAIRS, PAIR_MAX, POLICIES, POLICY_SEAL, SETS, SET_BONUS, setKey, setOf, setText, descAll, descDiff, descOf, modsFor, pairKey, pairOf, pairText, policyOf,
+  FAMILY_COLOR, FAMILY_NAME, MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, POLICY_SEAL, SETS, setKey, setOf, setText, descAll, descDiff, descOf, modsFor, pairKey, pairOf, pairText, policyOf,
   type BuildStats, type Owned, type PolicyId,
 } from '../core/build';
 import {
@@ -614,7 +614,7 @@ export class RunUI {
       ['朝・昼・夜に「方針」を1つ選んで、店を育てる。', C.cream],
       ['毎日の売上目標に届かないと、そこで店じまい。', C.cream],
       ['決まった2つの方針がそろって皿に効くと「かけ合わせ」。', '#ffe9b4'],
-      [`育てた組ほど強い（最大+${Math.round(PAIR_MAX * 100)}%）。噛み合う店を組もう。`, '#ffe9b4'],
+      ['同じ皿に効く方針は、倍率が掛け算で重なる（全部込みで×30まで）。', '#ffe9b4'],
     ];
     lines.forEach(([t, c], i) => sc.T(t, 28, 53 + i * 12, sc.fitSize(t, 8, 252, 6), c));
     sc.PR(28, 103, 250, 1, '#5a3a1c');
@@ -1175,7 +1175,7 @@ export class RunUI {
         sc.T(found ? `型『${x.name}』` : '型『？？？』', X, 60, 11, '#ffb0e0');
         let yy = 80;
         yy += this.para(sc, found ? setText(x) : `「${policyOf(x.ids[0]).name}」と、まだ見つけていない2つの方針の型`, X, yy, 8.5, W, found ? C.w : C.gray) * 11 + 6;
-        this.para(sc, `型は打った皿だけに効き、+${Math.round(SET_BONUS * 100)}%。まとめ出しは入らない。`, X, yy, 8, W, C.cream);
+        this.para(sc, '型は打った皿だけで成立する（売上は変わらない）。まとめ出しは入らない。', X, yy, 8, W, C.cream);
         sc.T(`見つけた型 ${m.sets.length}/${SETS.length}・かけ合わせ ${m.discovered.length}/${PAIRS.length}`, X, 180, 8, '#a9f0e4');
       } else {
       const p = PAIRS[b.sel - SETS.length];
@@ -1183,7 +1183,7 @@ export class RunUI {
       sc.T(found ? `『${p.name}』` : '『？？？』', X, 60, 11, C.gold3);
       let y = 80;
       y += this.para(sc, found ? pairText(p) : `「${policyOf(p.a).name}」と、まだ見つけていない方針の組`, X, y, 8.5, W, found ? C.w : C.gray) * 11 + 6;
-      this.para(sc, `増える割合は、2つの段階の合計×10%（Lv1同士で+20%、最大+${Math.round(PAIR_MAX * 100)}%）。いくつも重なると、そのぶん足される。`, X, y, 8, W, C.cream);
+      this.para(sc, '名前付きの2つが同じ皿に効くと見つかる。売上は変わらず、ずかんに残る。', X, y, 8, W, C.cream);
       sc.T(`見つけた型 ${m.sets.length}/${SETS.length}・かけ合わせ ${m.discovered.length}/${PAIRS.length}`, X, 180, 8, '#a9f0e4');
       }
     } else if (b.tab === 2) {

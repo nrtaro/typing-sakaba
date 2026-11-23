@@ -1,8 +1,8 @@
 // 繁盛記（ビルドを育てる営業）：方針の一覧と、方針が営業（Shop）に与える変更。
 // 数値はすべてここに置く。Shop は BuildMods だけを見てふるまいを変える（通常営業・ひがわりでは null）。
 //
-// 作りの方針：1つで何でも解決する方針は置かない。どの方針も単体では控えめで、
-// 「かけ合わせ」（決まった2つがそろって、その皿に効く）で大きく伸びる。
+// 作りの方針：1皿に効いた方針の倍率は、ぜんぶ掛け算で重なる（全部込みで dishPrice.ts の MULT_CAP まで）。
+// 「かけ合わせ」「型」（決まった2つ・3つが同じ皿に効く）は売上を変えず、発見として記録する。
 // 連鎖・勢い・調達・台所・客あしらい、どの系統からでも店を組めるようにする。
 
 export type PolicyId =
@@ -34,13 +34,6 @@ export interface Policy {
 
 export const MAX_SLOTS = 5;
 export const MAX_LEVEL = 3;
-/**
- * かけ合わせ：決まった2つの方針がそろって、その皿に効いたときに増える割合。
- * 2つの段階の合計×10%（Lv1同士で+20%、最大まで育てた同士で+60%）。広く浅くより、育てた組が強い。
- */
-export const PAIR_STEP = 0.1;
-export const pairBonus = (lvA: number, lvB: number) => PAIR_STEP * (lvA + lvB);
-export const PAIR_MAX = pairBonus(3, 3);
 /** 待たせない店：待ち時間がこの割合以上残っている客が対象 */
 export const QUICK_RATIO = 0.7;
 /** 大入り袋：何コンボごとに大入りになるか */
@@ -64,8 +57,6 @@ export const HEAT_MISS_KEEP = 0.5;
 export const ENCHO_COMBO = 30;
 /** 朝市：昼と夜の調達で持ち帰る素材の倍率 */
 export const LATE_TRIP = 0.85;
-/** 型：決まった3つの方針がそろって、打った皿に効いたときに増える割合（その中のかけ合わせとは別に足す） */
-export const SET_BONUS = 0.6;
 
 const L = <T>(a: T, b: T, c: T) => [a, b, c] as [T, T, T];
 const CHAIN = L(1, 2, 3);
@@ -269,7 +260,7 @@ export const POLICY_SEAL: Record<PolicyId, string> = {
 export const FAMILY_NAME: Record<Family, string> = { chain: '連鎖', combo: '勢い', trip: '調達', stock: '台所', guest: '客あしらい' };
 
 /**
- * 名前の付いたかけ合わせ。2つがそろって、その皿に効いたときに売上が増え、「発見」として記録する。
+ * 名前の付いたかけ合わせ。2つがそろって、その皿に効いたときに「発見」として記録する（売上は変えない）。
  * 皿ごとに効く方針（fires）は「その皿に効いた」こと、店全体に効く方針は「持っている」ことが条件。
  * どの方針にも2つ以上の相手があり、どの系統からでも組める。
  */
@@ -312,7 +303,7 @@ export const PAIRS: Pair[] = [
 ];
 
 /**
- * 型：決まった3つの方針がそろって、打った皿に効いたときの大きな見返り（まとめ出しは入らない）。
+ * 型：決まった3つの方針がそろって、打った皿に効いたときに成立する（売上は変えない。まとめ出しは入らない）。
  * 皿ごとに効く方針はその皿に効いたこと、店全体に効く方針は持っていることが条件。ついでの皿には付かない。
  */
 export interface FormSet { ids: [PolicyId, PolicyId, PolicyId]; name: string }
@@ -330,7 +321,7 @@ const SET_BY_KEY = new Map(SETS.map((s) => [setKey(s), s]));
 export const setOf = (key: string) => SET_BY_KEY.get(key);
 /** 型の説明 */
 export function setText(s: FormSet): string {
-  return `「${s.ids.map((id) => policyOf(id).name).join('」「')}」の3つがそろって打った皿に効くと、その皿の売上+${Math.round(SET_BONUS * 100)}%（中のかけ合わせとは別に足す。ついでの皿には付かない）`;
+  return `「${s.ids.map((id) => policyOf(id).name).join('」「')}」の3つがそろって打った皿に効くと、型が成立する（売上は変わらない。ついでの皿では成立しない）`;
 }
 export const pairKey = (a: PolicyId, b: PolicyId) => (a < b ? `${a}+${b}` : `${b}+${a}`);
 const PAIR_BY_KEY = new Map(PAIRS.map((p) => [pairKey(p.a, p.b), p]));
@@ -344,8 +335,8 @@ export function pairText(p: Pair): string {
   const when = (id: PolicyId) => (policyOf(id).fires ? `「${policyOf(id).name}」が効いた皿` : `「${policyOf(id).name}」を持っている`);
   const [x, y] = policyOf(p.a).fires ? [p.a, p.b] : [p.b, p.a];
   return policyOf(y).fires
-    ? `「${policyOf(x).name}」と「${policyOf(y).name}」が同じ皿に効くと、その皿の売上アップ`
-    : `${when(y)}と、${when(x)}の売上アップ`;
+    ? `「${policyOf(x).name}」と「${policyOf(y).name}」が同じ皿に効くと、この組を発見`
+    : `${when(y)}と、${when(x)}で、この組を発見`;
 }
 
 export interface Owned { id: PolicyId; lv: number }

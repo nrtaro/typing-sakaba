@@ -2,7 +2,8 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
-import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MAX, IDLE_MIN, IPPATSU_MISS, SET_BONUS, SETS, setKey, QUICK_RATIO, REFILL_EAT, pairBonus, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MAX, IDLE_MIN, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { priceOf, type Factor, type Price } from './dishPrice';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
 import {
@@ -52,7 +53,9 @@ export type ShopEvent =
   | { type: 'key'; ok: boolean; count: number }
   | { type: 'serve'; seat: number; gain: number; combo: number; hiden?: boolean; banquet?: boolean;
       /** 繁盛記：この皿に効いた方針・まとめ出しの何皿目か（0 は打った皿）・酒を付けたか・この皿で初めて成立したかけ合わせ */
-      tags?: PolicyId[]; chain?: number; poured?: boolean; pair?: string; pairs?: number; pairMult?: number; dish?: Dish;
+      tags?: PolicyId[]; chain?: number; poured?: boolean; pair?: string; pairs?: number; dish?: Dish;
+      /** 掛ける前の額・上限の前の倍率・実際に払われた倍率・上限で止まったか・効いた倍率 */
+      base?: number; raw?: number; paid?: number; capped?: boolean; factors?: Factor[];
       /** 型：この皿で初めて成立した型／この皿に効いた型の数／一発勝負の結果（true＝ミスなし、false＝ミスあり）／連打の熱の倍率 */
       set?: string; sets?: number; clean?: boolean; heat?: number }
   /** 繁盛記：延長営業で閉店が延びた */
@@ -90,6 +93,11 @@ export type ShopEvent =
   | { type: 'comboBreak' }
   | { type: 'phase'; index: number }
   | { type: 'end' };
+
+/** 繁盛記の見積もりの条件：まとめ出しの何皿目か／ミスなしで打ったか／まかないで素材が減らないか */
+export interface QuoteCtx { chain: number; clean: boolean; saved: boolean }
+/** 見積もり：額と倍率の内訳、効く方針、出したあとの連打の熱（熱を持っていなければ undefined） */
+export type Quote = Price & { tags: PolicyId[]; heat?: number };
 
 export interface ShopStats {
   served: number;
@@ -437,15 +445,64 @@ export class Shop {
     }
   }
 
+  /** コンボが c のときの売上の倍率 */
+  private comboMultAt(c: number) {
+    return Math.min(this.build?.comboCap ?? SHOP.comboMaxMult, 1 + Math.floor(c / SHOP.comboStep) * SHOP.comboBonus);
+  }
+
+  /**
+   * 繁盛記：その席の注文を今出したらいくらか。店の状態も乱数も変えない（札の予告と会計の両方が使う）。
+   * chain はまとめ出しの何皿目か（0 は打った皿）、clean はミスなしで打ったか、saved はまかないで素材が減らないか。
+   * 出せない席（空き・歩いている・食べている）、調達中、方針がない営業では null
+   */
+  quote(seat: number, ctx: QuoteCtx): Quote | null {
+    const b = this.build;
+    const g = this.seats[seat];
+    if (!b || !g || g.state !== 'wait' || this.away) return null;
+    const { chain, clean, saved } = ctx;
+    const tags: PolicyId[] = [];
+    const factors: Factor[] = [];
+    const tip = Math.round((g.wait / g.maxWait) * SHOP.tipMax);
+    let tipB = tip * b.tipMult;
+    let add = 0;
+    let heat: number | undefined;
+    const nextCombo = this.combo + 1 + b.comboPlus;
+    if (chain > 0) { tags.push('matome'); factors.push({ id: 'matome', mult: b.chainMult }); }
+    if (g.refill && b.refillMult > 1) { tags.push('betsubara'); factors.push({ id: 'betsubara', mult: b.refillMult }); }
+    if (this.comboMultAt(nextCombo) > SHOP.comboMaxMult) tags.push('ryoshusho');
+    if (this.fresh > 0 && b.freshMult > 1) { tags.push('nushi'); factors.push({ id: 'nushi', mult: b.freshMult }); }
+    // おやじの見栄：素材を使う前の「一番少ない素材」で決める
+    if (b.lowMult > 1 && this.scarcest().some((id) => g.dish.need[id])) { tags.push('mie'); factors.push({ id: 'mie', mult: b.lowMult }); }
+    if (b.quickTip > 1 && g.wait / g.maxWait >= QUICK_RATIO) { tags.push('sekkachi'); tipB *= b.quickTip; }
+    if (b.aleAdd > 0 && !g.dish.need.ale && this.stock.ale > 0) { add = b.aleAdd; tags.push('mouippai'); }
+    if (g.big) tags.push('oomori');
+    // おもてなし：前の皿からあいた秒数ぶん、チップが増える（まとめ出しのついでの皿には付かない）
+    const idle = Math.min(IDLE_MAX, this.clock - this.lastServeAt);
+    if (b.idleTip > 0 && chain === 0 && idle >= IDLE_MIN) { tags.push('omotenashi'); tipB += Math.round(idle * b.idleTip) * b.tipMult; }
+    if (saved) tags.push('makanai');
+    if (this.fever && b.feverMult > 1) { tags.push('ooiri'); factors.push({ id: 'ooiri', mult: b.feverMult }); }
+    // 一発勝負・連打の熱：打った皿だけ（まとめ出しのついでの皿には付かない）
+    if (chain === 0 && b.ippatsuMult > 1) {
+      if (clean) tags.push('ippatsu');
+      factors.push({ id: 'ippatsu', mult: clean ? b.ippatsuMult : IPPATSU_MISS });
+    }
+    if (chain === 0 && b.heatCap > 1) {
+      heat = this.clock - this.lastTypedAt <= HEAT_GAP ? Math.min(b.heatCap - 1, this.heat + HEAT_STEP) : 0;
+      if (heat > 0) { tags.push('netsu'); factors.push({ id: 'netsu', mult: 1 + heat }); }
+    }
+    factors.push({ id: 'combo', mult: this.comboMultAt(nextCombo) });
+    if (this.hidenArmed) factors.push({ id: 'hiden', mult: HIDEN_MULT });
+    if (g.banquet) factors.push({ id: 'banquet', mult: BANQUET_MULT });
+    return { ...priceOf(g.dish.price + tipB + add, factors), tags, heat };
+  }
+
   /** 1皿を出す。chain はまとめ出しの何皿目か（0 は打った皿）、chained はまとめ出しが効いたか */
   private serveOne(seat: number, chain: number, chained: boolean) {
     const g = this.seats[seat]!;
     const b = this.build;
-    const tags: PolicyId[] = [];
     const saved = !!b && b.saveChance > 0 && this.brng!.next() < b.saveChance;
-    // おやじの見栄：素材を使う前の「一番少ない素材」で決める
-    const scarce = b && b.lowMult > 1 ? this.scarcest() : [];
-    const low = scarce.some((id) => g.dish.need[id]);
+    // 繁盛記：素材を使う前・コンボが進む前の状態で見積もり、その額で確定する
+    const q = b ? this.quote(seat, { chain, clean: this.wordMisses === 0, saved }) : null;
     if (!saved) for (const [id, n] of Object.entries(g.dish.need)) this.takeStock(id as IngredientId, n!);
     const comboBefore = this.combo;
     this.combo += 1 + (b?.comboPlus ?? 0);
@@ -459,65 +516,36 @@ export class Shop {
     let poured = false;
     let pair: string | undefined;
     let pairCount = 0;
-    let pairMult = 1;
     let setCount = 0;
     let set: string | undefined;
     let clean: boolean | undefined;
     let heatNow: number | undefined;
-    if (!b) gain = Math.round((g.dish.price + tip) * this.multiplier * special);
+    let tags: PolicyId[] = [];
+    if (!b || !q) gain = Math.round((g.dish.price + tip) * this.multiplier * special);
     else {
-      let mult = 1;
-      let tipB = tip * b.tipMult;
-      if (chained) { tags.push('matome'); if (chain > 0) mult *= b.chainMult; }
-      if (g.refill && b.refillMult > 1) { tags.push('betsubara'); mult *= b.refillMult; this.buildStats.refills++; }
-      if (this.multiplier > SHOP.comboMaxMult) tags.push('ryoshusho');
-      if (this.fresh > 0 && b.freshMult > 1) { tags.push('nushi'); mult *= b.freshMult; }
-      if (low) { tags.push('mie'); mult *= b.lowMult; }
-      if (b.quickTip > 1 && g.wait / g.maxWait >= QUICK_RATIO) { tags.push('sekkachi'); tipB *= b.quickTip; }
-      let add = 0;
-      if (b.aleAdd > 0 && !g.dish.need.ale && this.stock.ale > 0) { this.takeStock('ale', 1); add = b.aleAdd; poured = true; tags.push('mouippai'); }
-      if (g.big) tags.push('oomori');
-      // おもてなし：前の皿からあいた秒数ぶん、チップが増える（まとめ出しのついでの皿には付かない）
-      const idle = Math.min(IDLE_MAX, this.clock - this.lastServeAt);
-      if (b.idleTip > 0 && chain === 0 && idle >= IDLE_MIN) { tags.push('omotenashi'); tipB += Math.round(idle * b.idleTip) * b.tipMult; }
-      if (saved) tags.push('makanai');
-      if (this.fever && b.feverMult > 1) { tags.push('ooiri'); mult *= b.feverMult; }
-      // 一発勝負・連打の熱：打った皿だけ（まとめ出しのついでの皿には付かない）
-      if (chain === 0 && b.ippatsuMult > 1) {
-        clean = this.wordMisses === 0;
-        if (clean) { tags.push('ippatsu'); mult *= b.ippatsuMult; } else mult *= IPPATSU_MISS;
-      }
-      if (chain === 0 && b.heatCap > 1) {
-        this.heat = this.clock - this.lastTypedAt <= HEAT_GAP ? Math.min(b.heatCap - 1, this.heat + HEAT_STEP) : 0;
+      tags = chained && chain === 0 ? ['matome', ...q.tags] : [...q.tags];
+      gain = q.gain;
+      if (tags.includes('mouippai')) { this.takeStock('ale', 1); poured = true; }
+      if (tags.includes('betsubara')) this.buildStats.refills++;
+      if (chain === 0 && b.ippatsuMult > 1) clean = this.wordMisses === 0;
+      if (q.heat !== undefined) {
+        this.heat = q.heat;
         this.lastTypedAt = this.clock;
-        heatNow = 1 + this.heat;
-        if (this.heat > 0) { tags.push('netsu'); mult *= heatNow; }
+        heatNow = 1 + q.heat;
         this.buildStats.maxHeat = Math.max(this.buildStats.maxHeat, heatNow);
       }
-      // かけ合わせ：名前付きの組が同じ皿に効いたら、1組につき売上が増える
+      // かけ合わせ・型：名前付きの組が同じ皿に効いたら「発見」として記録する（売上は変えない）
       // 店全体に効く方針（呼び込み・大漁旗など）は、持っているだけで相手になる
-      let pairs = 0;
-      let bonus = 0;
       const found: string[] = [];
-      const hit = (x: PolicyId, y: PolicyId) => {
-        if (!pairOf(pairKey(x, y))) return;
-        pairs++;
-        bonus += pairBonus(b.levels[x] ?? 1, b.levels[y] ?? 1);
-        found.push(pairKey(x, y));
-      };
+      const hit = (x: PolicyId, y: PolicyId) => { if (pairOf(pairKey(x, y))) found.push(pairKey(x, y)); };
       for (let i = 0; i < tags.length; i++) {
         for (let j = i + 1; j < tags.length; j++) hit(tags[i], tags[j]);
         for (const p of b.passive) hit(tags[i], p);
       }
-      // 型：3つがそろって打った皿に効いたら、さらに足す
       const on = (id: PolicyId) => tags.includes(id) || b.passive.includes(id);
       const setsHit = chain === 0 ? SETS.filter((x) => x.ids.every(on)) : [];
-      bonus += SET_BONUS * setsHit.length;
       setCount = setsHit.length;
-      const stack = 1 + bonus;
-      pairCount = pairs;
-      pairMult = stack;
-      gain = Math.round(((g.dish.price + tipB) * mult + add) * this.multiplier * stack * special);
+      pairCount = found.length;
       // 振り返り用：方針がなかった場合との差を、効いた方針に分ける
       const plain = Math.round((g.dish.price + tip) * Math.min(this.multiplier, SHOP.comboMaxMult) * special);
       const st = this.buildStats;
@@ -528,7 +556,7 @@ export class Shop {
       for (const t of tags) st.fired[t] = (st.fired[t] ?? 0) + 1;
       for (const t of share) st.yen[t] = (st.yen[t] ?? 0) + extra / share.length;
       st.bestServe = Math.max(st.bestServe, gain);
-      st.maxStack = Math.max(st.maxStack, pairs);
+      st.maxStack = Math.max(st.maxStack, found.length);
       for (const key of found) if (!st.pairs.includes(key)) { st.pairs.push(key); pair ??= key; }
       for (const x of setsHit) if (!st.sets.includes(setKey(x))) { st.sets.push(setKey(x)); set ??= setKey(x); }
     }
@@ -544,9 +572,9 @@ export class Shop {
     g.t = b && g.extra ? REFILL_EAT : SHOP.eatTime;
     this.lastServeAt = this.clock;
     this.crew.assign(seat, g, this.away?.who);
-    if (!b) this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
+    if (!b || !q) this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
     else {
-      this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, pair, pairs: pairCount, pairMult, dish, set, sets: setCount, clean, heat: heatNow });
+      this.events.push({ type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, pair, pairs: pairCount, dish, set, sets: setCount, clean, heat: heatNow, base: q.base, raw: q.raw, paid: q.paid, capped: q.capped, factors: q.factors });
       // 大入り袋：10コンボごとに大入り（最中に届いたら延ばす）
       if (b.feverSecs > 0 && Math.floor(this.combo / FEVER_EVERY) > Math.floor(comboBefore / FEVER_EVERY)) {
         this.feverUntil = this.clock + b.feverSecs;

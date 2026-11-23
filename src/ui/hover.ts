@@ -2,7 +2,7 @@
 // 描くたびに場所を登録し直し、最後にマウスの下にある説明を1つだけ描く。打って遊ぶ操作には影響しない。
 import { C, type Color } from './palette';
 import { LW, type Screen } from './screen';
-import { FAMILY_COLOR, FAMILY_NAME, MAX_LEVEL, PAIR_MAX, SETS, descOf, pairKey, pairOf, pairText, partnersOf, policyOf, setOf, setText, type Owned, type PolicyId } from '../core/build';
+import { FAMILY_COLOR, FAMILY_NAME, MAX_LEVEL, SETS, descOf, pairKey, pairOf, pairText, partnersOf, policyOf, setOf, setText, type Owned, type PolicyId } from '../core/build';
 
 export interface Tip { title: string; col: Color; lines: { t: string; col?: Color }[] }
 
@@ -83,7 +83,7 @@ export function pairTip(key: string): Tip | null {
     title: `かけ合わせ『${p.name}』`, col: '#ffe27a',
     lines: [
       { t: pairText(p), col: C.w },
-      { t: `増える割合は、2つの段階の合計×10%（最大+${Math.round(PAIR_MAX * 100)}%）` },
+      { t: '売上は変わらない。見つけるとずかんに残る' },
       { t: 'いくつも重なると、そのぶん足される', col: '#8fb8a8' },
     ],
   };

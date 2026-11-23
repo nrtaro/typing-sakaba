@@ -160,7 +160,7 @@ export class ShopView {
         const pairs = ev.pairs ?? 0;
         const tint = pairs > 0 ? '#ffe27a' : tags.length ? FAMILY_COLOR[policyOf(tags[0]).family] : C.gold;
         this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tint, big: true });
-        if (tags.length) this.pop(`tags${ev.seat}`, { x: seat.x, y: seat.ty - 6, t: -delay, text: (ev.sets ?? 0) > 0 ? `型！ ×${(ev.pairMult ?? 1).toFixed(1)}` : pairs > 0 ? `かけ合わせ ×${(ev.pairMult ?? 1).toFixed(1)}` : tags.slice(0, 3).map((t) => POLICY_SEAL[t]).join('・'), col: (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint });
+        if (tags.length) this.pop(`tags${ev.seat}`, { x: seat.x, y: seat.ty - 6, t: -delay, text: (ev.sets ?? 0) > 0 ? '型！' : pairs > 0 ? 'かけ合わせ！' : tags.slice(0, 3).map((t) => POLICY_SEAL[t]).join('・'), col: (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint });
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, tint, Math.round((light ? 5 : 10) * this.fxScale), 80);
         for (const t of tags) {
           this.run.fired[t] = this.time + delay;
