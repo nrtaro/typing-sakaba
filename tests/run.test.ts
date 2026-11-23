@@ -270,6 +270,8 @@ describe('作り直した方針', () => {
     const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
     if (ev.type !== 'serve') throw new Error('serve');
     expect(ev.factors).toContainEqual({ id: 'makanai', mult: 1.8 });
+    // 倍率を付けたので、方針ごとの稼ぎ（主力の判定）にも数える
+    expect(s.buildStats.yen.makanai ?? 0).toBeGreaterThan(0);
     expect(s.stock.fish).toBe(30);
   });
 

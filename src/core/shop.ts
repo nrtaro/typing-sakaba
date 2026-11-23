@@ -578,7 +578,8 @@ export class Shop {
       const whole: PolicyId | null = chain > 0 ? 'matome' : g.refill && b.refillMult > 1 ? 'betsubara' : null;
       if (whole) st.yen[whole] = (st.yen[whole] ?? 0) + Math.min(plain, gain);
       const extra = Math.max(0, gain - plain);
-      const share = tags.filter((t) => t !== 'makanai');
+      // まかないは、倍率を付けた皿（素材が減らなかった皿）でだけ稼ぎに数える
+      const share = tags.filter((t) => t !== 'makanai' || q.factors.some((f) => f.id === 'makanai'));
       for (const t of tags) st.fired[t] = (st.fired[t] ?? 0) + 1;
       for (const t of share) st.yen[t] = (st.yen[t] ?? 0) + extra / share.length;
       st.bestServe = Math.max(st.bestServe, gain);
