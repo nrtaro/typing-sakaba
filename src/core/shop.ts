@@ -2,7 +2,7 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
-import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, PLENTY_AT, PREP_SECS, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
 import { priceOf, type Factor, type Price } from './dishPrice';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
@@ -393,10 +393,19 @@ export class Shop {
     return Math.max(0, this.freshUntil - this.clock);
   }
 
-  /** いま一番残りが少ない素材（同じ数なら全部）。おやじの見栄の対象 */
+  /** 残っている（1個以上ある）素材のうち、一番少ない素材（同じ数なら全部）。おやじの見栄の対象。残っている素材がなければ空 */
   scarcest(): IngredientId[] {
-    const min = Math.min(...INGREDIENT_ORDER.map((id) => this.stock[id]));
-    return INGREDIENT_ORDER.filter((id) => this.stock[id] === min);
+    const left = INGREDIENT_ORDER.filter((id) => this.stock[id] > 0);
+    if (!left.length) return [];
+    const min = Math.min(...left.map((id) => this.stock[id]));
+    return left.filter((id) => this.stock[id] === min);
+  }
+
+  /** 今の時間帯が始まった時刻 */
+  get phaseStart(): number {
+    let t = 0;
+    for (let i = 0; i < this.phaseIndex; i++) t += PHASES[i].length;
+    return t;
   }
 
   /** 大入りの最中か */
@@ -508,7 +517,12 @@ export class Shop {
     }
     // おもてなし：前の皿から間をあけて打った皿（まとめ出しのついでの皿には付かない）
     if (b.idleMult > 1 && chain === 0 && this.clock - this.lastServeAt >= IDLE_MIN) { tags.push('omotenashi'); factors.push({ id: 'omotenashi', mult: b.idleMult }); }
-    if (saved) tags.push('makanai');
+    if (saved) { tags.push('makanai'); if (b.saveMult > 1) factors.push({ id: 'makanai', mult: b.saveMult }); }
+    // 大漁旗：主素材がたっぷりある皿（素材を使う前の数）
+    if (b.plentyMult > 1 && this.stock[Shop.mainOf(g.dish)] >= PLENTY_AT) { tags.push('tairyo'); factors.push({ id: 'tairyo', mult: b.plentyMult }); }
+    if (b.morningMult > 1 && this.phaseIndex === 0) { tags.push('asaichi'); factors.push({ id: 'asaichi', mult: b.morningMult }); }
+    // こまめな仕込み：時間帯のはじめの仕込みたて
+    if (b.prepMult > 1 && this.clock - this.phaseStart < PREP_SECS) { tags.push('shikomi'); factors.push({ id: 'shikomi', mult: b.prepMult }); }
     if (this.fever && b.feverMult > 1) { tags.push('ooiri'); factors.push({ id: 'ooiri', mult: b.feverMult }); }
     // 一発勝負・連打の熱：打った皿だけ（まとめ出しのついでの皿には付かない）
     if (chain === 0 && b.ippatsuMult > 1) {

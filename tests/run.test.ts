@@ -99,7 +99,7 @@ describe('方針のはたらき', () => {
     s.seats[0] = { ...guest('hunterStew'), banquet: true };
     const ev = type(s, 'ぽとふのおおなべ').find((e) => e.type === 'serve')!;
     if (ev.type !== 'serve') throw new Error('serve');
-    expect(ev.raw).toBeCloseTo(2 * 2.7 * 3.5 * 2);
+    expect(ev.raw).toBeCloseTo(2 * 2.2 * 3.5 * 2);
     expect(ev.paid).toBe(30);
     expect(ev.capped).toBe(true);
     expect(ev.gain).toBe(Math.round(ev.base! * 30));
@@ -223,6 +223,66 @@ describe('作り直した方針', () => {
     expect(serves).toHaveLength(3);
     expect(serves.map((e) => e.type === 'serve' && e.combo)).toEqual([10, 11, 12]);
     for (const e of serves) if (e.type === 'serve') expect(e.factors).toContainEqual({ id: 'combo', mult: 1.5 });
+  });
+
+  it('さっきのヌシ：とれたてのあいだ全部の皿が×1.8（Lv2）', () => {
+    const s = shopWith([{ id: 'nushi', lv: 2 }], ['grilledFish']);
+    s.freshUntil = s.clock + 10;
+    expect(s.quote(0, { chain: 0, clean: true, saved: false })!.factors).toContainEqual({ id: 'nushi', mult: 1.8 });
+  });
+
+  it('大漁旗：主素材が8個以上ある皿が×1.5（Lv2）', () => {
+    const s = shopWith([{ id: 'tairyo', lv: 2 }], ['grilledFish']);
+    const ctx = { chain: 0, clean: true, saved: false };
+    s.stock.fish = 8;
+    expect(s.quote(0, ctx)!.factors).toContainEqual({ id: 'tairyo', mult: 1.5 });
+    s.stock.fish = 7;
+    expect(s.quote(0, ctx)!.factors.some((f) => f.id === 'tairyo')).toBe(false);
+  });
+
+  it('朝市：朝の時間帯の皿が×1.8（Lv2）。昼には付かない', () => {
+    const s = shopWith([{ id: 'asaichi', lv: 2 }], ['grilledFish']);
+    const ctx = { chain: 0, clean: true, saved: false };
+    s.clock = 10;
+    expect(s.quote(0, ctx)!.factors).toContainEqual({ id: 'asaichi', mult: 1.8 });
+    s.clock = 60;
+    expect(s.quote(0, ctx)!.factors.some((f) => f.id === 'asaichi')).toBe(false);
+  });
+
+  it('おやじの見栄：残っている素材のうち一番少ない素材の皿が×2.5（Lv2）。0個の素材は数えない', () => {
+    const s = shopWith([{ id: 'mie', lv: 2 }], ['jerky']);
+    for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 10;
+    s.stock.fish = 0;
+    s.stock.meat = 2;
+    expect(s.scarcest()).toEqual(['meat']);
+    expect(s.quote(0, { chain: 0, clean: true, saved: false })!.factors).toContainEqual({ id: 'mie', mult: 2.5 });
+    for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 0;
+    expect(s.scarcest()).toEqual([]);
+  });
+
+  it('まかない名人：素材が減らなかった皿が×1.4（Lv2）。予告には付かない', () => {
+    const mods = modsFor([{ id: 'makanai', lv: 2 }]);
+    mods.saveChance = 1;
+    const s = new Shop(new Rng(1), DIFFICULTIES[1], NORMAL_RULES, mods);
+    for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 30;
+    s.seats[0] = guest('grilledFish');
+    expect(s.quote(0, { chain: 0, clean: true, saved: false })!.factors.some((f) => f.id === 'makanai')).toBe(false);
+    const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.factors).toContainEqual({ id: 'makanai', mult: 1.4 });
+    expect(s.stock.fish).toBe(30);
+  });
+
+  it('こまめな仕込み：時間帯のはじめの15秒、全部の皿が×1.5（Lv2）。昼のはじめからも数える', () => {
+    const s = shopWith([{ id: 'shikomi', lv: 2 }], ['grilledFish']);
+    const ctx = { chain: 0, clean: true, saved: false };
+    const has = () => s.quote(0, ctx)!.factors.some((f) => f.id === 'shikomi' && f.mult === 1.5);
+    s.clock = 10;
+    expect(has()).toBe(true);
+    s.clock = 20;
+    expect(has()).toBe(false);
+    s.clock = 55;
+    expect(has()).toBe(true);
   });
 
   it('おやじの見栄：いま一番少ない素材を使う皿だけ、売上が上がる', () => {
