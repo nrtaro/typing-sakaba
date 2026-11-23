@@ -38,6 +38,9 @@ export const RANDOM: Strategy = {
 };
 export const NONE: Strategy = { name: '方針なし', pick: () => null };
 
+/** 【予告で選ぶときの余裕】待ち時間がこの秒数以上ある皿だけを、予告の高い順に狙う */
+export const QUOTE_MARGIN = 3;
+
 /** バランス確認に使う6通りの組み方（run.sim と policy.sim で共有） */
 export const BUILDS: Strategy[] = [
   prefer('連鎖の店', ['matome', 'mouippai', 'betsubara', 'yobikomi', 'tairyo', 'makanai', 'nushi']),
@@ -76,10 +79,9 @@ function suitableRoad(ids: RoadId[], run: RunState): RoadId {
 
 /** 1回の挑戦を最後まで（目標に届かなくても forceAll なら4日間続けて、日ごとの売上を見る） */
 /**
- * aim：狙う皿の選び方。urgent＝作れる皿のうち、いちばん急ぐ皿。quote＝札の予告で高い皿（新しい会計で使う）
+ * pickBy：狙う皿の選び方。urgent＝作れる皿のうち、いちばん急ぐ皿。quote＝札の予告で高い皿（新しい会計で使う）
  */
-export function botRun(seed: number, strat: Strategy, kps: number, missRate: number, loop = 1, meta: RunMeta = emptyMeta(), forceAll = false, think = 0.4, aim: 'urgent' | 'quote' = 'urgent'): BotRun {
-  if (aim === 'quote') throw new Error('予告で選ぶ作戦は、新しい会計（Shop.quote）ができてから使う');
+export function botRun(seed: number, strat: Strategy, kps: number, missRate: number, loop = 1, meta: RunMeta = emptyMeta(), forceAll = false, think = 0.4, pickBy: 'urgent' | 'quote' = 'urgent'): BotRun {
   meta.loop = loop;
   meta.pick = loop;
   const run = newRun(meta, seed, `bot-${seed}`);
@@ -133,7 +135,11 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
       }
       for (const e of s.drain()) {
         if (e.src === 'shop' && e.ev.type === 'lack') lack++;
-        if (e.src === 'shop' && e.ev.type === 'serve') { bestServe = Math.max(bestServe, e.ev.gain); bestInput = Math.max(bestInput, e.ev.gain); }
+        if (e.src === 'shop' && e.ev.type === 'serve') {
+          bestServe = Math.max(bestServe, e.ev.gain);
+          bestInput = Math.max(bestInput, e.ev.gain);
+          if (e.ev.paid !== undefined) { paid.push(e.ev.paid); if (e.ev.capped) capped++; }
+        }
         if (e.src === 'shop' && e.ev.type === 'chain') bestInput = Math.max(bestInput, e.ev.total);
         if (e.src === 'shop' && e.ev.type === 'phase' && slot < PICKS_PER_DAY) pendingSlot = slot++;
       }
@@ -166,7 +172,11 @@ export function botRun(seed: number, strat: Strategy, kps: number, missRate: num
         const live = shop.input.active.find((l) => l.target.id === aim) ?? shop.input.active[0];
         if (live) { s.input(miss ? 'q' : live.matcher.remaining[0]); continue; }
         const waiting = shop.seats.map((g, i) => ({ g, i })).filter((x) => x.g?.state === 'wait');
-        const ok = waiting.filter((x) => !shop.canMake(x.g!.dish).length).sort((a, b) => a.g!.wait - b.g!.wait)[0];
+        const makeable = waiting.filter((x) => !shop.canMake(x.g!.dish).length).sort((a, b) => a.g!.wait - b.g!.wait);
+        // 予告で選ぶ：待ち時間に余裕のある皿のうち、今出したらいちばん高い皿。なければいちばん急ぐ皿
+        const worth = (i: number) => shop.quote(i, { chain: 0, clean: true, saved: false })?.gain ?? 0;
+        const roomy = pickBy === 'quote' ? makeable.filter((x) => x.g!.wait >= QUOTE_MARGIN).sort((a, b) => worth(b.i) - worth(a.i)) : [];
+        const ok = roomy[0] ?? makeable[0];
         const blocked = waiting.find((x) => shop.canMake(x.g!.dish).length);
         // 手が空いていて素材が少なければ、先に取りに行く
         const low = !ok && !blocked ? TRIPS.map((t) => ({ t, n: Math.min(...t.gives.map((g) => shop.stock[g])) })).sort((a, b) => a.n - b.n)[0] : null;

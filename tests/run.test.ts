@@ -810,8 +810,16 @@ describe('進行', () => {
     expect(d.feverSecs).toBe(0);
     expect(d.blockedSecs).toBeGreaterThanOrEqual(0);
     expect(d.fired.matome ?? 0).toBeGreaterThan(0);
-    expect(d.paid).toEqual([]);
-    expect(d.capped).toBe(0);
+  });
+
+  it('ボット：予告で選ぶと、同じ種でも狙う皿が変わり、倍率の記録が入る', () => {
+    const strat = prefer('一発', ['ippatsu', 'oomori', 'matome']);
+    const a = botRun(11, strat, 6.5, 0.04, 1, emptyMeta(), true, 0.4, 'urgent');
+    const b = botRun(11, strat, 6.5, 0.04, 1, emptyMeta(), true, 0.4, 'quote');
+    expect(a.days[0].paid.length).toBe(a.days[0].served);
+    expect(b.days[0].sales).not.toBe(a.days[0].sales);
+    expect(Math.max(...b.days[0].paid)).toBeLessThanOrEqual(30);
+    expect(b.days[0].capped).toBeGreaterThanOrEqual(0);
   });
 
   it('ボット：方針なしは4日もたない。考えた構成は、でたらめより先まで進む', () => {
