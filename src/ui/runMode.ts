@@ -805,8 +805,8 @@ export class RunUI {
         const lrows = wrapText(sc, (o.glow ? '★' : '') + o.link, 7.5, w - 16);
         const lh = 5 + lrows.length * 9.5;
         const ly = y + 146 - lh;
-        sc.panel(x + 4, ly, w - 8, lh, o.glow ? '#4a3410' : '#22302a', o.glow ? '#ffe27a' : '#5a7a68', a);
-        lrows.forEach((t, k) => sc.T(t, x + 8, ly + 3 + k * 9.5, 7.5, o.glow ? '#ffe9b4' : '#bfe6d2', 'left', a));
+        sc.panel(x + 4, ly, w - 8, lh, o.hot ? '#4a3410' : '#22302a', o.hot ? '#ffe27a' : '#5a7a68', a);
+        lrows.forEach((t, k) => sc.T(t, x + 8, ly + 3 + k * 9.5, 7.5, o.hot ? '#ffe9b4' : '#bfe6d2', 'left', a));
       }
       this.roma(sc, pol.kana, x + w / 2, y + 150, dim, sc.fitSize(new RomajiMatcher(pol.kana).remaining, 10, w - 22, 6.5));
       // 候補には効果と相性を直接表示する。札全体のホバーは隣の候補を覆うため付けない。

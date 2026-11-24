@@ -28,13 +28,19 @@ describe('候補の出方', () => {
 
 describe('光らせ方', () => {
   it('全部の皿に効く方針は光らせない。目印が同じか、名前付きの組の相手なら光る', () => {
-    expect(glowFor('tsuyoki', [{ id: 'aiso', lv: 1 }])).toBe(false);
+    expect(glowFor('tsuyoki', [{ id: 'aiso', lv: 1 }])).toBe(true);
     expect(glowFor('hayakuchi', [{ id: 'ippatsu', lv: 1 }])).toBe(true);
     expect(glowFor('tema', [{ id: 'yoippari', lv: 1 }])).toBe(true);
-    expect(glowFor('ippatsu', [{ id: 'yoyaku', lv: 1 }])).toBe(false);
-    expect(glowFor('tsuyoki', [{ id: 'yoyaku', lv: 1 }])).toBe(false);
+    expect(glowFor('tsuyoki', [{ id: 'ippatsu', lv: 1 }])).toBe(false);
+    expect(glowFor('ippatsu', [{ id: 'tsuyoki', lv: 1 }])).toBe(false);
     expect(glowFor('mie', [{ id: 'makanai', lv: 1 }])).toBe(true);
     expect(glowFor('mouippai', [])).toBe(false);
+  });
+
+  it('名前付きの組・型の相手を持っていれば、全部の皿に効く方針でも光る（設計書 5.5）', () => {
+    expect(glowFor('ippatsu', [{ id: 'yoyaku', lv: 1 }])).toBe(true);
+    expect(glowFor('tsuyoki', [{ id: 'yoyaku', lv: 1 }])).toBe(true);
+    expect(glowFor('yoyaku', [{ id: 'ippatsu', lv: 1 }, { id: 'ryoshusho', lv: 1 }])).toBe(true);
   });
 
   it('候補の札に glow が付く', () => {

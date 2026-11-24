@@ -55,3 +55,14 @@ it('素材の助けのいちばん長い形も、結果の画面の幅（196px�
   const w = (t: string) => [...t].reduce((s, ch) => s + (/[\x20-\x7e]/.test(ch) ? 3.75 : 7.5), 0);
   expect(w(helpLine({ keiki: 999, prep: 999, makanai: 99 })!)).toBeLessThanOrEqual(196);
 });
+
+it('倍率がたくさん重なっても、式は帯の幅（422px、6.5px）に収まる', () => {
+  const ids = ['yoyaku', 'tsuyoki', 'mie', 'oomori', 'tema', 'ippatsu', 'yoippari', 'hiden', 'banquet', 'combo'] as const;
+  const ev = serve({ factors: ids.map((id, i) => ({ id, mult: id === 'yoippari' ? 0.9 : 1.2 + i * 0.1 })), gain: 69000, paid: 30, capped: true });
+  const text = formulaText(ev);
+  const w = [...text].reduce((s, ch) => s + (/[ -~]/.test(ch) ? 3.25 : 6.5), 0);
+  expect(w).toBeLessThanOrEqual(422);
+  expect(text).toContain('…');
+  expect(text).toContain('コンボ×');
+  expect(text.endsWith('= 上限×30 69,000円')).toBe(true);
+});

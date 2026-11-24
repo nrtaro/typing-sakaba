@@ -14,7 +14,7 @@ import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/l
 import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
 import { setOf } from '../core/build';
-import { MULT_CAP, previewTier } from '../core/dishPrice';
+import { MULT_CAP, previewTier, type Factor } from '../core/dishPrice';
 import { FAMILY_COLOR, FEVER_EVERY, HEAT_GAP, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
@@ -54,10 +54,26 @@ const FACTOR_LABEL: Record<string, string> = { combo: 'コンボ', hiden: '秘�
 const num = (x: number) => String(Math.round(x * 100) / 100);
 /** 掛け算の式（例：天ぷら盛り 230円 → ヌシ×2.2 → 大漁×1.8 → 一発×2 → コンボ×3 = 5,465円） */
 export function formulaText(ev: ServeEvent): string {
-  const parts = (ev.factors ?? []).map((f) => `${FACTOR_LABEL[f.id] ?? POLICY_SEAL[f.id as PolicyId]}×${num(f.mult)}`);
+  const label = (f: Factor) => `${FACTOR_LABEL[f.id] ?? POLICY_SEAL[f.id as PolicyId]}×${num(f.mult)}`;
   const head = `${ev.dish?.text ?? ''} ${Math.round(ev.base ?? 0).toLocaleString()}円`;
-  return [head, ...parts].join(' → ') + ` = ${ev.capped ? `上限×${MULT_CAP} ` : ''}${ev.gain.toLocaleString()}円`;
+  const tail = ` = ${ev.capped ? `上限×${MULT_CAP} ` : ''}${ev.gain.toLocaleString()}円`;
+  const keep = [...(ev.factors ?? [])];
+  const build = (cut: boolean) => [head, ...keep.map(label), ...(cut ? ['…'] : [])].join(' → ') + tail;
+  // 帯（FORMULA_WIDTH）に入らなければ、効き目の小さい倍率（1に近いもの）から省いて「…」にする。コンボは残す
+  let cut = false;
+  while (approxWidth(build(cut)) > FORMULA_WIDTH) {
+    const drop = keep.filter((f) => f.id !== 'combo').sort((a, b) => Math.abs(Math.log(a.mult)) - Math.abs(Math.log(b.mult)))[0];
+    if (!drop) break;
+    keep.splice(keep.indexOf(drop), 1);
+    cut = true;
+  }
+  return build(cut);
 }
+/** 式の帯の幅（論理px）と、いちばん小さい文字の大きさ */
+const FORMULA_WIDTH = 422;
+const FORMULA_MIN_SIZE = 6.5;
+/** 字の幅のおおよそ（全角1字＝文字の大きさ、半角はその半分）。帯に入るかの見積もりに使う */
+const approxWidth = (s: string) => [...s].reduce((w, ch) => w + (/[ -~]/.test(ch) ? FORMULA_MIN_SIZE / 2 : FORMULA_MIN_SIZE), 0);
 /** 帯の知らせ */
 interface Banner { text: string; t: number; col: Color }
 /** 【待てる知らせの数】これを超えたら古いものから捨てる */
@@ -1029,7 +1045,7 @@ export class ShopView {
       // 式の帯：目標の帯の下・知らせの帯の上に1行（左の方針の判子の列は避ける）
       const f = this.formula;
       const a = Math.min(1, f.t * 8, (1.8 - f.t) * 3);
-      const size = sc.fitSize(f.text, 8, 422, 6.5);
+      const size = sc.fitSize(f.text, 8, FORMULA_WIDTH, FORMULA_MIN_SIZE);
       const tw = sc.W(f.text, size) + 12;
       const x = Math.max(40, 255 - tw / 2);
       sc.panel(x, 44, tw, 12, 'rgba(42,27,38,0.92)', '#ffe27a', a);

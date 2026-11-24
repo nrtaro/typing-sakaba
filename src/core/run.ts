@@ -384,13 +384,16 @@ function readSeen(v: unknown): DaySeen | null {
   return Object.fromEntries(keys.map((k) => [k, Math.floor(o[k] as number)])) as unknown as DaySeen;
 }
 
-/** 選ぶ画面で光らせるか：全部の皿に効く方針は光らせない。名前付きの組・型の相手か、目印が同じ方針を持っていれば光る */
+/**
+ * 選ぶ画面で光らせるか（設計書 5.5）：名前付きの組・型の相手を持っていれば光る。
+ * せまい条件の重なり（目印が同じ）は、全部の皿に効く方針（all）では数えない（どれとも重なるため）
+ */
 export function glowFor(id: PolicyId, owned: Owned[]): boolean {
-  const mine = MARKS[id];
-  if (mine.includes('all')) return false;
   const has = (p: PolicyId) => owned.some((o) => o.id === p);
   if (SETS.some((x) => x.ids.includes(id) && x.ids.every((q) => q === id || has(q)))) return true;
-  if (partnersOf(id).some((p) => has(p) && !MARKS[p].includes('all'))) return true;
+  if (partnersOf(id).some(has)) return true;
+  const mine = MARKS[id];
+  if (mine.includes('all')) return false;
   return owned.some((o) => o.id !== id && MARKS[o.id].some((m) => m !== 'all' && mine.includes(m)));
 }
 
