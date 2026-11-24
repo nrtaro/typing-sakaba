@@ -1,3 +1,5 @@
+import { SHOP } from './shopConfig';
+import { TAVERN_SEATS } from './tavernNavigation';
 // 繁盛記（ビルドを育てる営業）：方針の一覧と、方針が営業（Shop）に与える変更。
 // 数値はすべてここに置く。Shop は BuildMods だけを見てふるまいを変える（通常営業・ひがわりでは null）。
 //
@@ -123,6 +125,8 @@ const BOLD_WAIT = L(0.15, 0.2, 0.25);
 const NIGHT_MULT = L(1.4, 1.6, 1.8);
 /** 【景気づけの数】10皿ごとに、よく使った素材2種類それぞれに足す数 */
 const KEIKI_GAIN = L(2, 3, 4);
+/** 割合を「7割」の形で */
+const wari = (v: number) => `${Math.round(v * 10)}割`;
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const v2 = <A, B>(a: [A, A, A], b: [B, B, B], f: (x: A) => string, g: (x: B) => string) => L([f(a[0]), g(b[0])], [f(a[1]), g(b[1])], [f(a[2]), g(b[2])]);
 const v1 = <A>(a: [A, A, A], f: (x: A) => string) => L([f(a[0])], [f(a[1])], [f(a[2])]);
@@ -132,121 +136,121 @@ export const POLICIES: Policy[] = [
   {
     id: 'matome', name: 'まとめ出し', kana: 'まとめだし', family: 'chain', starter: true,
     quip: '「ついでだ、そっちの卓も持ってけ」',
-    text: '料理を出すと、同じ主素材（札の左端の素材）の注文も{0}件いっしょに出る。ついでの皿も割引なし',
+    text: `同じ主素材（札の左端）の注文も{0}件いっしょに出る。ついでの皿も、その皿の倍率で数える`,
     vals: v1(CHAIN, s),
   },
   {
     id: 'betsubara', name: 'しめは別腹', kana: 'べつばら', family: 'guest', starter: true,
     quip: '「さっき食べたのは前菜です」',
-    text: 'お客の{0}が、食べたあとにもう1品たのむ。その2品目は売上×{1}',
+    text: 'お客の{0}が食べたあとにもう1品たのむ。その2品目の皿は ×{1}',
     vals: v2(REFILL_CHANCE, REFILL_MULT, pct, s),
   },
   {
     id: 'ryoshusho', name: '領収書はいらない', kana: 'りょうしゅうしょ', family: 'combo', starter: true,
     quip: '「勢いで払う客は、勢いで出す店に来る」',
-    text: 'コンボで売上が増える倍率（10コンボごとに+0.5）の上限が、×2から×{0}に。コンボが切れるまでのミス{1}',
+    text: `コンボの倍率の上限が ×${SHOP.comboMaxMult} から ×{0} に。コンボが切れるまでのミス{1}`,
     vals: L([s(COMBO_CAP[0]), 'は今のまま'], [s(COMBO_CAP[1]), 'が+1回'], [s(COMBO_CAP[2]), 'が+1回']),
   },
   {
     id: 'nushi', name: 'さっきのヌシ', kana: 'ぬし', family: 'trip', starter: true,
     quip: '「本日のおすすめ：さっき捕ったやつ」',
-    text: '調達から帰って{0}秒のあいだ「とれたて」。そのあいだは全部の皿が売上×{1}',
+    text: '調達から帰って{0}秒は「とれたて」。そのあいだの皿は ×{1}',
     vals: v2(FRESH_SECS, FRESH_MULT, s, s),
   },
   {
     id: 'tairyo', name: '大漁旗', kana: 'たいりょうばた', family: 'trip', starter: true,
     quip: '「かごが足りん。舟ごと持って帰る」',
-    text: '調達で持ち帰る素材が×{0}。主素材が8個以上ある皿は売上×{1}',
+    text: `調達の持ち帰りが ×{0}。主素材が${PLENTY_AT}個以上ある皿は ×{1}`,
     vals: v2(TRIP_MULT, PLENTY_MULT, s, s),
   },
   {
     id: 'mie', name: 'おやじの見栄', kana: 'みえ', family: 'stock', starter: true,
     quip: '「残り少ない？ なら値打ちもんだ」',
-    text: '残っている素材のうち、一番少ない素材を使う皿は売上×{0}（0個の素材は数えない）',
+    text: '残っている素材で一番少ない素材を使う皿は ×{0}（0個の素材は数えない）',
     vals: v1(LOW_MULT, s),
   },
   {
     id: 'sekkachi', name: '待たせない店', kana: 'またせない', family: 'combo', starter: true,
     quip: '「座る前に出てきたんだが」',
-    text: '待ち時間が7割以上残っているお客の皿は売上×{0}',
+    text: `待ち時間が${wari(QUICK_RATIO)}以上残っているお客の皿は ×{0}`,
     vals: v1(QUICK_MULT, s),
   },
   {
     id: 'mouippai', name: 'とりあえずもう一杯', kana: 'もういっぱい', family: 'guest', starter: true,
     quip: '「頼んでないけど、飲む」',
-    text: '酒以外の料理に酒を1杯付けた皿は売上×{0}（酒を1つ使う）',
+    text: '酒以外の料理に酒を1杯付けた皿は ×{0}（酒を1つ使う）',
     vals: v1(ALE_MULT, s),
   },
   {
     id: 'oomori', name: '大盛り上等', kana: 'おおもり', family: 'stock', starter: false, unlock: '2日目の目標を突破する',
     quip: '「並？ うちにそんな量はない」',
-    text: 'お客の{0}が「大盛り」をたのむ。大盛りは素材を2倍使い、売上×{1}',
+    text: `お客の{0}が大盛りをたのむ。素材は${BIG_NEED}倍、大盛りの皿は ×{1}`,
     vals: v2(BIG_CHANCE, BIG_MULT, pct, s),
   },
   {
     id: 'yobikomi', name: '呼び込み上手', kana: 'よびこみ', family: 'guest', starter: true,
     quip: '「通りすがりも、気づけば座ってる」',
-    text: 'お客が{0}多く来る。8席が埋まっているあいだは全部の皿が売上×{1}',
+    text: `お客が{0}多く来る。${TAVERN_SEATS.length}席が埋まっているあいだの皿は ×{1}`,
     vals: v2(GUESTS, FULL_MULT, pct, s),
   },
   {
     id: 'makanai', name: 'まかない名人', kana: 'まかない', family: 'stock', starter: false, unlock: 'かけ合わせを3種類見つける',
     quip: '「切れ端で一品。原価は聞くな」',
-    text: '料理を出すとき、{0}の確率で素材が減らない。減らなかった皿は売上×{1}',
+    text: '{0}の確率で素材が減らない。減らなかった皿は ×{1}',
     vals: v2(SAVE, SAVE_MULT, pct, s),
   },
   {
     id: 'ooiri', name: '大入り袋', kana: 'おおいり', family: 'combo', starter: false, unlock: '繁盛記で30コンボを出す',
     quip: '「袋が配りきれん。もう投げろ」',
-    text: 'コンボを切らさずに10皿出すごとに{0}秒の「大入り」。そのあいだは全部の皿が売上×{1}',
+    text: `コンボを切らさずに${FEVER_EVERY}皿出すごとに{0}秒の大入り。そのあいだの皿は ×{1}`,
     vals: v2(FEVER_SECS, FEVER_MULT, s, s),
   },
   {
     id: 'aiso', name: '看板娘の愛想', kana: 'あいそ', family: 'guest', starter: true,
     quip: '「怒る気が、どこかへ行った」',
-    text: 'お客が{0}長く待ち、怒って帰っても{1}。待ち時間が半分を切ったお客の皿は売上×{2}',
+    text: `お客が{0}長く待ち、怒って帰っても{1}。待ち時間が${wari(LATE_RATIO)}を切ったお客の皿は ×{2}`,
     vals: L([pct(WAIT[0]), '減点なし', s(LATE_MULT[0])], [pct(WAIT[1]), '減点なし', s(LATE_MULT[1])], [pct(WAIT[2]), '減点なし・コンボも続く', s(LATE_MULT[2])]),
   },
   {
     id: 'shikomi', name: 'こまめな仕込み', kana: 'しこみ', family: 'stock', starter: true,
     quip: '「手が空いたら刻め。空いてなくても刻め」',
-    text: `朝・昼・夜が始まるたびに全部の素材が+{0}。始まって${PREP_SECS}秒は全部の皿が売上×{1}`,
+    text: `朝・昼・夜のはじめに全部の素材+{0}。はじめの${PREP_SECS}秒の皿は ×{1}`,
     vals: v2(STOCK, PREP_MULT, s, s),
   },
   {
     id: 'yoyaku', name: '予約のみ', kana: 'よやく', family: 'combo', starter: true,
     quip: '「本日は、ご予約のお客様だけ」',
-    text: 'お客が{0}減る。かわりに全部の皿が売上×{1}、1皿出すとコンボが{2}進む',
+    text: 'お客が{0}減る。全部の皿は ×{1}、1皿でコンボが{2}進む',
     vals: L([pct(FEWER[0]), s(YOYAKU_MULT[0]), String(COMBO_PLUS[0] + 1)], [pct(FEWER[1]), s(YOYAKU_MULT[1]), String(COMBO_PLUS[1] + 1)], [pct(FEWER[2]), s(YOYAKU_MULT[2]), String(COMBO_PLUS[2] + 1)]),
   },
   {
     id: 'omotenashi', name: 'おもてなし', kana: 'おもてなし', family: 'guest', starter: true,
     quip: '「ごゆっくり。ほんとうに、ごゆっくり」',
-    text: `前の皿から${IDLE_MIN}秒以上あけて打った皿は売上×{0}（ついでの皿には付かない）`,
+    text: `前の皿から${IDLE_MIN}秒以上あけて打った皿は ×{0}（ついでの皿は除く）`,
     vals: v1(IDLE_MULT, s),
   },
   {
     id: 'ippatsu', name: '一発勝負', kana: 'いっぱつ', family: 'combo', starter: true,
     quip: '「打ち直した皿は、出せん」',
-    text: `ミスなしで打ち切った皿は売上×{0}。ミスした言葉で出した皿は×${IPPATSU_MISS}（打った皿だけ）`,
+    text: `ミスなしで打ち切った皿は ×{0}。ミスした皿は ×${IPPATSU_MISS}（打った皿だけ）`,
     vals: v1(IPPATSU, s),
   },
   {
     id: 'netsu', name: '連打の熱', kana: 'ねつ', family: 'combo', starter: true,
     quip: '「手が止まったら、熱が逃げる」',
-    text: `前に打って出した皿から${HEAT_GAP}秒以内に出すと、売上の倍率が+${HEAT_STEP}ずつ上がる（上限×{0}。ミスすると熱が半分に、${HEAT_GAP}秒あくと元に戻る。打った皿だけ）`,
+    text: `${HEAT_GAP}秒以内に続けて打って出した皿は、倍率が+${HEAT_STEP}ずつ上がる（上限 ×{0}。ミスで${wari(HEAT_MISS_KEEP)}に、間があくと戻る）`,
     vals: v1(HEAT_CAP, s),
   },
   {
     id: 'asaichi', name: '朝市', kana: 'あさいち', family: 'trip', starter: true,
     quip: '「いいものは、日の出と一緒に売り切れる」',
-    text: `朝に出かけた調達は持ち帰りが×{0}（昼と夜は×${LATE_TRIP}）。朝の皿は売上×{1}`,
+    text: `朝に出かけた調達は持ち帰りが ×{0}（昼と夜は ×${LATE_TRIP}）。朝の皿は ×{1}`,
     vals: v2(MORNING_TRIP, MORNING_MULT, s, s),
   },
   {
     id: 'encho', name: '延長営業', kana: 'えんちょう', family: 'combo', starter: true,
     quip: '「のれんは、勢いが止まるまで下ろさない」',
-    text: `閉店の時点でコンボが${ENCHO_COMBO}以上なら、営業が{0}秒延びる（1日1回）。延長のあいだは全部の皿が売上×{1}`,
+    text: `閉店のときコンボが${ENCHO_COMBO}以上なら{0}秒延長（1日1回）。延長のあいだの皿は ×{1}`,
     vals: v2(EXTEND, EXTEND_MULT, s, s),
   },
   {
@@ -276,7 +280,7 @@ export const POLICIES: Policy[] = [
   {
     id: 'keiki', name: '景気づけ', kana: 'けいきづけ', family: 'combo', starter: false, unlock: '大入り袋で大入りを出す',
     quip: '「景気のいい店には、品物が集まる」',
-    text: `コンボを切らさずに${FEVER_EVERY}皿出すごとに、その${FEVER_EVERY}皿で一番多く使った素材2種類が +{0}ずつ増える`,
+    text: `コンボを切らさずに${FEVER_EVERY}皿出すごとに、そのあいだに一番多く使った素材2種類が +{0}ずつ増える`,
     vals: v1(KEIKI_GAIN, s),
   },
 ];
