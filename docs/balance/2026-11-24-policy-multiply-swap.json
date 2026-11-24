@@ -1,0 +1,540 @@
+{
+  "seeds": [
+    11,
+    23,
+    37,
+    41,
+    59,
+    67,
+    83,
+    97
+  ],
+  "loops": [
+    1,
+    3,
+    5
+  ],
+  "rows": [
+    {
+      "base": "連鎖の店",
+      "order": [
+        "matome",
+        "mouippai",
+        "betsubara",
+        "yobikomi",
+        "tairyo",
+        "makanai",
+        "nushi"
+      ],
+      "from": "matome",
+      "to": "ippatsu",
+      "before": [
+        {
+          "kps": 4.5,
+          "clear": 6,
+          "n": 24,
+          "day4": 95,
+          "trips": 5.46,
+          "boostShare": 0
+        },
+        {
+          "kps": 6.5,
+          "clear": 21,
+          "n": 24,
+          "day4": 154,
+          "trips": 5.6,
+          "boostShare": 0
+        },
+        {
+          "kps": 9,
+          "clear": 23,
+          "n": 24,
+          "day4": 219,
+          "trips": 5.68,
+          "boostShare": 0
+        }
+      ],
+      "after": [
+        {
+          "kps": 4.5,
+          "clear": 0,
+          "n": 24,
+          "day4": 68,
+          "trips": 4.58,
+          "boostShare": 0.17
+        },
+        {
+          "kps": 6.5,
+          "clear": 15,
+          "n": 24,
+          "day4": 139,
+          "trips": 4.91,
+          "boostShare": 0.2
+        },
+        {
+          "kps": 9,
+          "clear": 24,
+          "n": 24,
+          "day4": 237,
+          "trips": 5.15,
+          "boostShare": 0.23
+        }
+      ]
+    },
+    {
+      "base": "強気の店",
+      "order": [
+        "tsuyoki",
+        "yobikomi",
+        "aiso",
+        "sekkachi",
+        "ooiri",
+        "matome"
+      ],
+      "from": "tsuyoki",
+      "to": "ippatsu",
+      "before": [
+        {
+          "kps": 4.5,
+          "clear": 3,
+          "n": 24,
+          "day4": 70,
+          "trips": 4.59,
+          "boostShare": 0.68
+        },
+        {
+          "kps": 6.5,
+          "clear": 13,
+          "n": 24,
+          "day4": 116,
+          "trips": 4.59,
+          "boostShare": 0.69
+        },
+        {
+          "kps": 9,
+          "clear": 20,
+          "n": 24,
+          "day4": 157,
+          "trips": 4.57,
+          "boostShare": 0.7
+        }
+      ],
+      "after": [
+        {
+          "kps": 4.5,
+          "clear": 0,
+          "n": 24,
+          "day4": 56,
+          "trips": 4.44,
+          "boostShare": 0.24
+        },
+        {
+          "kps": 6.5,
+          "clear": 13,
+          "n": 24,
+          "day4": 110,
+          "trips": 4.58,
+          "boostShare": 0.29
+        },
+        {
+          "kps": 9,
+          "clear": 19,
+          "n": 24,
+          "day4": 186,
+          "trips": 4.72,
+          "boostShare": 0.34
+        }
+      ]
+    },
+    {
+      "base": "強気の店",
+      "order": [
+        "tsuyoki",
+        "yobikomi",
+        "aiso",
+        "sekkachi",
+        "ooiri",
+        "matome"
+      ],
+      "from": "yobikomi",
+      "to": "makanai",
+      "before": [
+        {
+          "kps": 4.5,
+          "clear": 3,
+          "n": 24,
+          "day4": 70,
+          "trips": 4.59,
+          "boostShare": 0.37
+        },
+        {
+          "kps": 6.5,
+          "clear": 13,
+          "n": 24,
+          "day4": 116,
+          "trips": 4.59,
+          "boostShare": 0.33
+        },
+        {
+          "kps": 9,
+          "clear": 20,
+          "n": 24,
+          "day4": 157,
+          "trips": 4.57,
+          "boostShare": 0.29
+        }
+      ],
+      "after": [
+        {
+          "kps": 4.5,
+          "clear": 1,
+          "n": 24,
+          "day4": 78,
+          "trips": 4.36,
+          "boostShare": 0.2
+        },
+        {
+          "kps": 6.5,
+          "clear": 15,
+          "n": 24,
+          "day4": 124,
+          "trips": 4.42,
+          "boostShare": 0.2
+        },
+        {
+          "kps": 9,
+          "clear": 20,
+          "n": 24,
+          "day4": 165,
+          "trips": 4.3,
+          "boostShare": 0.2
+        }
+      ]
+    },
+    {
+      "base": "少人数の店",
+      "order": [
+        "yoyaku",
+        "omotenashi",
+        "aiso",
+        "ryoshusho",
+        "ooiri",
+        "betsubara"
+      ],
+      "from": "yoyaku",
+      "to": "ippatsu",
+      "before": [
+        {
+          "kps": 4.5,
+          "clear": 19,
+          "n": 24,
+          "day4": 138,
+          "trips": 4.69,
+          "boostShare": 0.82
+        },
+        {
+          "kps": 6.5,
+          "clear": 22,
+          "n": 24,
+          "day4": 178,
+          "trips": 4.31,
+          "boostShare": 0.78
+        },
+        {
+          "kps": 9,
+          "clear": 22,
+          "n": 24,
+          "day4": 173,
+          "trips": 4.15,
+          "boostShare": 0.76
+        }
+      ],
+      "after": [
+        {
+          "kps": 4.5,
+          "clear": 3,
+          "n": 24,
+          "day4": 78,
+          "trips": 4.59,
+          "boostShare": 0.33
+        },
+        {
+          "kps": 6.5,
+          "clear": 16,
+          "n": 24,
+          "day4": 132,
+          "trips": 4.63,
+          "boostShare": 0.4
+        },
+        {
+          "kps": 9,
+          "clear": 20,
+          "n": 24,
+          "day4": 161,
+          "trips": 4.9,
+          "boostShare": 0.44
+        }
+      ]
+    },
+    {
+      "base": "夜の店",
+      "order": [
+        "yoippari",
+        "tema",
+        "hayakuchi",
+        "tsuyoki",
+        "aiso",
+        "ryoshusho"
+      ],
+      "from": "yoippari",
+      "to": "ippatsu",
+      "before": [
+        {
+          "kps": 4.5,
+          "clear": 4,
+          "n": 24,
+          "day4": 80,
+          "trips": 4.51,
+          "boostShare": 0.38
+        },
+        {
+          "kps": 6.5,
+          "clear": 18,
+          "n": 24,
+          "day4": 173,
+          "trips": 4.56,
+          "boostShare": 0.44
+        },
+        {
+          "kps": 9,
+          "clear": 24,
+          "n": 24,
+          "day4": 306,
+          "trips": 4.7,
+          "boostShare": 0.44
+        }
+      ],
+      "after": [
+        {
+          "kps": 4.5,
+          "clear": 3,
+          "n": 24,
+          "day4": 81,
+          "trips": 4.5,
+          "boostShare": 0.39
+        },
+        {
+          "kps": 6.5,
+          "clear": 20,
+          "n": 24,
+          "day4": 172,
+          "trips": 4.54,
+          "boostShare": 0.45
+        },
+        {
+          "kps": 9,
+          "clear": 24,
+          "n": 24,
+          "day4": 307,
+          "trips": 4.66,
+          "boostShare": 0.5
+        }
+      ]
+    },
+    {
+      "base": "夜の店",
+      "order": [
+        "yoippari",
+        "tema",
+        "hayakuchi",
+        "tsuyoki",
+        "aiso",
+        "ryoshusho"
+      ],
+      "from": "tema",
+      "to": "ooiri",
+      "before": [
+        {
+          "kps": 4.5,
+          "clear": 4,
+          "n": 24,
+          "day4": 80,
+          "trips": 4.51,
+          "boostShare": 0.34
+        },
+        {
+          "kps": 6.5,
+          "clear": 18,
+          "n": 24,
+          "day4": 173,
+          "trips": 4.56,
+          "boostShare": 0.39
+        },
+        {
+          "kps": 9,
+          "clear": 24,
+          "n": 24,
+          "day4": 306,
+          "trips": 4.7,
+          "boostShare": 0.42
+        }
+      ],
+      "after": [
+        {
+          "kps": 4.5,
+          "clear": 2,
+          "n": 24,
+          "day4": 55,
+          "trips": 4.56,
+          "boostShare": 0.02
+        },
+        {
+          "kps": 6.5,
+          "clear": 11,
+          "n": 24,
+          "day4": 115,
+          "trips": 4.59,
+          "boostShare": 0.07
+        },
+        {
+          "kps": 9,
+          "clear": 22,
+          "n": 24,
+          "day4": 218,
+          "trips": 4.71,
+          "boostShare": 0.12
+        }
+      ]
+    },
+    {
+      "base": "夜の店",
+      "order": [
+        "yoippari",
+        "tema",
+        "hayakuchi",
+        "tsuyoki",
+        "aiso",
+        "ryoshusho"
+      ],
+      "from": "hayakuchi",
+      "to": "makanai",
+      "before": [
+        {
+          "kps": 4.5,
+          "clear": 4,
+          "n": 24,
+          "day4": 80,
+          "trips": 4.51,
+          "boostShare": 0.17
+        },
+        {
+          "kps": 6.5,
+          "clear": 18,
+          "n": 24,
+          "day4": 173,
+          "trips": 4.56,
+          "boostShare": 0.2
+        },
+        {
+          "kps": 9,
+          "clear": 24,
+          "n": 24,
+          "day4": 306,
+          "trips": 4.7,
+          "boostShare": 0.21
+        }
+      ],
+      "after": [
+        {
+          "kps": 4.5,
+          "clear": 1,
+          "n": 24,
+          "day4": 73,
+          "trips": 4.22,
+          "boostShare": 0.22
+        },
+        {
+          "kps": 6.5,
+          "clear": 18,
+          "n": 24,
+          "day4": 153,
+          "trips": 4.51,
+          "boostShare": 0.21
+        },
+        {
+          "kps": 9,
+          "clear": 23,
+          "n": 24,
+          "day4": 277,
+          "trips": 4.59,
+          "boostShare": 0.23
+        }
+      ]
+    },
+    {
+      "base": "景気＋多い素材",
+      "order": [
+        "keiki",
+        "tairyo",
+        "oomori",
+        "matome",
+        "ooiri",
+        "shikomi"
+      ],
+      "from": "keiki",
+      "to": "makanai",
+      "before": [
+        {
+          "kps": 4.5,
+          "clear": 2,
+          "n": 24,
+          "day4": 68,
+          "trips": 4.15,
+          "boostShare": 0.18
+        },
+        {
+          "kps": 6.5,
+          "clear": 18,
+          "n": 24,
+          "day4": 178,
+          "trips": 4.3,
+          "boostShare": 0.32
+        },
+        {
+          "kps": 9,
+          "clear": 24,
+          "n": 24,
+          "day4": 291,
+          "trips": 4.28,
+          "boostShare": 0.38
+        }
+      ],
+      "after": [
+        {
+          "kps": 4.5,
+          "clear": 8,
+          "n": 24,
+          "day4": 103,
+          "trips": 4.01,
+          "boostShare": 0.4
+        },
+        {
+          "kps": 6.5,
+          "clear": 23,
+          "n": 24,
+          "day4": 209,
+          "trips": 4.15,
+          "boostShare": 0.39
+        },
+        {
+          "kps": 9,
+          "clear": 24,
+          "n": 24,
+          "day4": 331,
+          "trips": 4.1,
+          "boostShare": 0.39
+        }
+      ]
+    }
+  ]
+}
