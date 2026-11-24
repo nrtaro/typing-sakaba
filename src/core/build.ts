@@ -549,6 +549,20 @@ export function stockGainOnPick(id: PolicyId, from: number, to: number) {
   return STOCK[Math.min(MAX_LEVEL, to) - 1] - (from > 0 ? STOCK[from - 1] : 0);
 }
 
+/** 1日に出した皿の数え：読みの長い皿・素材2種類／3種類以上の皿・朝／夜の皿・コンボを切らさずに10皿出した回数 */
+export interface DaySeen { served: number; long: number; kinds2: number; kinds3: number; morning: number; night: number; tens: number }
+export const emptySeen = (): DaySeen => ({ served: 0, long: 0, kinds2: 0, kinds3: 0, morning: 0, night: 0, tens: 0 });
+
+/** 選ぶ画面で光らせるための、重なりの目印（all は全部の皿に効くので光らせない） */
+export type Mark = 'all' | 'typing' | 'night' | 'morning' | 'fresh' | 'plenty' | 'scarce' | 'combo' | 'wait' | 'rush' | 'ale';
+export const MARKS: Record<PolicyId, Mark[]> = {
+  matome: ['rush'], betsubara: ['wait'], ryoshusho: ['combo'], nushi: ['fresh'], tairyo: ['fresh', 'plenty'], mie: ['scarce'],
+  sekkachi: ['rush'], mouippai: ['ale'], oomori: ['plenty'], yobikomi: ['rush'], makanai: ['scarce'], ooiri: ['combo'],
+  aiso: ['wait'], shikomi: ['plenty'], yoyaku: ['all'], omotenashi: ['typing', 'wait'], ippatsu: ['typing'], netsu: ['typing', 'rush'],
+  asaichi: ['morning', 'fresh'], encho: ['night', 'combo'], hayakuchi: ['typing', 'night'], tema: ['night'], tsuyoki: ['all'],
+  yoippari: ['night'], keiki: ['combo', 'plenty'],
+};
+
 /** 営業の中で数える、方針のはたらき（結果の振り返りと実績に使う） */
 export interface BuildStats {
   /** 発動タグに配分した直接売上の推計（補給・客数・コンボ進行等の間接効果は含まない） */
@@ -571,6 +585,8 @@ export interface BuildStats {
   /** 連打の熱の最高倍率／延長営業で延びた秒数 */
   maxHeat: number;
   extended: number;
+  /** 出した皿の数え（方針の有無にかかわらず。次の日の選ぶ画面の見込みに使う） */
+  seen: DaySeen;
   /** こまめな仕込みで、時間帯のはじめに足した素材の合計の個数（円には換えない） */
   prep: number;
   /** 景気づけで増えた素材の合計の個数（円には換えない） */
@@ -579,5 +595,5 @@ export interface BuildStats {
   maxStack: number;
 }
 export function emptyBuildStats(): BuildStats {
-  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0, keiki: 0, prep: 0 };
+  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0, keiki: 0, prep: 0, seen: emptySeen() };
 }

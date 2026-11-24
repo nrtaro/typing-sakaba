@@ -342,6 +342,7 @@ export class Shop {
         this.comboMistakes = 0;
         this.feverCount = 0;
         this.keikiUsed = {};
+        this.streak = 0;
         this.events.push({ type: 'comboBreak' });
       }
       this.events.push({ type: 'key', ok: false, count: 0 });
@@ -603,6 +604,7 @@ export class Shop {
       const total = Object.values(weight).reduce((a, w) => a + (w ?? 0), 0);
       if (total > 0) for (const [id, w] of Object.entries(weight) as [PolicyId, number][]) st.yen[id] = (st.yen[id] ?? 0) + (extra * w) / total;
       st.bestServe = Math.max(st.bestServe, gain);
+      this.countSeen(g.dish);
     }
     this.score += gain;
     this.stats.served++;
@@ -675,6 +677,20 @@ export class Shop {
     st.fired.keiki = (st.fired.keiki ?? 0) + 1;
     st.keiki += gain * top.length;
     this.events.push({ type: 'keiki', items: top.map((id) => ({ id, n: gain })) });
+  }
+  /** コンボを切らさずに出した皿の数（方針の有無にかかわらず。10皿で seen.tens を数える） */
+  private streak = 0;
+  /** 出した皿を数える（次の日の選ぶ画面の見込み） */
+  private countSeen(dish: Dish) {
+    const v = this.buildStats.seen;
+    v.served++;
+    if (dish.kana.length >= LONG_KANA) v.long++;
+    const kinds = Object.keys(dish.need).length;
+    if (kinds === 2) v.kinds2++;
+    else if (kinds >= 3) v.kinds3++;
+    if (this.phaseIndex === 0) v.morning++;
+    else if (this.phaseIndex === 2) v.night++;
+    if (++this.streak >= FEVER_EVERY) { this.streak = 0; v.tens++; }
   }
   private feverOn = false;
   /** 大入り袋：コンボを切らさずに出した皿の数（コンボが切れたら 0） */
@@ -872,6 +888,7 @@ export class Shop {
             this.comboMistakes = 0;
             this.feverCount = 0;
             this.keikiUsed = {};
+            this.streak = 0;
           }
           if (!this.build?.noAngryPenalty) this.score = Math.max(0, this.score - SHOP.angryPenalty * (this.build?.angryMult ?? 1) * this.rules.angryPenaltyMult * (g.banquet ? BANQUET_PENALTY_MULT : 1));
           this.events.push({ type: 'angry', seat: i });

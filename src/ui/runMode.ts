@@ -19,7 +19,7 @@ import {
   type BuildStats, type Owned, type PolicyId,
 } from '../core/build';
 import {
-  AIDS, PERKS, RUN_ACHIEVEMENTS, RUN_DAYS, aidFor, RUN_NAME, TRIALS, applyOffer, availablePolicies, bestCleared, clampPick, closeDay, coinsFor, dayPlan, earnedAchievements, firstClearGift, goalFor, loopGoalMult,
+  AIDS, PERKS, RUN_ACHIEVEMENTS, RUN_DAYS, aidFor, RUN_NAME, TRIALS, applyOffer, availablePolicies, bestCleared, clampPick, closeDay, coinsFor, dayPlan, estimateFor, earnedAchievements, firstClearGift, goalFor, loopGoalMult,
   newRun, nextNorenRank, norenRank, offersFor, roadOffers, roadOf, runTotal, takeRoad, trialsFor,
   type DayOutcome, type NorenRank, type Offer, type Road, type RunMeta, type RunState,
 } from '../core/run';
@@ -779,7 +779,7 @@ export class RunUI {
       const h = 172;
       sc.PR(x + 2, y + 4, w, h, '#0c0604', 0.5 * a);
       if (live || chosen) sc.glow(x, y, w, h, chosen ? C.w : C.gold3, chosen ? 1 : 0.8);
-      else if (o.hot) sc.glow(x, y, w, h, '#ffe27a', 0.3 + 0.2 * Math.sin(g.t * 4 + i));
+      else if (o.glow) sc.glow(x, y, w, h, '#ffe27a', 0.3 + 0.2 * Math.sin(g.t * 4 + i));
       sc.panel(x, y, w, h, live ? '#3c2634' : '#2a1b26', chosen ? C.w : live ? C.gold : col, a);
       sc.PR(x + 1, y + 1, w - 2, 14, col, 0.85 * a);
       sc.T(`${FAMILY_NAME[pol.family]}の方針`, x + 5, y + 3.5, n >= 4 ? 7.5 : 8, '#1a1016', 'left', a);
@@ -797,13 +797,16 @@ export class RunUI {
         ? this.rich(sc, descDiff(o.id, from, o.lv), x + 7, y + 45, size, w - 14, C.cream, '#fff0a8', a)
         : this.para(sc, descOf(o.id, o.lv), x + 7, y + 45, size, w - 14, C.cream, a);
       const yy = y + 45 + rows * (size + 2.5) + 2;
-      if (yy < y + 100) this.para(sc, pol.quip, x + 7, yy, 7.5, w - 14, '#b8a0b0', a, 9.5);
+      // 見込み（昨日の注文から数えられる方針だけ）があれば、一言の代わりに出す
+      const est = o.kind === 'up' ? null : estimateFor(o.id, o.lv, run.lastSeen);
+      if (est) this.para(sc, est, x + 7, yy, 7.5, w - 14, '#a9f0e4', a, 9.5);
+      else if (yy < y + 100) this.para(sc, pol.quip, x + 7, yy, 7.5, w - 14, '#b8a0b0', a, 9.5);
       if (o.link) {
-        const lrows = wrapText(sc, (o.hot ? '★' : '') + o.link, 7.5, w - 16);
+        const lrows = wrapText(sc, (o.glow ? '★' : '') + o.link, 7.5, w - 16);
         const lh = 5 + lrows.length * 9.5;
         const ly = y + 146 - lh;
-        sc.panel(x + 4, ly, w - 8, lh, o.hot ? '#4a3410' : '#22302a', o.hot ? '#ffe27a' : '#5a7a68', a);
-        lrows.forEach((t, k) => sc.T(t, x + 8, ly + 3 + k * 9.5, 7.5, o.hot ? '#ffe9b4' : '#bfe6d2', 'left', a));
+        sc.panel(x + 4, ly, w - 8, lh, o.glow ? '#4a3410' : '#22302a', o.glow ? '#ffe27a' : '#5a7a68', a);
+        lrows.forEach((t, k) => sc.T(t, x + 8, ly + 3 + k * 9.5, 7.5, o.glow ? '#ffe9b4' : '#bfe6d2', 'left', a));
       }
       this.roma(sc, pol.kana, x + w / 2, y + 150, dim, sc.fitSize(new RomajiMatcher(pol.kana).remaining, 10, w - 22, 6.5));
       // 候補には効果と相性を直接表示する。札全体のホバーは隣の候補を覆うため付けない。

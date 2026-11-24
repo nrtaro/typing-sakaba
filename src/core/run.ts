@@ -3,8 +3,8 @@
 //   朝・昼・夜の方針えらび（1日3回×4日）→ 閉店で売上目標の判定 → 明日の営業えらび（道中）→ …
 //   4日目の目標を越えるとクリアで、次は「のれん」が1枚増えて難しくなる（上限なし）。
 import {
-  MAX_LEVEL, MAX_SLOTS, PAIRS, POLICIES, SETS, isPolicy, modsFor, pairKey, pairOf, partnersOf, policyOf, setOf, stockGainOnPick,
-  type BuildMods, type BuildStats, type Owned, type PolicyId,
+  MARKS, MAX_LEVEL, MAX_SLOTS, PAIRS, emptySeen, POLICIES, SETS, isPolicy, modsFor, pairKey, pairOf, partnersOf, policyOf, setOf, stockGainOnPick,
+  type BuildMods, type BuildStats, type DaySeen, type Owned, type PolicyId,
 } from './build';
 import { NORMAL_RULES, type DayRules } from './daily';
 import { subRng } from './rng';
@@ -185,6 +185,8 @@ export interface RunState {
   yen: Partial<Record<PolicyId, number>>;
   /** 常連の見舞いの段階（同じのれんで続けて負けたあとの挑戦だけ。0＝なし） */
   aid: number;
+  /** 前の日に出した皿の数え（選ぶ画面の見込み。1日目と古い保存データは null） */
+  lastSeen: DaySeen | null;
 }
 
 export interface RunSummary {
@@ -264,7 +266,7 @@ function readRun(v: unknown): RunState | null {
   if (days.length !== (stage === 'closed' || stage === 'road' ? day + 1 : day)) return null;
   return {
     v: 1, id: o.id.slice(0, 64), seed: num(o.seed, 0xffffffff), loop: Math.max(1, num(o.loop)), day, stage, owned: readOwned(o.owned),
-    rerolls: num(o.rerolls, 9), boost: o.boost === true, road: isRoad(o.road) ? o.road : 'joren', days, pairs: readPairs(o.pairs), yen: readYen(o.yen), aid: num(o.aid, AIDS.length),
+    rerolls: num(o.rerolls, 9), boost: o.boost === true, road: isRoad(o.road) ? o.road : 'joren', days, pairs: readPairs(o.pairs), yen: readYen(o.yen), aid: num(o.aid, AIDS.length), lastSeen: readSeen(o.lastSeen),
   };
 }
 
@@ -339,7 +341,7 @@ export function newRun(meta: RunMeta, seed: number, id: string): RunState {
   // 常連の見舞いは、いちばん上ののれんで負け続けたときだけ（下ののれんでは付かない）
   const aid = loop === meta.loop ? aidFor(meta.losses) : 0;
   const boost = aid > 0 && AIDS[aid - 1].boost;
-  return { v: 1, id, seed: seed >>> 0, loop, day: 0, stage: 'morning', owned: [], rerolls: 1 + (perkCount(meta) >= 2 ? 1 : 0), boost, road: 'joren', days: [], pairs: [], yen: {}, aid };
+  return { v: 1, id, seed: seed >>> 0, loop, day: 0, stage: 'morning', owned: [], rerolls: 1 + (perkCount(meta) >= 2 ? 1 : 0), boost, road: 'joren', days: [], pairs: [], yen: {}, aid, lastSeen: null };
 }
 
 /** その日の営業に渡すもの：難しさ・お題のルール・方針のはたらき・目標・乱数の種 */
@@ -367,8 +369,42 @@ export interface Offer {
   lv: number;
   /** 今の構成とのつながり（なければ null） */
   link: string | null;
-  /** 名前付きのかけ合わせになる相手を持っているか */
+  /** 名前付きのかけ合わせになる相手を持っているか（候補の出やすさに使う） */
   hot: boolean;
+  /** 選ぶ画面で光らせるか（せまい条件が重なる・名前付きの組の相手を持っている。候補の出やすさには使わない） */
+  glow?: boolean;
+}
+
+/** 古い保存データや壊れた値は null */
+function readSeen(v: unknown): DaySeen | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const keys = Object.keys(emptySeen()) as (keyof DaySeen)[];
+  if (!keys.every((k) => typeof o[k] === 'number' && Number.isFinite(o[k]) && (o[k] as number) >= 0)) return null;
+  return Object.fromEntries(keys.map((k) => [k, Math.floor(o[k] as number)])) as unknown as DaySeen;
+}
+
+/** 選ぶ画面で光らせるか：全部の皿に効く方針は光らせない。名前付きの組・型の相手か、目印が同じ方針を持っていれば光る */
+export function glowFor(id: PolicyId, owned: Owned[]): boolean {
+  const mine = MARKS[id];
+  if (mine.includes('all')) return false;
+  const has = (p: PolicyId) => owned.some((o) => o.id === p);
+  if (SETS.some((x) => x.ids.includes(id) && x.ids.every((q) => q === id || has(q)))) return true;
+  if (partnersOf(id).some((p) => has(p) && !MARKS[p].includes('all'))) return true;
+  return owned.some((o) => o.id !== id && MARKS[o.id].some((m) => m !== 'all' && mine.includes(m)));
+}
+
+/** 選ぶ画面の見込み：前の日の注文から数えられる、見て分かる条件の方針だけ */
+export function estimateFor(id: PolicyId, lv: number, seen: DaySeen | null): string | null {
+  if (!seen) return null;
+  switch (id) {
+    case 'hayakuchi': return `昨日なら${seen.long}皿が対象`;
+    case 'tema': return `昨日なら${seen.kinds2 + seen.kinds3}皿が対象`;
+    case 'yoippari': return `昨日なら夜の${seen.night}皿が対象`;
+    case 'asaichi': return `昨日なら朝の${seen.morning}皿が対象`;
+    case 'keiki': return `昨日なら${seen.tens}回、素材+${seen.tens * 2 * modsFor([{ id, lv }]).keikiGain}個`;
+    default: return null;
+  }
 }
 
 /** 第3段（組を足す前）のかけ合わせの数。PAIRS の先頭からこの数が、古い保存データの組 */
@@ -437,6 +473,7 @@ export function offersFor(run: RunState, meta: RunMeta, slot: number, rerolled: 
     if (!more) break;
     out.push(more);
   }
+  for (const o of out) o.glow = o.kind !== 'up' && glowFor(o.id, run.owned);
   return out;
 }
 
@@ -494,6 +531,7 @@ export function closeDay(run: RunState, meta: RunMeta, f: DayFacts, now = new Da
   const goal = goalFor(run.day, run.loop, run.road);
   const result: DayResult = { sales: Math.floor(f.sales), goal, served: f.served, maxCombo: f.maxCombo, angry: f.angry, maxChain: f.build.maxChain, bestServe: f.build.bestServe, road: run.road };
   run.days.push(result);
+  run.lastSeen = { ...f.build.seen };
   for (const [k, n] of Object.entries(f.build.yen)) if (isPolicy(k)) run.yen[k] = Math.round((run.yen[k] ?? 0) + (n ?? 0));
   const newPairs = f.build.pairs.filter((p) => pairOf(p) && !meta.discovered.includes(p));
   for (const p of f.build.pairs) if (pairOf(p) && !run.pairs.includes(p)) run.pairs.push(p);
