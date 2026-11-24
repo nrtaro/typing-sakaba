@@ -22,6 +22,8 @@ export interface SimRow {
   feverShare: number; blockedSecs: number; trips: number;
   /** 方針ごとに、倍率が乗った皿の数 ÷ 出した皿の数（4日目まで続けた結果） */
   boostShare: Partial<Record<PolicyId, number>>;
+  /** 実績の届きやすさ（ふつうに遊んだ挑戦のうち）：1皿5,000円以上／目標の2倍で終えた日がある／4日の合計10万円以上 */
+  serve5k: number; double: number; total100k: number;
 }
 
 const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
@@ -54,6 +56,9 @@ function row(strat: Strategy, [kps, miss, think]: readonly [number, number, numb
     feverShare: r2(avg(days.map((d) => d.feverSecs / Math.max(1, d.seconds)))),
     blockedSecs: Math.round(avg(days.map((d) => d.blockedSecs))),
     trips: r2(avg(days.map((d) => d.trips))),
+    serve5k: r2(real.filter((r) => r.days.some((d) => d.bestServe >= 5000)).length / real.length),
+    double: r2(real.filter((r) => r.days.some((d) => d.sales >= d.goal * 2)).length / real.length),
+    total100k: r2(real.filter((r) => r.days.reduce((n, d) => n + d.sales, 0) >= 100000).length / real.length),
     boostShare: Object.fromEntries(
       [...new Set(days.flatMap((d) => Object.keys(d.boosted)))].map((id) => [id, r2(days.reduce((n, d) => n + (d.boosted[id as PolicyId] ?? 0), 0) / Math.max(1, served))]),
     ),
