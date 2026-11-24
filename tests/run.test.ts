@@ -1320,3 +1320,40 @@ describe('第3段：新しいかけ合わせ', () => {
     }
   });
 });
+
+describe('第4段：方針ごとの稼ぎの振り返り', () => {
+  it('稼ぎは、効いた倍率の対数の比で配る（×4 は ×2 の2倍）', () => {
+    const s = shopWith([{ id: 'ippatsu', lv: 1 }, { id: 'nushi', lv: 1 }], ['grilledFish']);
+    s.build!.ippatsuMult = 2;
+    s.build!.freshMult = 4;
+    s.freshUntil = 10;
+    type(s, 'やきざかな');
+    const y = s.buildStats.yen;
+    expect(y.nushi! / y.ippatsu!).toBeCloseTo(2, 2);
+  });
+
+  it('引き換えの倍率だけの皿では、どの方針にも配らない', () => {
+    const s = shopWith([{ id: 'ippatsu', lv: 1 }, { id: 'yoippari', lv: 1 }], ['grilledFish']);
+    for (let i = 0; i <= s.comboMissAllowance; i++) s.key('q');
+    type(s, 'やきざかな');
+    expect(Object.values(s.buildStats.yen).every((v) => !v)).toBe(true);
+  });
+
+  it('上限で止まった皿でも、配った額は有限で0以上、合計は売上以内', () => {
+    const s = shopWith([{ id: 'mie', lv: 3 }, { id: 'ippatsu', lv: 3 }, { id: 'yoyaku', lv: 3 }, { id: 'tema', lv: 3 }, { id: 'tsuyoki', lv: 3 }], ['spicyPot']);
+    s.combo = 60;
+    const ev = type(s, 'ちげなべおおもり').find((e) => e.type === 'serve')!;
+    if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.capped).toBe(true);
+    const vals = Object.values(s.buildStats.yen) as number[];
+    expect(vals.every((v) => Number.isFinite(v) && v >= 0)).toBe(true);
+    expect(vals.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(ev.gain + 1e-6);
+  });
+
+  it('こまめな仕込みで時間帯のはじめに足した素材を数える', () => {
+    const s = shopWith([{ id: 'shikomi', lv: 3 }], []);
+    s.clock = 49.99;
+    s.update(0.05);
+    expect(s.buildStats.prep).toBe(5 * 6);
+  });
+});

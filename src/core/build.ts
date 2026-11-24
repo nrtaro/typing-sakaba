@@ -571,11 +571,13 @@ export interface BuildStats {
   /** 連打の熱の最高倍率／延長営業で延びた秒数 */
   maxHeat: number;
   extended: number;
+  /** こまめな仕込みで、時間帯のはじめに足した素材の合計の個数（円には換えない） */
+  prep: number;
   /** 景気づけで増えた素材の合計の個数（円には換えない） */
   keiki: number;
   /** 1皿に重なったかけ合わせの最大数 */
   maxStack: number;
 }
 export function emptyBuildStats(): BuildStats {
-  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0, keiki: 0 };
+  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0, keiki: 0, prep: 0 };
 }

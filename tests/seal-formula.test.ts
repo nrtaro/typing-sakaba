@@ -39,3 +39,19 @@ describe('式の帯', () => {
     expect(v.formula?.text).toContain('= 2,300円');
   });
 });
+
+describe('結果の画面の素材の助け', () => {
+  it('0のものは出さず、どれもなければ null', async () => {
+    const { helpLine } = await import('../src/ui/runMode');
+    expect(helpLine({ keiki: 24, prep: 15, makanai: 9 })).toBe('素材：景気づけ+24個・仕込み+15個・まかない9皿');
+    expect(helpLine({ keiki: 0, prep: 30, makanai: 0 })).toBe('素材：仕込み+30個');
+    expect(helpLine({ keiki: 0, prep: 0, makanai: 0 })).toBeNull();
+    expect(helpLine(undefined)).toBeNull();
+  });
+});
+
+it('素材の助けのいちばん長い形も、結果の画面の幅（196px、7.5px）に入る', async () => {
+  const { helpLine } = await import('../src/ui/runMode');
+  const w = (t: string) => [...t].reduce((s, ch) => s + (/[\x20-\x7e]/.test(ch) ? 3.75 : 7.5), 0);
+  expect(w(helpLine({ keiki: 999, prep: 999, makanai: 99 })!)).toBeLessThanOrEqual(196);
+});

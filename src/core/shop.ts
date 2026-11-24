@@ -593,11 +593,15 @@ export class Shop {
       const whole: PolicyId | null = chain > 0 ? 'matome' : g.refill && b.refillMult > 1 ? 'betsubara' : null;
       if (whole) st.yen[whole] = (st.yen[whole] ?? 0) + Math.min(plain, gain);
       const extra = Math.max(0, gain - plain);
-      // まかないは、倍率を付けた皿（素材が減らなかった皿）でだけ稼ぎに数える
-      const share = tags.filter((t) => t !== 'makanai' || q.factors.some((f) => f.id === 'makanai'));
       for (const t of tags) st.fired[t] = (st.fired[t] ?? 0) + 1;
       for (const f of q.factors) if (f.mult > 1 && isPolicy(f.id)) st.boosted[f.id] = (st.boosted[f.id] ?? 0) + 1;
-      for (const t of share) st.yen[t] = (st.yen[t] ?? 0) + extra / share.length;
+      // 増えた分は、効いた倍率（1より大きいもの）の対数の比で配る。領収書は、コンボの上限を広げた分だけ
+      const weight: Partial<Record<PolicyId, number>> = {};
+      for (const f of q.factors) if (f.mult > 1 && isPolicy(f.id)) weight[f.id] = (weight[f.id] ?? 0) + Math.log(f.mult);
+      const comboMult = q.factors.find((f) => f.id === 'combo')?.mult ?? 1;
+      if (tags.includes('ryoshusho') && comboMult > SHOP.comboMaxMult) weight.ryoshusho = Math.log(comboMult / SHOP.comboMaxMult);
+      const total = Object.values(weight).reduce((a, w) => a + (w ?? 0), 0);
+      if (total > 0) for (const [id, w] of Object.entries(weight) as [PolicyId, number][]) st.yen[id] = (st.yen[id] ?? 0) + (extra * w) / total;
       st.bestServe = Math.max(st.bestServe, gain);
     }
     this.score += gain;
@@ -772,6 +776,7 @@ export class Shop {
       // こまめな仕込み：時間帯が変わるたびに素材が増える
       if (this.build && this.build.phaseStock > 0) {
         for (const id of INGREDIENT_ORDER) this.addStock(id, this.build.phaseStock);
+        this.buildStats.prep += this.build.phaseStock * INGREDIENT_ORDER.length;
         this.events.push({ type: 'restock', n: this.build.phaseStock });
       }
     }

@@ -40,6 +40,13 @@ const KIND_NAME: Record<Item['kind'], string> = { front: '二つ名（前）', b
 const BOOK_TABS = ['実績とごほうび', '型とかけ合わせ', '方針', 'おまけと試練'] as const;
 const ease = (v: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
 const yen = (n: number) => `${Math.round(n).toLocaleString()}円`;
+/** 素材を増やした・減らなかった方針の振り返り（円に換えず、個数で見せる） */
+export interface DayHelp { keiki: number; prep: number; makanai: number }
+export function helpLine(h: DayHelp | undefined): string | null {
+  if (!h) return null;
+  const parts = [h.keiki > 0 ? `景気づけ+${h.keiki}個` : '', h.prep > 0 ? `仕込み+${h.prep}個` : '', h.makanai > 0 ? `まかない${h.makanai}皿` : ''].filter(Boolean);
+  return parts.length ? `素材：${parts.join('・')}` : null;
+}
 
 interface PickState {
   slot: number;
@@ -66,7 +73,7 @@ export class RunUI {
   private pendingSlot: number | null = null;
   /** 方針を選んだあと、営業が再開するまでの間 */
   resumeIn = 0;
-  outcome: (DayOutcome & { achievements: string[]; coins: number; yen: BuildStats['yen']; resumed?: boolean }) | null = null;
+  outcome: (DayOutcome & { achievements: string[]; coins: number; yen: BuildStats['yen']; help?: DayHelp; resumed?: boolean }) | null = null;
   book = { tab: 0, sel: 0, from: 'hub' as RunScreen, note: '' };
   private fxDone = { stamp: false, tick: 0, reward: false, gift: false, rank: false };
   /** 入口を開いたときに、さかのぼって届いた飾りの知らせ */
@@ -286,7 +293,8 @@ export class RunUI {
     g.view.run = null;
     this.go('hub');
     this.save(({ achievements, coins }) => {
-      this.outcome = { ...out, achievements, coins, yen: { ...shop.buildStats.yen } };
+      const bs = shop.buildStats;
+      this.outcome = { ...out, achievements, coins, yen: { ...bs.yen }, help: { keiki: bs.keiki, prep: bs.prep, makanai: bs.boosted.makanai ?? 0 } };
       if (out.summary) this.run = null;
       this.fxDone = { stamp: false, tick: 0, reward: false, gift: false, rank: false };
       g.refreshCollection();
@@ -818,10 +826,12 @@ export class RunUI {
   // ---------- 日別の結果 ----------
 
   /** いちばん働いた方針（増えた売上の多い順に3つ） */
-  private drawTop(sc: Screen, x: number, y: number, w: number, yenBy: BuildStats['yen'], a: number, owned: Owned[]) {
+  private drawTop(sc: Screen, x: number, y: number, w: number, yenBy: BuildStats['yen'], a: number, owned: Owned[], help?: DayHelp) {
     const top = (Object.entries(yenBy) as [PolicyId, number][]).filter(([, v]) => v > 0).sort((p, q) => q[1] - p[1]).slice(0, 3);
     sc.T('直接売上の推計（上位3つ）', x, y, 8, C.gold3, 'left', a);
-    sc.T('補給・客数・コンボ進行等は含まない', x, y + 63, 7, C.gray, 'left', a);
+    const hl = helpLine(help);
+    if (hl) sc.T(hl, x, y + 63, sc.fitSize(hl, 7.5, w, 7.5), FAMILY_COLOR.stock, 'left', a);
+    else sc.T('補給・客数・コンボ進行等は含まない', x, y + 63, 7, C.gray, 'left', a);
     if (!top.length) { sc.T('直接売上の計上なし', x, y + 14, 8, C.gray, 'left', a); return; }
     const max = top[0][1];
     top.forEach(([id, v], i) => {
@@ -904,7 +914,7 @@ export class RunUI {
       sc.T(v, 124 + (i % 2) * 104, 88 + Math.floor(i / 2) * 13, 8, C.w, 'right', a2);
     });
     sc.PR(28, 116, 196, 1, '#5a3a1c', a2);
-    this.drawTop(sc, 28, 122, 196, o.yen, a2, run.owned);
+    this.drawTop(sc, 28, 122, 196, o.yen, a2, run.owned, o.help);
     // 右：見つけたかけ合わせ・解放・ごほうび
     sc.panel(244, 82, 218, 124, 'rgba(36,23,14,0.95)', '#8a6232', a2);
     let y = 88;
