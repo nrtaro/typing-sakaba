@@ -9,9 +9,9 @@ const SIM_SEEDS = [11, 23, 37, 41, 59, 67, 83, 97];
 
 interface SwapCase { base: string; order: PolicyId[]; from: PolicyId; to: PolicyId }
 const CASES: SwapCase[] = [
-  { base: '連鎖の店', order: ['matome', 'mouippai', 'betsubara', 'yobikomi', 'tairyo', 'makanai', 'nushi'], from: 'matome', to: 'makanai' },
-  { base: '強気の店', order: ['tsuyoki', 'yobikomi', 'aiso', 'sekkachi', 'ooiri', 'matome'], from: 'tsuyoki', to: 'sekkachi' },
-  { base: '強気の店', order: ['tsuyoki', 'yobikomi', 'aiso', 'sekkachi', 'ooiri', 'matome'], from: 'yobikomi', to: 'ooiri' },
+  { base: '連鎖の店', order: ['matome', 'mouippai', 'betsubara', 'yobikomi', 'tairyo', 'makanai', 'nushi'], from: 'matome', to: 'ippatsu' },
+  { base: '強気の店', order: ['tsuyoki', 'yobikomi', 'aiso', 'sekkachi', 'ooiri', 'matome'], from: 'tsuyoki', to: 'ippatsu' },
+  { base: '強気の店', order: ['tsuyoki', 'yobikomi', 'aiso', 'sekkachi', 'ooiri', 'matome'], from: 'yobikomi', to: 'makanai' },
   { base: '少人数の店', order: ['yoyaku', 'omotenashi', 'aiso', 'ryoshusho', 'ooiri', 'betsubara'], from: 'yoyaku', to: 'ippatsu' },
   { base: '夜の店', order: ['yoippari', 'tema', 'hayakuchi', 'tsuyoki', 'aiso', 'ryoshusho'], from: 'yoippari', to: 'ippatsu' },
   { base: '夜の店', order: ['yoippari', 'tema', 'hayakuchi', 'tsuyoki', 'aiso', 'ryoshusho'], from: 'tema', to: 'ooiri' },
