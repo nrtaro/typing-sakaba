@@ -52,7 +52,7 @@ describe('光らせ方', () => {
   });
 });
 
-const seen = (over: Partial<BuildStats['seen']> = {}): BuildStats['seen'] => ({ served: 40, long: 12, kinds2: 9, kinds3: 4, morning: 8, night: 20, tens: 3, ...over });
+const seen = (over: Partial<BuildStats['seen']> = {}): BuildStats['seen'] => ({ served: 40, long: 12, kinds2: 9, kinds3: 4, morning: 8, night: 20, tens: 3, fives: 6, ...over });
 
 describe('昨日の注文からの見込み', () => {
   it('見て分かる条件の方針だけに出す。前の日がなければ出さない', () => {
@@ -61,8 +61,8 @@ describe('昨日の注文からの見込み', () => {
     expect(estimateFor('tema', 2, seen())).toBe('昨日なら13皿が対象');
     expect(estimateFor('yoippari', 1, seen())).toBe('昨日なら夜の20皿が対象');
     expect(estimateFor('asaichi', 1, seen())).toBe('昨日なら朝の8皿が対象');
-    expect(estimateFor('keiki', 3, seen())).toBe('昨日なら3回、素材+24個');
-    expect(estimateFor('keiki', 1, seen({ tens: 0 }))).toBe('昨日なら0回、素材+0個');
+    expect(estimateFor('keiki', 3, seen())).toBe('昨日なら6回、素材+48個');
+    expect(estimateFor('keiki', 1, seen({ fives: 0 }))).toBe('昨日なら0回、素材+0個');
     expect(estimateFor('yoyaku', 3, seen())).toBeNull();
     expect(estimateFor('aiso', 3, seen())).toBeNull();
   });
@@ -83,6 +83,7 @@ describe('昨日の注文からの見込み', () => {
     expect(v.morning).toBe(2);
     for (let i = 0; i < 8; i++) serve(s, 'grilledFish');
     expect(s.buildStats.seen.tens).toBe(1);
+    expect(s.buildStats.seen.fives).toBe(2);
     for (let i = 0; i < 9; i++) serve(s, 'grilledFish');
     for (let i = 0; i <= s.comboMissAllowance; i++) s.key('q');
     serve(s, 'grilledFish');

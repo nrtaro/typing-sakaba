@@ -58,10 +58,10 @@ describe('知らせの順番待ち', () => {
 });
 
 describe('次の10皿までの残り', () => {
-  it('大入り袋か景気づけを持っていれば、上にある方の判子に「あと○」を出す', async () => {
+  it('大入り袋は10皿、景気づけは5皿までの残りを、それぞれの判子の横に出す', async () => {
     const { tenLeft } = await import('../src/ui/shopView');
-    expect(tenLeft([{ id: 'ippatsu', lv: 1 }], 3)).toBeNull();
-    expect(tenLeft([{ id: 'ippatsu', lv: 1 }, { id: 'keiki', lv: 2 }, { id: 'ooiri', lv: 1 }], 3)).toEqual({ index: 1, text: 'あと7' });
-    expect(tenLeft([{ id: 'ooiri', lv: 1 }], 0)).toEqual({ index: 0, text: 'あと10' });
+    expect(tenLeft([{ id: 'ippatsu', lv: 1 }], { fever: 3, keiki: 1 })).toEqual([]);
+    expect(tenLeft([{ id: 'ippatsu', lv: 1 }, { id: 'keiki', lv: 2 }, { id: 'ooiri', lv: 1 }], { fever: 3, keiki: 1 })).toEqual([{ index: 1, text: 'あと4' }, { index: 2, text: 'あと7' }]);
+    expect(tenLeft([{ id: 'ooiri', lv: 1 }], { fever: 0, keiki: 0 })).toEqual([{ index: 0, text: 'あと10' }]);
   });
 });

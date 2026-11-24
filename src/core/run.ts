@@ -405,7 +405,7 @@ export function estimateFor(id: PolicyId, lv: number, seen: DaySeen | null): str
     case 'tema': return `昨日なら${seen.kinds2 + seen.kinds3}皿が対象`;
     case 'yoippari': return `昨日なら夜の${seen.night}皿が対象`;
     case 'asaichi': return `昨日なら朝の${seen.morning}皿が対象`;
-    case 'keiki': return `昨日なら${seen.tens}回、素材+${seen.tens * 2 * modsFor([{ id, lv }]).keikiGain}個`;
+    case 'keiki': return `昨日なら${seen.fives}回、素材+${seen.fives * 2 * modsFor([{ id, lv }]).keikiGain}個`;
     default: return null;
   }
 }

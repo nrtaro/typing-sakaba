@@ -39,6 +39,8 @@ export const MAX_LEVEL = 3;
 export const QUICK_RATIO = 0.7;
 /** 大入り袋：コンボを切らさずに何皿出すごとに大入りになるか（予約のみでコンボが速く進んでも皿の数で数える） */
 export const FEVER_EVERY = 10;
+/** 【景気づけの皿の数】景気づけ：コンボを切らさずに何皿出すごとに素材が増えるか（大入り袋とは別に数える。ユーザーの決定 2026-11-24） */
+export const KEIKI_EVERY = 5;
 /** おもてなし：前の皿からの間を、何秒ぶんまで数えるか／何秒あいたら効いたと数えるか */
 export const IDLE_MIN = 2;
 /** 【たっぷりの数】大漁旗：主素材がこの数以上あれば「たっぷり」 */
@@ -280,7 +282,7 @@ export const POLICIES: Policy[] = [
   {
     id: 'keiki', name: '景気づけ', kana: 'けいきづけ', family: 'combo', starter: false, unlock: '大入り袋で大入りを出す',
     quip: '「景気のいい店には、品物が集まる」',
-    text: `コンボを切らさずに${FEVER_EVERY}皿出すごとに、そのあいだに一番多く使った素材2種類が +{0}ずつ増える`,
+    text: `コンボを切らさずに${KEIKI_EVERY}皿出すごとに、そのあいだに一番多く使った素材2種類が +{0}ずつ増える`,
     vals: v1(KEIKI_GAIN, s),
   },
 ];
@@ -549,9 +551,9 @@ export function stockGainOnPick(id: PolicyId, from: number, to: number) {
   return STOCK[Math.min(MAX_LEVEL, to) - 1] - (from > 0 ? STOCK[from - 1] : 0);
 }
 
-/** 1日に出した皿の数え：読みの長い皿・素材2種類／3種類以上の皿・朝／夜の皿・コンボを切らさずに10皿出した回数 */
-export interface DaySeen { served: number; long: number; kinds2: number; kinds3: number; morning: number; night: number; tens: number }
-export const emptySeen = (): DaySeen => ({ served: 0, long: 0, kinds2: 0, kinds3: 0, morning: 0, night: 0, tens: 0 });
+/** 1日に出した皿の数え：読みの長い皿・素材2種類／3種類以上の皿・朝／夜の皿・コンボを切らさずに10皿／5皿出した回数 */
+export interface DaySeen { served: number; long: number; kinds2: number; kinds3: number; morning: number; night: number; tens: number; fives: number }
+export const emptySeen = (): DaySeen => ({ served: 0, long: 0, kinds2: 0, kinds3: 0, morning: 0, night: 0, tens: 0, fives: 0 });
 
 /** 選ぶ画面で光らせるための、重なりの目印（all は全部の皿に効くので光らせない） */
 export type Mark = 'all' | 'typing' | 'night' | 'morning' | 'fresh' | 'plenty' | 'scarce' | 'combo' | 'wait' | 'rush' | 'ale';

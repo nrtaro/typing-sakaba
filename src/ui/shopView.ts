@@ -15,7 +15,7 @@ import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
 import { setOf } from '../core/build';
 import { MULT_CAP, previewTier, type Factor } from '../core/dishPrice';
-import { FAMILY_COLOR, FEVER_EVERY, HEAT_GAP, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
+import { FAMILY_COLOR, FEVER_EVERY, HEAT_GAP, KEIKI_EVERY, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
 } from '../core/shopConfig';
@@ -31,10 +31,11 @@ const DOOR = { x: 452, y: 202 };
 
 interface Exit { look: number; x: number; y: number; start: number; distance: number; path: { x: number; y: number }[] }
 interface Fx { anim: string; x: number; y: number; h: number; start: number }
-/** 大入り袋・景気づけ：次の10皿までの残りを、持っている方針のうち上にある方の判子に出す（目標を目の前に見せる） */
-export function tenLeft(owned: Owned[], count: number): { index: number; text: string } | null {
-  const index = owned.findIndex((o) => o.id === 'ooiri' || o.id === 'keiki');
-  return index < 0 ? null : { index, text: `あと${FEVER_EVERY - count}` };
+/** 大入り袋・景気づけ：次まで残りの皿を、それぞれの判子の横に出す（目標を目の前に見せる） */
+export function tenLeft(owned: Owned[], counts: { fever: number; keiki: number }): { index: number; text: string }[] {
+  return owned.flatMap((o, index) =>
+    o.id === 'ooiri' ? [{ index, text: `あと${FEVER_EVERY - counts.fever}` }]
+      : o.id === 'keiki' ? [{ index, text: `あと${KEIKI_EVERY - counts.keiki}` }] : []);
 }
 /** 【判子1個を押す秒数】皿の上の判子を、1つずつずらして押す */
 export const SEAL_STEP = 0.06;
@@ -1067,8 +1068,7 @@ export class ShopView {
       // マウスを乗せると効果（営業中も、一時停止中も）
       this.hover?.add(sc, x0, y, 22, 21, policyTip(o.id, o.lv, run.owned));
     });
-    const left = tenLeft(run.owned, shop.feverCount);
-    if (left) {
+    for (const left of tenLeft(run.owned, { fever: shop.feverCount, keiki: shop.keikiCount })) {
       const ly = 45 + left.index * 25 + 5;
       sc.panel(x0 + 24, ly - 1.5, sc.W(left.text, 7.5) + 6, 11, 'rgba(34,22,30,0.9)', FAMILY_COLOR.combo, 1);
       sc.T(left.text, x0 + 27, ly, 7.5, FAMILY_COLOR.combo);

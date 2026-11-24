@@ -2,7 +2,7 @@ import { startingStock } from './startingStock';
 import { Crew } from './crew';
 import { BANQUET_MULT, BANQUET_PENALTY_MULT, BANQUET_WAIT_MULT, HIDEN_MULT, NORMAL_RULES, type DayRules } from './daily';
 import { CandidateInput, type Target } from './candidates';
-import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, LONG_KANA, YOI_DAY, PLENTY_AT, PREP_SECS, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, isPolicy, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
+import { BIG_NEED, ENCHO_COMBO, FEVER_EVERY, KEIKI_EVERY, HEAT_GAP, HEAT_MISS_KEEP, HEAT_STEP, IDLE_MIN, LATE_RATIO, LONG_KANA, YOI_DAY, PLENTY_AT, PREP_SECS, IPPATSU_MISS, SETS, setKey, QUICK_RATIO, REFILL_EAT, emptyBuildStats, isPolicy, pairKey, pairOf, type BuildMods, type BuildStats, type PolicyId } from './build';
 import { priceOf, type Factor, type Price } from './dishPrice';
 import { Rng } from './rng';
 import { entryDistance, TAVERN_SEATS, WALK_SPEED } from './tavernNavigation';
@@ -341,6 +341,7 @@ export class Shop {
         this.combo = 0;
         this.comboMistakes = 0;
         this.feverCount = 0;
+        this.keikiCount = 0;
         this.keikiUsed = {};
         this.streak = 0;
         this.events.push({ type: 'comboBreak' });
@@ -622,16 +623,18 @@ export class Shop {
     if (!b || !q) this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet });
     else {
       this.events.push(ev = { type: 'serve', seat, gain, combo: this.combo, hiden, banquet: !!g.banquet, tags, chain, poured, dish, clean, heat: heatNow, base: q.base, raw: q.raw, paid: q.paid, capped: q.capped, factors: q.factors });
-      // 大入り袋・景気づけ：コンボを切らさずに FEVER_EVERY 皿出したら（大入りは最中に届いたら延ばす）
-      if ((b.feverSecs > 0 || b.keikiGain > 0) && ++this.feverCount >= FEVER_EVERY) {
+      // 大入り袋：コンボを切らさずに FEVER_EVERY 皿出したら大入り（最中に届いたら延ばす）
+      if (b.feverSecs > 0 && ++this.feverCount >= FEVER_EVERY) {
         this.feverCount = 0;
-        if (b.feverSecs > 0) {
-          this.feverUntil = this.clock + b.feverSecs;
-          this.feverOn = true;
-          this.buildStats.fevers++;
-          this.events.push({ type: 'fever', on: true, secs: b.feverSecs });
-        }
-        if (b.keikiGain > 0) this.keikiBoost(b.keikiGain, tags);
+        this.feverUntil = this.clock + b.feverSecs;
+        this.feverOn = true;
+        this.buildStats.fevers++;
+        this.events.push({ type: 'fever', on: true, secs: b.feverSecs });
+      }
+      // 景気づけ：コンボを切らさずに KEIKI_EVERY 皿出したら、よく使った素材が増える（大入りとは別に数える）
+      if (b.keikiGain > 0 && ++this.keikiCount >= KEIKI_EVERY) {
+        this.keikiCount = 0;
+        this.keikiBoost(b.keikiGain, tags);
         this.keikiUsed = {};
       }
     }
@@ -690,11 +693,15 @@ export class Shop {
     else if (kinds >= 3) v.kinds3++;
     if (this.phaseIndex === 0) v.morning++;
     else if (this.phaseIndex === 2) v.night++;
-    if (++this.streak >= FEVER_EVERY) { this.streak = 0; v.tens++; }
+    this.streak++;
+    if (this.streak % KEIKI_EVERY === 0) v.fives++;
+    if (this.streak >= FEVER_EVERY) { this.streak = 0; v.tens++; }
   }
   private feverOn = false;
   /** 大入り袋：コンボを切らさずに出した皿の数（コンボが切れたら 0） */
   feverCount = 0;
+  /** 景気づけ：コンボを切らさずに出した皿の数（KEIKI_EVERY で素材が増える。コンボが切れたら 0） */
+  keikiCount = 0;
 
   /** ミスで素材をこぼす：打っている料理の素材から。打っていなければ一番多い素材から */
   private spill() {
@@ -887,6 +894,7 @@ export class Shop {
             this.combo = 0;
             this.comboMistakes = 0;
             this.feverCount = 0;
+            this.keikiCount = 0;
             this.keikiUsed = {};
             this.streak = 0;
           }

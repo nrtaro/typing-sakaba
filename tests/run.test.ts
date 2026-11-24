@@ -4,7 +4,7 @@ import { Shop, type Guest } from '../src/core/shop';
 import { Rng } from '../src/core/rng';
 import { DAY_LENGTH, DISHES, DIFFICULTIES } from '../src/core/shopConfig';
 import { NORMAL_RULES } from '../src/core/daily';
-import { type PolicyId, MAX_LEVEL, MAX_SLOTS, PAIRS, POLICY_SEAL, POLICIES, REFILL_EAT, SETS, setKey, descDiff, descOf, emptyMods, modsFor, pairKey, partnersOf, policyOf } from '../src/core/build';
+import { type PolicyId, KEIKI_EVERY, MAX_LEVEL, MAX_SLOTS, PAIRS, POLICY_SEAL, POLICIES, REFILL_EAT, SETS, setKey, descDiff, descOf, emptyMods, modsFor, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
   AIDS, GOAL_BASE, availablePolicies, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
   DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, GOAL_EASE_LOOP, GOAL_LATE_STEP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
@@ -1202,22 +1202,24 @@ describe('第3段：景気づけ', () => {
   const serve = (s: Shop, id: string, g: Guest = guest(id)) => { s.seats[0] = g; return type(s, KANA[id]); };
   const used = (s: Shop) => (s as unknown as { keikiUsed: Record<string, number> }).keikiUsed;
 
-  it('景気づけ：コンボを切らさずに10皿出すと、その10皿で一番多く使った素材2種類が +2→+3→+4', () => {
+  it('景気づけ：コンボを切らさずに5皿出すと、その5皿で一番多く使った素材2種類が +2→+3→+4（ユーザーの決定 2026-11-24）', () => {
+    expect(KEIKI_EVERY).toBe(5);
     const s = shopWith([{ id: 'keiki', lv: 3 }], []);
-    const evs = [
-      ...Array.from({ length: 6 }, () => 'grilledFish'), ...Array.from({ length: 3 }, () => 'vegSoup'), 'mushSaute',
-    ].flatMap((id) => serve(s, id));
+    const evs = ['grilledFish', 'grilledFish', 'grilledFish', 'vegSoup', 'mushSaute'].flatMap((id) => serve(s, id));
     const k = evs.filter((e) => e.type === 'keiki');
     expect(k).toHaveLength(1);
     expect(k[0].type === 'keiki' && k[0].items).toEqual([{ id: 'fish', n: 4 }, { id: 'veg', n: 4 }]);
-    expect(s.stock.fish).toBe(30 - 12 + 4);
-    expect(s.stock.veg).toBe(30 - 6 + 4);
+    expect(s.stock.fish).toBe(30 - 6 + 4);
+    expect(s.stock.veg).toBe(30 - 2 + 4);
     expect(s.stock.mush).toBe(30 - 2);
     const last = evs.filter((e) => e.type === 'serve').at(-1)!;
     expect(last.type === 'serve' && last.tags).toContain('keiki');
     expect(s.buildStats.keiki).toBe(8);
     expect(s.buildStats.fired.keiki).toBe(1);
     expect(modsFor([{ id: 'keiki', lv: 1 }]).keikiGain).toBe(2);
+    // 次の5皿で、もう一度
+    const more = Array.from({ length: 5 }, () => 'vegSoup').flatMap((id) => serve(s, id));
+    expect(more.filter((e) => e.type === 'keiki')).toHaveLength(1);
   });
 
   it('景気づけ：まかないで減らなかった分は数えず、大盛りの倍の分ともう一杯の酒は数える', () => {
@@ -1232,30 +1234,34 @@ describe('第3段：景気づけ', () => {
 
   it('景気づけ：コンボが切れたら、数えた皿も素材も数え直す', () => {
     const s = shopWith([{ id: 'keiki', lv: 3 }], []);
-    for (let i = 0; i < 9; i++) serve(s, 'grilledFish');
-    expect(s.feverCount).toBe(9);
+    for (let i = 0; i < 4; i++) serve(s, 'grilledFish');
+    expect(s.keikiCount).toBe(4);
     for (let i = 0; i <= s.comboMissAllowance; i++) s.key('q');
     expect(s.combo).toBe(0);
-    expect(s.feverCount).toBe(0);
+    expect(s.keikiCount).toBe(0);
     expect(used(s)).toEqual({});
-    const evs = Array.from({ length: 9 }, () => 'vegSoup').flatMap((id) => serve(s, id));
+    const evs = Array.from({ length: 4 }, () => 'vegSoup').flatMap((id) => serve(s, id));
     expect(evs.some((e) => e.type === 'keiki')).toBe(false);
-    const ten = serve(s, 'vegSoup').find((e) => e.type === 'keiki')!;
-    expect(ten.type === 'keiki' && ten.items).toEqual([{ id: 'veg', n: 4 }]);
+    const five = serve(s, 'vegSoup').find((e) => e.type === 'keiki')!;
+    expect(five.type === 'keiki' && five.items).toEqual([{ id: 'veg', n: 4 }]);
   });
 
   it('景気づけ：使った数が同じなら素材の並び順、1種類だけならその1種類', () => {
     const s = shopWith([{ id: 'keiki', lv: 2 }], []);
-    const evs = ['mushSaute', 'vegSoup', 'grilledFish', 'mushSaute', 'vegSoup', 'grilledFish', 'mushSaute', 'vegSoup', 'grilledFish', 'ale'].flatMap((id) => serve(s, id));
+    const evs = ['mushSaute', 'vegSoup', 'grilledFish', 'ale', 'ale'].flatMap((id) => serve(s, id));
     const k = evs.find((e) => e.type === 'keiki')!;
     expect(k.type === 'keiki' && k.items).toEqual([{ id: 'fish', n: 3 }, { id: 'veg', n: 3 }]);
   });
 
-  it('大入り袋だけを持つ店の大入りの数え方は変わらない', () => {
+  it('大入り袋は今どおり10皿ごと。景気づけと両方持てば、10皿で景気づけ2回・大入り1回', () => {
     const s = shopWith([{ id: 'ooiri', lv: 1 }], []);
     const evs = Array.from({ length: 10 }, () => 'grilledFish').flatMap((id) => serve(s, id));
-    expect(evs.some((e) => e.type === 'fever' && e.on)).toBe(true);
+    expect(evs.filter((e) => e.type === 'fever' && e.on)).toHaveLength(1);
     expect(evs.some((e) => e.type === 'keiki')).toBe(false);
+    const both = shopWith([{ id: 'ooiri', lv: 1 }, { id: 'keiki', lv: 1 }], []);
+    const evs2 = Array.from({ length: 10 }, () => 'grilledFish').flatMap((id) => serve(both, id));
+    expect(evs2.filter((e) => e.type === 'keiki')).toHaveLength(2);
+    expect(evs2.filter((e) => e.type === 'fever' && e.on)).toHaveLength(1);
   });
 });
 
@@ -1303,8 +1309,8 @@ describe('第3段：新しいかけ合わせ', () => {
     格式の店: { owned: ['tsuyoki', 'yoyaku'], seats: ['grilledFish'], kana: 'やきざかな' },
     夜通し: { owned: ['yoippari', 'encho'], seats: ['grilledFish'], kana: 'やきざかな', prep: (s) => { s.extra = 15; s.clock = DAY_LENGTH + 3; } },
     夜の早口: { owned: ['hayakuchi', 'yoippari'], seats: ['vegSoup'], kana: 'おんやさいもり', prep: at(125) },
-    大盤振る舞い: { owned: ['keiki', 'matome'], seats: ['grilledFish', 'driedFish'], kana: 'やきざかな', prep: (s) => { s.feverCount = 9; } },
-    蔵いっぱい: { owned: ['keiki', 'shikomi'], seats: ['grilledFish'], kana: 'やきざかな', prep: (s) => { s.feverCount = 9; } },
+    大盤振る舞い: { owned: ['keiki', 'matome'], seats: ['grilledFish', 'driedFish'], kana: 'やきざかな', prep: (s) => { s.keikiCount = 4; } },
+    蔵いっぱい: { owned: ['keiki', 'shikomi'], seats: ['grilledFish'], kana: 'やきざかな', prep: (s) => { s.keikiCount = 4; } },
   };
 
   it('新しいかけ合わせは、実際に同じ皿で発見できる', () => {
