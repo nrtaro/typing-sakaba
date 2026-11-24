@@ -15,7 +15,7 @@ import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
 import { setOf } from '../core/build';
 import { previewTier } from '../core/dishPrice';
-import { FAMILY_COLOR, HEAT_GAP, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
+import { FAMILY_COLOR, FEVER_EVERY, HEAT_GAP, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
 } from '../core/shopConfig';
@@ -31,6 +31,15 @@ const DOOR = { x: 452, y: 202 };
 
 interface Exit { look: number; x: number; y: number; start: number; distance: number; path: { x: number; y: number }[] }
 interface Fx { anim: string; x: number; y: number; h: number; start: number }
+/** 大入り袋・景気づけ：次の10皿までの残りを、持っている方針のうち上にある方の判子に出す（目標を目の前に見せる） */
+export function tenLeft(owned: Owned[], count: number): { index: number; text: string } | null {
+  const index = owned.findIndex((o) => o.id === 'ooiri' || o.id === 'keiki');
+  return index < 0 ? null : { index, text: `あと${FEVER_EVERY - count}` };
+}
+/** 帯の知らせ */
+interface Banner { text: string; t: number; col: Color }
+/** 【待てる知らせの数】これを超えたら古いものから捨てる */
+export const BANNER_QUEUE = 3;
 interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean; slot?: string; count?: number }
 interface FxBounds { x: number; y: number; w: number; h: number }
 interface Spark { bounds?: FxBounds; x: number; y: number; vx: number; vy: number; t: number; col: Color }
@@ -91,7 +100,15 @@ export class ShopView {
   skillPos: Record<SkillId, { x: number; y: number }> = { shinagire: { x: 40, y: 34 }, hiden: { x: 40, y: 34 } };
   gotTrip: { id: TripId; t: number; gains: Partial<Record<IngredientId, number>>; overflow: Partial<Record<IngredientId, number>>; lucky: boolean } | null = null;
   /** 出かけている／帰ってきた家族のひとこと */
-  banner: { text: string; t: number; col: Color } | null = null;
+  banner: Banner | null = null;
+  /** 繁盛記：出番を待っている帯の知らせ（同じ瞬間に来ても消えずに順に出る） */
+  bannerQueue: Banner[] = [];
+  /** 帯の知らせを出す。繁盛記では、出している知らせがあれば待たせる。urgent（時間帯の知らせ）はすぐ出す。通常営業は今どおり上書き */
+  private say(b: Banner, urgent = false) {
+    if (!this.run || urgent || !this.banner) { this.banner = b; return; }
+    this.bannerQueue.push(b);
+    if (this.bannerQueue.length > BANNER_QUEUE) this.bannerQueue.shift();
+  }
   /** 繁盛記の表示（通常営業・ひがわりでは null） */
   run: RunHud | null = null;
   /** マウスを乗せたときの説明の登録先 */
@@ -190,7 +207,7 @@ export class ShopView {
       }
       case 'fever':
         if (ev.on) {
-          this.banner = { text: `大入り！ ${ev.secs}秒のあいだ売上アップ`, t: 1.6, col: '#ffe27a' };
+          this.say({ text: `大入り！ ${ev.secs}秒のあいだ売上アップ`, t: 1.6, col: '#ffe27a' });
           if (this.run) this.run.fired.ooiri = this.time;
           for (let i = 0; i < Math.round(30 * this.fxScale); i++) {
             this.confetti.push({ x: Math.random() * 480, y: -10 - Math.random() * 40, vx: (Math.random() - 0.5) * 30, vy: 50 + Math.random() * 50, t: 0, life: 1.6 + Math.random() * 0.8, col: i % 2 ? '#ffd25c' : '#fff0a8', spin: Math.random() * 6 });
@@ -198,20 +215,20 @@ export class ShopView {
         }
         break;
       case 'keiki':
-        // 景気づけ：10皿目に増えた素材を一度だけ見せる（大入りの帯と重ならないよう、帯の下に出す）
-        this.pop('keiki', { x: LW / 2, y: 172, t: 0, text: `景気づけ！ ${ev.items.map((x) => `${INGREDIENT_NAME[x.id]}+${x.n}`).join(' ')}`, col: '#ffd25c', big: true });
+        // 景気づけ：10皿目に増えた素材を、帯の知らせで一度だけ見せる（大入りと同時なら、その次に出る）
+        this.say({ text: `景気づけ！ ${ev.items.map((x) => `${INGREDIENT_NAME[x.id]}+${x.n}`).join(' ')}`, t: 1.8, col: '#ffd25c' });
         break;
       case 'extend':
-        this.banner = { text: `延長営業！ 閉店まで+${ev.secs}秒`, t: 2.2, col: '#ffe27a' };
+        this.say({ text: `延長営業！ 閉店まで+${ev.secs}秒`, t: 2.2, col: '#ffe27a' });
         this.callout = { text: '延長！', t: 0, col: '#ffe27a', level: 8 };
         if (this.run) this.run.fired.encho = this.time;
         break;
       case 'fresh':
-        this.banner = { text: `とれたて！ ${ev.n}秒のあいだ売上アップ`, t: 1.8, col: FAMILY_COLOR.trip };
+        this.say({ text: `とれたて！ ${ev.n}秒のあいだ売上アップ`, t: 1.8, col: FAMILY_COLOR.trip });
         if (this.run) this.run.fired.nushi = this.time;
         break;
       case 'restock':
-        this.banner = { text: `仕込みが上がった！ 全部の素材+${ev.n}`, t: 1.8, col: FAMILY_COLOR.stock };
+        this.say({ text: `仕込みが上がった！ 全部の素材+${ev.n}`, t: 1.8, col: FAMILY_COLOR.stock });
         if (this.run) this.run.fired.shikomi = this.time;
         break;
       case 'lack': {
@@ -229,30 +246,30 @@ export class ShopView {
         break;
       }
       case 'tripStart':
-        this.banner = { text: `${FAMILY_NAME[ev.trip.who]}「${ev.trip.act}に行ってくる！」`, t: 1.6, col: C.w };
+        this.say({ text: `${FAMILY_NAME[ev.trip.who]}「${ev.trip.act}に行ってくる！」`, t: 1.6, col: C.w });
         break;
       case 'tripEnd':
         if (ev.delayed) {
-          this.banner = { text: `${FAMILY_NAME[ev.trip.who]}「あとで届くよ！」`, t: 1.6, col: C.gold3 };
+          this.say({ text: `${FAMILY_NAME[ev.trip.who]}「あとで届くよ！」`, t: 1.6, col: C.gold3 });
           break;
         }
-        this.banner = ev.lucky
+        this.say(ev.lucky
           ? { text: `${FAMILY_NAME[ev.trip.who]}「大当たり！たくさん取れたよ」`, t: 1.8, col: C.gold3 }
           : Object.keys(ev.overflow).length
             ? { text: `${FAMILY_NAME[ev.trip.who]}「倉庫に入りきらない…」`, t: 1.8, col: '#ff9a8a' }
-            : { text: `${FAMILY_NAME[ev.trip.who]}「ただいま！」`, t: 1.6, col: C.gold3 };
+            : { text: `${FAMILY_NAME[ev.trip.who]}「ただいま！」`, t: 1.6, col: C.gold3 });
         this.gotTrip = { id: ev.trip.id, t: 1.6, gains: ev.gains, overflow: ev.overflow, lucky: ev.lucky };
         break;
       case 'phase': {
         const lucky = shop.luckyTrip(ev.index);
         const name = lucky ? TRIPS.find((tr) => tr.id === lucky)!.text : '';
-        this.banner = { text: `― ${PHASES[ev.index].name}の部 ―${lucky ? `　当たりは「${name}」` : ''}`, t: lucky ? 2.2 : 1.6, col: C.gold3 };
+        this.say({ text: `― ${PHASES[ev.index].name}の部 ―${lucky ? `　当たりは「${name}」` : ''}`, t: lucky ? 2.2 : 1.6, col: C.gold3 }, true);
         break;
       }
       case 'delivery':
-        this.banner = Object.keys(ev.overflow).length
+        this.say(Object.keys(ev.overflow).length
           ? { text: `${TRIPS.find((tr) => tr.id === ev.trip.id)!.act}の素材が届いた（倉庫に入りきらない…）`, t: 1.8, col: '#ff9a8a' }
-          : { text: `${TRIPS.find((tr) => tr.id === ev.trip.id)!.act}の素材が届いた！`, t: 1.6, col: C.gold3 };
+          : { text: `${TRIPS.find((tr) => tr.id === ev.trip.id)!.act}の素材が届いた！`, t: 1.6, col: C.gold3 });
         this.gotTrip = { id: ev.trip.id, t: 1.6, gains: ev.gains, overflow: ev.overflow, lucky: false };
         break;
       case 'spoil':
@@ -265,11 +282,11 @@ export class ShopView {
         break;
       }
       case 'hiden':
-        this.banner = { text: '秘伝の味、仕込んだ！ 次の1皿が売上2倍', t: 1.6, col: '#ffe27a' };
+        this.say({ text: '秘伝の味、仕込んだ！ 次の1皿が売上2倍', t: 1.6, col: '#ffe27a' });
         this.sparkAt(this.skillPos.hiden, '#ffe27a', 14, 70);
         break;
       case 'banquet':
-        this.banner = { text: `予約の宴会のお客が来た！「${ev.dish.text}」`, t: 2.2, col: '#ffe27a' };
+        this.say({ text: `予約の宴会のお客が来た！「${ev.dish.text}」`, t: 2.2, col: '#ffe27a' });
         break;
       case 'spill':
         this.pop('spill', { x: LW / 2, y: 192, t: 0, text: `${INGREDIENT_NAME[ev.ing]}をこぼした！ −1`, col: '#ff8a7a', big: true });
@@ -337,7 +354,7 @@ export class ShopView {
     this.sparks = this.sparks.filter((p) => p.t < 0.7);
     if (this.lackTrip && (this.lackTrip.t -= dt) <= 0) this.lackTrip = null;
     if (this.gotTrip && (this.gotTrip.t -= dt) <= 0) this.gotTrip = null;
-    if (this.banner && (this.banner.t -= dt) <= 0) this.banner = null;
+    if (this.banner && (this.banner.t -= dt) <= 0) this.banner = this.bannerQueue.shift() ?? null;
     // 席が空いたら、その客が入り口へ歩いて出ていく
     if (shop) {
       shop.seats.forEach((g, i) => {
@@ -977,7 +994,7 @@ export class ShopView {
     // 連打の熱：今の倍率（HEAT_GAP 秒あくと冷める）。一発勝負：今の言葉にミスがあるか
     if (b && b.heatCap > 1 && shop.heat > 0 && shop.clock - shop.lastTyped <= HEAT_GAP) note(`熱 ×${(1 + shop.heat).toFixed(1)}`, '#ff9a5a');
     if (b && b.ippatsuMult > 1 && shop.input.typed.length > 0) note(shop.wordMisses ? '一発 ×0.8' : `一発 ×${b.ippatsuMult}`, shop.wordMisses ? '#ff7a6a' : FAMILY_COLOR.combo);
-    if (shop.extra > 0 && shop.clock > 180) note('延長営業中', '#ffe27a');
+    if (shop.extra > 0 && shop.clock >= DAY_LENGTH) note('延長営業中', '#ffe27a');
     // 方針の判子：効いた瞬間に弾んで光る
     run.owned.forEach((o, i) => {
       const pol = policyOf(o.id);
@@ -994,6 +1011,12 @@ export class ShopView {
       // マウスを乗せると効果（営業中も、一時停止中も）
       this.hover?.add(sc, x0, y, 22, 21, policyTip(o.id, o.lv, run.owned));
     });
+    const left = tenLeft(run.owned, shop.feverCount);
+    if (left) {
+      const ly = 45 + left.index * 25 + 5;
+      sc.panel(x0 + 24, ly - 1.5, sc.W(left.text, 7.5) + 6, 11, 'rgba(34,22,30,0.9)', FAMILY_COLOR.combo, 1);
+      sc.T(left.text, x0 + 27, ly, 7.5, FAMILY_COLOR.combo);
+    }
   }
 
   /** 繁盛記：まとめ出しで皿が飛ぶ線、連鎖の掛け声、かけ合わせの知らせ、大入りの縁の光 */
