@@ -6,7 +6,7 @@ import { C, TRIP_COLOR, type Color } from './palette';
 import { Screen, LW } from './screen';
 import { FAM, guestSprite, ICON, PORTRAIT, WALKERS } from './sprites';
 import { drawChair, drawLights, drawRoomLive, drawTable, pen, roomLayer, shadow } from './room';
-import { SKILL_KANA, Shop, type Guest, type ShopEvent, type SkillId } from '../core/shop';
+import { SKILL_KANA, Shop, type Guest, type ServeEvent, type ShopEvent, type SkillId } from '../core/shop';
 import type { Art } from './amber/art';
 import { animLength, walkFrame } from './amber/manifest';
 import { entryPose, WALK_SPEED } from '../core/tavernNavigation';
@@ -14,7 +14,7 @@ import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/l
 import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
 import { setOf } from '../core/build';
-import { previewTier } from '../core/dishPrice';
+import { MULT_CAP, previewTier } from '../core/dishPrice';
 import { FAMILY_COLOR, FEVER_EVERY, HEAT_GAP, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
@@ -35,6 +35,28 @@ interface Fx { anim: string; x: number; y: number; h: number; start: number }
 export function tenLeft(owned: Owned[], count: number): { index: number; text: string } | null {
   const index = owned.findIndex((o) => o.id === 'ooiri' || o.id === 'keiki');
   return index < 0 ? null : { index, text: `あと${FEVER_EVERY - count}` };
+}
+/** 【判子1個を押す秒数】皿の上の判子を、1つずつずらして押す */
+export const SEAL_STEP = 0.06;
+/** 【式を出す倍率】これ以上の皿だけ、掛け算の式を帯に出す */
+export const FORMULA_AT = 10;
+/** 全部の皿に効く方針（判子の並びでは後ろに回す） */
+const EVERY_DISH: PolicyId[] = ['yoyaku', 'tsuyoki'];
+/** 判子にするタグを、その皿で効いた倍率の大きい順に並べる（倍率のないタグは1.0、全部の皿に効く方針はいつも後ろ） */
+export function sealOrder(ev: ServeEvent): PolicyId[] {
+  const mult = (id: PolicyId) => ev.factors?.find((f) => f.id === id)?.mult ?? 1;
+  const tags = ev.tags ?? [];
+  return tags.map((id, i) => ({ id, i, all: EVERY_DISH.includes(id) ? 1 : 0, m: mult(id) }))
+    .sort((a, b) => a.all - b.all || b.m - a.m || a.i - b.i)
+    .map((x) => x.id);
+}
+const FACTOR_LABEL: Record<string, string> = { combo: 'コンボ', hiden: '秘伝', banquet: '宴会', big: '大盛' };
+const num = (x: number) => String(Math.round(x * 100) / 100);
+/** 掛け算の式（例：天ぷら盛り 230円 → ヌシ×2.2 → 大漁×1.8 → 一発×2 → コンボ×3 = 5,465円） */
+export function formulaText(ev: ServeEvent): string {
+  const parts = (ev.factors ?? []).map((f) => `${FACTOR_LABEL[f.id] ?? POLICY_SEAL[f.id as PolicyId]}×${num(f.mult)}`);
+  const head = `${ev.dish?.text ?? ''} ${Math.round(ev.base ?? 0).toLocaleString()}円`;
+  return [head, ...parts].join(' → ') + ` = ${ev.capped ? `上限×${MULT_CAP} ` : ''}${ev.gain.toLocaleString()}円`;
 }
 /** 帯の知らせ */
 interface Banner { text: string; t: number; col: Color }
@@ -118,6 +140,8 @@ export class ShopView {
   /** まとめ出しで皿が飛ぶ線・かけ合わせの知らせ・連鎖の掛け声 */
   private links: { from: number; to: number; t: number; delay: number }[] = [];
   private pairNote: { name: string; t: number; set?: boolean } | null = null;
+  /** ×10以上の皿の掛け算の式（新しい1件だけ） */
+  formula: { text: string; t: number } | null = null;
   private chainNote: { count: number; total: number; t: number } | null = null;
   /** 目標を越えた瞬間に鳴らす音などを、Game が一度だけ拾う */
   goalHit = false;
@@ -180,9 +204,14 @@ export class ShopView {
         const pairs = ev.pairs ?? 0;
         const tint = pairs > 0 ? '#ffe27a' : tags.length ? FAMILY_COLOR[policyOf(tags[0]).family] : C.gold;
         this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tint, big: true });
-        // 判子は席の幅（64px）に収まるよう最大3つ。上限で止まったら最後を「上限」にする。ついでの皿は金額だけ
-        const seals = tags.slice(0, ev.capped ? 2 : 3).map((t) => POLICY_SEAL[t]).join('') + (ev.capped ? '上限' : '');
-        if ((ev.chain ?? 0) === 0 && seals) this.pop(`tags${ev.seat}`, { x: seat.x, y: seat.ty - 6, t: -delay, text: seals, col: (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint });
+        // 判子は席の幅（64px）に収まるよう最大3つを、倍率の大きい順に1つずつ押す。上限で止まったら最後を「上限」にする。ついでの皿は金額だけ
+        if ((ev.chain ?? 0) === 0) {
+          const seals = sealOrder(ev).slice(0, ev.capped ? 2 : 3).map((t) => POLICY_SEAL[t]);
+          if (ev.capped) seals.push('上限');
+          const scol = (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint;
+          seals.forEach((text, k) => this.pop(`tags${ev.seat}-${k}`, { x: seat.x + (k - (seals.length - 1) / 2) * 19, y: seat.ty - 6, t: -delay - k * SEAL_STEP, text, col: scol }));
+          if ((ev.paid ?? 0) >= FORMULA_AT) this.formula = { text: formulaText(ev), t: 0 };
+        }
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, tint, Math.round((light ? 5 : 10) * this.fxScale), 80);
         for (const t of tags) {
           this.run.fired[t] = this.time + delay;
@@ -337,6 +366,7 @@ export class ShopView {
     for (const l of this.links) l.t += dt;
     this.links = this.links.filter((l) => l.t - l.delay < 0.45);
     if (this.pairNote && (this.pairNote.t += dt) > 2.2) this.pairNote = null;
+    if (this.formula && (this.formula.t += dt) > 1.8) this.formula = null;
     if (this.chainNote && (this.chainNote.t += dt) > 1.0) this.chainNote = null;
     if (this.sparks.length > 420) this.sparks.splice(0, this.sparks.length - 420);
     // 繁盛記：目標を越えた瞬間
@@ -995,6 +1025,16 @@ export class ShopView {
     if (b && b.heatCap > 1 && shop.heat > 0 && shop.clock - shop.lastTyped <= HEAT_GAP) note(`熱 ×${(1 + shop.heat).toFixed(1)}`, '#ff9a5a');
     if (b && b.ippatsuMult > 1 && shop.input.typed.length > 0) note(shop.wordMisses ? '一発 ×0.8' : `一発 ×${b.ippatsuMult}`, shop.wordMisses ? '#ff7a6a' : FAMILY_COLOR.combo);
     if (shop.extra > 0 && shop.clock >= DAY_LENGTH) note('延長営業中', '#ffe27a');
+    if (this.formula) {
+      // 式の帯：目標の帯の下・知らせの帯の上に1行（左の方針の判子の列は避ける）
+      const f = this.formula;
+      const a = Math.min(1, f.t * 8, (1.8 - f.t) * 3);
+      const size = sc.fitSize(f.text, 8, 422, 6.5);
+      const tw = sc.W(f.text, size) + 12;
+      const x = Math.max(40, 255 - tw / 2);
+      sc.panel(x, 44, tw, 12, 'rgba(42,27,38,0.92)', '#ffe27a', a);
+      sc.T(f.text, x + 6, 46, size, '#ffe9b4', 'left', a);
+    }
     // 方針の判子：効いた瞬間に弾んで光る
     run.owned.forEach((o, i) => {
       const pol = policyOf(o.id);
