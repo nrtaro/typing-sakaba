@@ -262,7 +262,7 @@ export class ShopView {
         break;
       case 'keiki':
         // 景気づけ：10皿目に増えた素材を、帯の知らせで一度だけ見せる（大入りと同時なら、その次に出る）
-        this.say({ text: `景気づけ！ ${ev.items.map((x) => `${INGREDIENT_NAME[x.id]}+${x.n}`).join(' ')}`, t: 1.8, col: '#ffd25c' });
+        this.say({ text: `景気づけ！ ${ev.items.map((x) => `${INGREDIENT_NAME[x.id]}+${x.n}`).join(' ')}${shop.build && shop.build.keikiMult > 1 ? `（次の${KEIKI_EVERY}皿 ×${shop.build.keikiMult}）` : ''}`, t: 1.8, col: '#ffd25c' });
         break;
       case 'extend':
         this.say({ text: `延長営業！ 閉店まで+${ev.secs}秒`, t: 2.2, col: '#ffe27a' });

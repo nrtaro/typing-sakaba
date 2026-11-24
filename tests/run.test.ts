@@ -1253,6 +1253,40 @@ describe('第3段：景気づけ', () => {
     expect(k.type === 'keiki' && k.items).toEqual([{ id: 'fish', n: 3 }, { id: 'veg', n: 3 }]);
   });
 
+  it('景気づけ：増えた素材を使う皿は、次の5皿のあいだ ×1.3→1.5→1.8。コンボが切れたら終わる', () => {
+    const s = shopWith([{ id: 'keiki', lv: 3 }], []);
+    ['grilledFish', 'grilledFish', 'grilledFish', 'vegSoup', 'mushSaute'].forEach((id) => serve(s, id));
+    const fish = serve(s, 'grilledFish').find((e) => e.type === 'serve')!;
+    if (fish.type !== 'serve') throw new Error('serve');
+    expect(fish.factors!.find((f) => f.id === 'keiki')?.mult).toBe(1.8);
+    expect(fish.tags).toContain('keiki');
+    const mush = serve(s, 'mushSaute').find((e) => e.type === 'serve')!;
+    if (mush.type !== 'serve') throw new Error('serve');
+    expect(mush.factors!.find((f) => f.id === 'keiki')).toBeUndefined();
+    for (let i = 0; i <= s.comboMissAllowance; i++) s.key('q');
+    const after = serve(s, 'grilledFish').find((e) => e.type === 'serve')!;
+    if (after.type !== 'serve') throw new Error('serve');
+    expect(after.factors!.find((f) => f.id === 'keiki')).toBeUndefined();
+    expect(modsFor([{ id: 'keiki', lv: 1 }]).keikiMult).toBe(1.3);
+  });
+
+  it('景気づけ：次の5皿目でまた増えたら、倍率の付く素材もその素材に入れ替わる', () => {
+    const s = shopWith([{ id: 'keiki', lv: 1 }], []);
+    ['grilledFish', 'grilledFish', 'grilledFish', 'grilledFish', 'grilledFish'].forEach((id) => serve(s, id));
+    const first = serve(s, 'grilledFish').find((e) => e.type === 'serve')!;
+    if (first.type !== 'serve') throw new Error('serve');
+    expect(first.factors!.find((f) => f.id === 'keiki')?.mult).toBe(1.3);
+    const evs = ['mushSaute', 'mushSaute', 'vegSoup', 'vegSoup'].flatMap((id) => serve(s, id));
+    const k = evs.filter((e) => e.type === 'keiki').at(-1)!;
+    expect(k.type === 'keiki' && k.items.map((x) => x.id)).toEqual(['veg', 'mush']);
+    const fish = serve(s, 'grilledFish').find((e) => e.type === 'serve')!;
+    if (fish.type !== 'serve') throw new Error('serve');
+    expect(fish.factors!.find((f) => f.id === 'keiki')).toBeUndefined();
+    const veg = serve(s, 'vegSoup').find((e) => e.type === 'serve')!;
+    if (veg.type !== 'serve') throw new Error('serve');
+    expect(veg.factors!.find((f) => f.id === 'keiki')?.mult).toBe(1.3);
+  });
+
   it('大入り袋は今どおり10皿ごと。景気づけと両方持てば、10皿で景気づけ2回・大入り1回', () => {
     const s = shopWith([{ id: 'ooiri', lv: 1 }], []);
     const evs = Array.from({ length: 10 }, () => 'grilledFish').flatMap((id) => serve(s, id));

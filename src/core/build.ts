@@ -127,6 +127,8 @@ const BOLD_WAIT = L(0.15, 0.2, 0.25);
 const NIGHT_MULT = L(1.4, 1.6, 1.8);
 /** 【景気づけの数】10皿ごとに、よく使った素材2種類それぞれに足す数 */
 const KEIKI_GAIN = L(2, 3, 4);
+/** 【景気の皿の倍率】景気づけで増えた素材を使う皿（次の KEIKI_EVERY 皿のあいだ。ユーザーの決定 2026-11-24、値は仮） */
+const KEIKI_MULT = L(1.3, 1.5, 1.8);
 /** 割合を「7割」の形で */
 const wari = (v: number) => `${Math.round(v * 10)}割`;
 const pct = (v: number) => `${Math.round(v * 100)}%`;
@@ -282,8 +284,8 @@ export const POLICIES: Policy[] = [
   {
     id: 'keiki', name: '景気づけ', kana: 'けいきづけ', family: 'combo', starter: false, unlock: '大入り袋で大入りを出す',
     quip: '「景気のいい店には、品物が集まる」',
-    text: `コンボを切らさずに${KEIKI_EVERY}皿出すごとに、そのあいだに一番多く使った素材2種類が +{0}ずつ増える`,
-    vals: v1(KEIKI_GAIN, s),
+    text: `コンボを切らさずに${KEIKI_EVERY}皿ごとに、よく使った素材2種類が +{0}。次の${KEIKI_EVERY}皿は、その素材を使う皿が ×{1}`,
+    vals: v2(KEIKI_GAIN, KEIKI_MULT, s, s),
   },
 ];
 
@@ -493,8 +495,9 @@ export interface BuildMods {
   tema3Mult: number;
   boldMult: number;
   nightMult: number;
-  /** 景気づけ：10皿ごとに足す素材の数（0 は持っていない） */
+  /** 景気づけ：足す素材の数（0 は持っていない）／増えた素材を使う皿の倍率 */
   keikiGain: number;
+  keikiMult: number;
 }
 
 export function emptyMods(): BuildMods {
@@ -504,7 +507,7 @@ export function emptyMods(): BuildMods {
     feverSecs: 0, feverMult: 1, waitMult: 1, noAngryPenalty: false, keepCombo: false, startStock: 0, phaseStock: 0,
     comboPlus: 0, tipMult: 1, walkMult: 1, dishShift: 0, impatient: 0, angryMult: 1, levels: {},
     ippatsuMult: 1, heatCap: 1, morningTrip: 1, laterTrip: 1, extendSecs: 0,
-    longMult: 1, tema2Mult: 1, tema3Mult: 1, boldMult: 1, nightMult: 1, keikiGain: 0,
+    longMult: 1, tema2Mult: 1, tema3Mult: 1, boldMult: 1, nightMult: 1, keikiGain: 0, keikiMult: 1,
   };
 }
 
@@ -539,7 +542,7 @@ export function modsFor(owned: Owned[], base: Partial<BuildMods> = {}): BuildMod
       case 'tema': m.tema2Mult = TEMA2_MULT[i]; m.tema3Mult = TEMA3_MULT[i]; break;
       case 'tsuyoki': m.boldMult = BOLD_MULT[i]; m.waitMult *= 1 - BOLD_WAIT[i]; break;
       case 'yoippari': m.nightMult = NIGHT_MULT[i]; break;
-      case 'keiki': m.keikiGain = KEIKI_GAIN[i]; break;
+      case 'keiki': m.keikiGain = KEIKI_GAIN[i]; m.keikiMult = KEIKI_MULT[i]; break;
     }
   }
   return m;

@@ -342,6 +342,7 @@ export class Shop {
         this.comboMistakes = 0;
         this.feverCount = 0;
         this.keikiCount = 0;
+        this.keikiLeft = 0;
         this.keikiUsed = {};
         this.streak = 0;
         this.events.push({ type: 'comboBreak' });
@@ -529,6 +530,8 @@ export class Shop {
     // こまめな仕込み：時間帯のはじめの仕込みたて
     if (b.prepMult > 1 && this.clock - this.phaseStart < PREP_SECS) { tags.push('shikomi'); factors.push({ id: 'shikomi', mult: b.prepMult }); }
     if (this.fever && b.feverMult > 1) { tags.push('ooiri'); factors.push({ id: 'ooiri', mult: b.feverMult }); }
+    // 景気づけ：増えた素材を使う皿（次の KEIKI_EVERY 皿のあいだ）
+    if (b.keikiMult > 1 && this.keikiLeft > 0 && this.keikiIds.some((id) => g.dish.need[id])) { tags.push('keiki'); factors.push({ id: 'keiki', mult: b.keikiMult }); }
     // 手間ひま：料理そのものの素材の種類（大盛りで個数が増えても種類は同じ）
     const kinds = Object.keys(g.dish.need).length;
     if (b.tema3Mult > 1 && kinds >= 3) { tags.push('tema'); factors.push({ id: 'tema', mult: b.tema3Mult }); }
@@ -631,6 +634,7 @@ export class Shop {
         this.buildStats.fevers++;
         this.events.push({ type: 'fever', on: true, secs: b.feverSecs });
       }
+      if (this.keikiLeft > 0) this.keikiLeft--;
       // 景気づけ：コンボを切らさずに KEIKI_EVERY 皿出したら、よく使った素材が増える（大入りとは別に数える）
       if (b.keikiGain > 0 && ++this.keikiCount >= KEIKI_EVERY) {
         this.keikiCount = 0;
@@ -665,6 +669,9 @@ export class Shop {
   }
   /** 景気づけ：この10皿で実際に倉庫から減らした素材の数 */
   private keikiUsed: Partial<Record<IngredientId, number>> = {};
+  /** 景気づけで増えた素材と、その倍率が付く残りの皿の数（コンボが切れたら 0） */
+  keikiIds: IngredientId[] = [];
+  keikiLeft = 0;
   private countUse(id: IngredientId, n: number) {
     if (this.build && this.build.keikiGain > 0) this.keikiUsed[id] = (this.keikiUsed[id] ?? 0) + n;
   }
@@ -675,7 +682,10 @@ export class Shop {
       .slice(0, 2);
     if (!top.length) return;
     for (const id of top) this.addStock(id, gain);
-    tags.push('keiki');
+    // 増えた素材を使う皿は、次の KEIKI_EVERY 皿のあいだ倍率が付く
+    this.keikiIds = top;
+    this.keikiLeft = KEIKI_EVERY;
+    if (!tags.includes('keiki')) tags.push('keiki');
     const st = this.buildStats;
     st.fired.keiki = (st.fired.keiki ?? 0) + 1;
     st.keiki += gain * top.length;
@@ -895,6 +905,7 @@ export class Shop {
             this.comboMistakes = 0;
             this.feverCount = 0;
             this.keikiCount = 0;
+            this.keikiLeft = 0;
             this.keikiUsed = {};
             this.streak = 0;
           }
