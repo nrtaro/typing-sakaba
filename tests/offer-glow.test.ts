@@ -102,3 +102,17 @@ describe('昨日の注文からの見込み', () => {
     expect(readMeta(raw).active?.lastSeen).toBeNull();
   });
 });
+
+describe('営業条件の相性', () => {
+  it('新しい方針5つは、どれかの営業条件の相性に入っている。相性の中は方針の ID だけ', async () => {
+    const { ROADS } = await import('../src/core/run');
+    const { isPolicy } = await import('../src/core/build');
+    for (const id of ['tsuyoki', 'keiki', 'tema', 'hayakuchi', 'yoippari'] as const) expect(ROADS.some((r) => r.good.includes(id)), id).toBe(true);
+    for (const r of ROADS) for (const id of r.good) expect(isPolicy(id), `${r.name}:${id}`).toBe(true);
+    expect(ROADS.find((r) => r.id === 'manin')!.good).toContain('tsuyoki');
+    expect(ROADS.find((r) => r.id === 'ichi')!.good).toContain('keiki');
+    expect(ROADS.find((r) => r.id === 'hashigo')!.good).toContain('tema');
+    expect(ROADS.find((r) => r.id === 'sekkachi')!.good).toContain('hayakuchi');
+    expect(ROADS.find((r) => r.id === 'enkai')!.good).toContain('yoippari');
+  });
+});

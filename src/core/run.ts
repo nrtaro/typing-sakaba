@@ -108,17 +108,17 @@ export const ROADS: Road[] = [
   // 1日目だけに使う、何も起きない日（明日の営業の候補には出さない）
   { id: 'joren', name: '常連の日', kana: 'じょうれん', lines: ['いつもの顔ぶれ。変わったことは起きない', '目標はそのまま'], goalMult: 1, mods: {}, rules: () => ({}), gift: null, good: [] },
   {
-    id: 'enkai', name: '宴会の日', kana: 'えんかい', lines: ['予約の宴会が3組来る。宴会の注文だけ売上2倍', '怒らせると減点も3倍。目標+15%'], goalMult: 1.15, mods: {}, gift: null, good: ['oomori', 'shikomi', 'tairyo', 'aiso'],
+    id: 'enkai', name: '宴会の日', kana: 'えんかい', lines: ['予約の宴会が3組来る。宴会の注文だけ売上2倍', '怒らせると減点も3倍。目標+15%'], goalMult: 1.15, mods: {}, gift: null, good: ['oomori', 'shikomi', 'tairyo', 'aiso', 'yoippari'],
     rules: (seed, day) => {
       const r = subRng(seed, 77, day);
       const pool = [...BANQUET_DISH];
       return { banquets: BANQUET_AT.map((at) => ({ at, dish: pool.splice(Math.floor(r.next() * pool.length), 1)[0] })) };
     },
   },
-  { id: 'manin', name: '満員御礼', kana: 'まんいん', lines: ['お客が3割多く来る。目標+25%', 'ごほうび：明日の朝えらぶ方針は、Lvが1つおまけ'], goalMult: 1.25, mods: { everyMult: 1 / 1.3 }, rules: () => ({}), gift: 'boost', good: ['matome', 'yobikomi', 'sekkachi'] },
-  { id: 'ichi', name: '市の立つ日', kana: 'いち', lines: ['調達で持ち帰る素材が1.5倍', '目標+10%'], goalMult: 1.1, mods: { tripMult: 1.5 }, rules: () => ({}), gift: null, good: ['nushi', 'tairyo', 'oomori', 'mouippai'] },
-  { id: 'sekkachi', name: 'せっかち客の日', kana: 'せっかち', lines: ['お客の待ち時間が3/4。チップは3倍', '目標+10%。ごほうび：明日は引き直し+2回'], goalMult: 1.1, mods: { waitMult: 0.75, tipMult: 3 }, rules: () => ({}), gift: 'reroll', good: ['sekkachi', 'omotenashi', 'aiso'] },
-  { id: 'hashigo', name: 'はしご酒の日', kana: 'はしご', lines: ['もう1品たのむお客が3割ふえる', '2品目は待たせても怒らない。目標+15%'], goalMult: 1.15, mods: { refillChance: 0.3 }, rules: () => ({}), gift: null, good: ['betsubara', 'mouippai', 'matome'] },
+  { id: 'manin', name: '満員御礼', kana: 'まんいん', lines: ['お客が3割多く来る。目標+25%', 'ごほうび：明日の朝えらぶ方針は、Lvが1つおまけ'], goalMult: 1.25, mods: { everyMult: 1 / 1.3 }, rules: () => ({}), gift: 'boost', good: ['matome', 'yobikomi', 'sekkachi', 'tsuyoki'] },
+  { id: 'ichi', name: '市の立つ日', kana: 'いち', lines: ['調達で持ち帰る素材が1.5倍', '目標+10%'], goalMult: 1.1, mods: { tripMult: 1.5 }, rules: () => ({}), gift: null, good: ['nushi', 'tairyo', 'oomori', 'mouippai', 'keiki'] },
+  { id: 'sekkachi', name: 'せっかち客の日', kana: 'せっかち', lines: ['お客の待ち時間が3/4。チップは3倍', '目標+10%。ごほうび：明日は引き直し+2回'], goalMult: 1.1, mods: { waitMult: 0.75, tipMult: 3 }, rules: () => ({}), gift: 'reroll', good: ['sekkachi', 'omotenashi', 'aiso', 'hayakuchi'] },
+  { id: 'hashigo', name: 'はしご酒の日', kana: 'はしご', lines: ['もう1品たのむお客が3割ふえる', '2品目は待たせても怒らない。目標+15%'], goalMult: 1.15, mods: { refillChance: 0.3 }, rules: () => ({}), gift: null, good: ['betsubara', 'mouippai', 'matome', 'tema'] },
   { id: 'nonbiri', name: 'のんびりの日', kana: 'のんびり', lines: ['お客が2割少なく、3割長く待ってくれる', '目標-10%。ひと息つける日'], goalMult: 0.9, mods: { everyMult: 1.25, waitMult: 1.3 }, rules: () => ({}), gift: null, good: ['yoyaku', 'omotenashi', 'aiso'] },
   { id: 'oogui', name: '大食いの日', kana: 'おおぐい', lines: ['大盛り（素材2倍・売上2倍）のお客が3割ふえる', '素材の減りが早い。目標+15%'], goalMult: 1.15, mods: { bigChance: 0.3 }, rules: () => ({}), gift: null, good: ['oomori', 'tairyo', 'makanai', 'shikomi'] },
 ];
