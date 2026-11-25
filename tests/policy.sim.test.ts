@@ -1,7 +1,8 @@
 // 方針の見直しの測定：変える前と後を同じ種・同じ条件で比べる（npm run sim:policy、POLICY_SIM_LABEL で出力の名前を変える）
 import { describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { emptyMeta, type RunMeta } from '../src/core/run';
 import type { PolicyId } from '../src/core/build';
 import { allMeta, botRun, BUILDS, RANDOM, type BotDay, type Strategy } from './runBot';
@@ -24,6 +25,8 @@ export interface SimRow {
   boostShare: Partial<Record<PolicyId, number>>;
   /** 実績の届きやすさ（ふつうに遊んだ挑戦のうち）：1皿5,000円以上／目標の2倍で終えた日がある／4日の合計10万円以上 */
   serve5k: number; double: number; total100k: number;
+  /** 上位の実績：1皿10,000円以上／3・4日目を目標の2倍で終えた日がある／4日の合計30万円以上 */
+  serve10k: number; doubleLate: number; total300k: number;
 }
 
 const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
@@ -59,6 +62,9 @@ function row(strat: Strategy, [kps, miss, think]: readonly [number, number, numb
     serve5k: r2(real.filter((r) => r.days.some((d) => d.bestServe >= 5000)).length / real.length),
     double: r2(real.filter((r) => r.days.some((d) => d.sales >= d.goal * 2)).length / real.length),
     total100k: r2(real.filter((r) => r.days.reduce((n, d) => n + d.sales, 0) >= 100000).length / real.length),
+    serve10k: r2(real.filter((r) => r.days.some((d) => d.bestServe >= 10000)).length / real.length),
+    doubleLate: r2(real.filter((r) => r.days.slice(2).some((d) => d.sales >= d.goal * 2)).length / real.length),
+    total300k: r2(real.filter((r) => r.days.reduce((n, d) => n + d.sales, 0) >= 300000).length / real.length),
     boostShare: Object.fromEntries(
       [...new Set(days.flatMap((d) => Object.keys(d.boosted)))].map((id) => [id, r2(days.reduce((n, d) => n + (d.boosted[id as PolicyId] ?? 0), 0) / Math.max(1, served))]),
     ),
@@ -83,15 +89,17 @@ export function runSim(label: string, aims: SimRow['aim'][]) {
     for (const loop of [1, 3, 5, 6]) for (const speed of [SLOW, MID, FAST]) for (const s of strats) add(row(s, speed, loop, '解放後', allMeta, aim));
     for (const loop of [10, 15, 20]) for (const speed of HIGH) for (const s of strats) add(row(s, speed, loop, '解放後', allMeta, aim));
   }
-  const output = `docs/balance/2026-11-23-policy-multiply-${label}.json`;
+  // 名前を付けたときだけ docs/balance に残す（名前なしで回しても、比べる元のデータを上書きしない）
+  const output = label ? `docs/balance/2026-11-23-policy-multiply-${label}.json` : join(tmpdir(), `policy-sim-${Date.now()}.json`);
   mkdirSync(dirname(output), { recursive: true });
   writeFileSync(output, JSON.stringify({ seeds: SIM_SEEDS, rows }, null, 2));
+  console.log(`出力：${output}`);
   return rows;
 }
 
 describe('方針の見直しの測定', () => {
   it('変える前と後の表', () => {
-    const label = process.env.POLICY_SIM_LABEL ?? 'before';
+    const label = process.env.POLICY_SIM_LABEL ?? '';
     const aims = (process.env.POLICY_SIM_AIMS ?? 'urgent').split(',') as SimRow['aim'][];
     expect(runSim(label, aims).length).toBeGreaterThan(0);
   }, 3600000 * 3);
