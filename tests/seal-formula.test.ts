@@ -107,3 +107,18 @@ describe('大きな倍率の皿の演出', () => {
     expect(cap.col).toBe(CAP_COL);
   });
 });
+
+describe('遅く打つ人の救いを見せる', () => {
+  it('負けた日で、予約のみもまとめ出しも持っていなければ、助言を出す', async () => {
+    const { lossHint } = await import('../src/ui/runMode');
+    expect(lossHint(true, [])).toBeNull();
+    expect(lossHint(false, [{ id: 'yoyaku', lv: 1 }])).toBeNull();
+    expect(lossHint(false, [{ id: 'ippatsu', lv: 1 }])).toContain('予約のみ');
+    expect(lossHint(false, [])).toContain('まとめ出し');
+  });
+
+  it('予約のみの文は、倍率が先に来る（損に読めないように）', async () => {
+    const { descOf } = await import('../src/core/build');
+    expect(descOf('yoyaku', 3).startsWith('全部の皿は ×1.8')).toBe(true);
+  });
+});

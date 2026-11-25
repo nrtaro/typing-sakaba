@@ -40,6 +40,11 @@ const KIND_NAME: Record<Item['kind'], string> = { front: '二つ名（前）', b
 const BOOK_TABS = ['実績とごほうび', '型とかけ合わせ', '方針', 'おまけと試練'] as const;
 const ease = (v: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, v)), 3);
 const yen = (n: number) => `${Math.round(n).toLocaleString()}円`;
+/** 負けた日の助言：遅く打つ人の救いになる方針（予約のみ・まとめ出し）を、持っていなければ知らせる */
+export function lossHint(passed: boolean, owned: Owned[]): string | null {
+  if (passed || owned.some((o) => o.id === 'yoyaku' || o.id === 'matome')) return null;
+  return '手が追いつかない日は、お客を絞る「予約のみ」や、まとめて出す「まとめ出し」が強い';
+}
 /** 素材を増やした・減らなかった方針の振り返り（円に換えず、個数で見せる） */
 export interface DayHelp { keiki: number; prep: number; makanai: number }
 export function helpLine(h: DayHelp | undefined): string | null {
@@ -919,6 +924,8 @@ export class RunUI {
     });
     sc.PR(28, 116, 196, 1, '#5a3a1c', a2);
     this.drawTop(sc, 28, 122, 196, o.yen, a2, run.owned, o.help);
+    const hint = lossHint(o.passed, run.owned);
+    if (hint) this.para(sc, hint, 254, 182, 7.5, 198, '#a9f0e4', a2, 9.5);
     // 右：見つけたかけ合わせ・解放・ごほうび
     sc.panel(244, 82, 218, 124, 'rgba(36,23,14,0.95)', '#8a6232', a2);
     let y = 88;

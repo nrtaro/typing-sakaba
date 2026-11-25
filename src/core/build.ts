@@ -224,7 +224,7 @@ export const POLICIES: Policy[] = [
   {
     id: 'yoyaku', name: '予約のみ', kana: 'よやく', family: 'combo', starter: true,
     quip: '「本日は、ご予約のお客様だけ」',
-    text: 'お客が{0}減る。全部の皿は ×{1}、1皿でコンボが{2}進む',
+    text: '全部の皿は ×{1}、1皿でコンボが{2}進む。そのかわり、お客が{0}減る（手が追いつかない日に向く）',
     vals: L([pct(FEWER[0]), s(YOYAKU_MULT[0]), String(COMBO_PLUS[0] + 1)], [pct(FEWER[1]), s(YOYAKU_MULT[1]), String(COMBO_PLUS[1] + 1)], [pct(FEWER[2]), s(YOYAKU_MULT[2]), String(COMBO_PLUS[2] + 1)]),
   },
   {
