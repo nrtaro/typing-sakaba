@@ -7,7 +7,7 @@ import { RomajiMatcher } from '../src/core/romaji';
 import { DISHES, DIFFICULTIES, type DifficultyId } from '../src/core/shopConfig';
 import { BANQUET_MULT, CONDITIONS, HIDEN_MULT, NORMAL_RULES, rulesFor, type DayRules } from '../src/core/daily';
 import { PAIRS, emptyBuildStats, pairKey } from '../src/core/build';
-import { applyOffer, closeDay, earnedAchievements, emptyMeta, newRun, offersFor, readMeta } from '../src/core/run';
+import { applyOffer, closeDay, dayPlan, earnedAchievements, emptyMeta, newRun, offersFor, readMeta } from '../src/core/run';
 
 function type(s: Shop, kana: string) {
   for (const ch of new RomajiMatcher(kana).remaining) s.key(ch);
@@ -89,5 +89,39 @@ describe('古い保存データ', () => {
     const back = roundTrip(meta);
     expect(earnedAchievements(back)).not.toContain('run-discover-all');
     expect(earnedAchievements(roundTrip(back))).not.toContain('run-discover-all');
+  });
+});
+
+describe('公開版（f5b6cd4）の形の保存データ', () => {
+  // 公開版の emptyMeta / newRun / closeDay がそのまま書いた形（lastSeen・allPairs・新しい方針はない）
+  const OLD = {
+    v: 1, loop: 2, pick: 2, clears: 1, runs: 3, daysCleared: 6,
+    best: { total: 61200, day: 23000, combo: 41, chain: 3, serve: 2400, ratio: 151, stack: 2 },
+    discovered: ['matome+mouippai', 'nushi+tairyo'], sets: [], sigs: ['tairyo'], policies: ['oomori'],
+    flags: { noAngry: false, max3: false },
+    active: {
+      v: 1, id: 'r3', seed: 12345, loop: 2, day: 1, stage: 'open',
+      owned: [{ id: 'nushi', lv: 2 }, { id: 'tairyo', lv: 1 }, { id: 'oomori', lv: 1 }],
+      rerolls: 1, boost: false, road: 'ichi',
+      days: [{ sales: 11800, goal: 10300, served: 41, maxCombo: 22, angry: 1, maxChain: 1, bestServe: 900, road: 'joren' }],
+      pairs: ['nushi+tairyo'], yen: { nushi: 2100, tairyo: 800 }, aid: 0,
+    },
+    last: null, paid: [], losses: 0,
+  };
+
+  it('読み込めて、続きの営業の目標と候補が作れ、閉店まで進められる', () => {
+    const meta = readMeta(JSON.parse(JSON.stringify(OLD)));
+    const run = meta.active!;
+    expect(run).not.toBeNull();
+    expect(run.lastSeen).toBeNull();
+    expect(meta.flags.allPairs).toBe(false);
+    expect(meta.discovered).toEqual(['matome+mouippai', 'nushi+tairyo']);
+    const plan = dayPlan(run, meta);
+    expect(Number.isFinite(plan.goal) && plan.goal > 0).toBe(true);
+    expect(offersFor(run, meta, 1, 0).length).toBeGreaterThan(0);
+    const out = closeDay(run, meta, { sales: plan.goal, served: 40, maxCombo: 20, angry: 0, build: emptyBuildStats() });
+    expect(out.passed).toBe(true);
+    expect(run.lastSeen).not.toBeNull();
+    expect(earnedAchievements(meta)).not.toContain('run-discover-all');
   });
 });
