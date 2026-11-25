@@ -14,7 +14,7 @@ import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/l
 import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
 import { setOf } from '../core/build';
-import { MULT_CAP, previewTier, type Factor } from '../core/dishPrice';
+import { MULT_CAP, PREVIEW_GOLD, PREVIEW_SILVER, previewTier, type Factor } from '../core/dishPrice';
 import { FAMILY_COLOR, FEVER_EVERY, HEAT_GAP, KEIKI_EVERY, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
@@ -39,6 +39,22 @@ export function tenLeft(owned: Owned[], counts: { fever: number; keiki: number }
 }
 /** 【判子1個を押す秒数】皿の上の判子を、1つずつずらして押す */
 export const SEAL_STEP = 0.06;
+/** 上限で止まった皿の判子「上限」の色 */
+export const CAP_COL = '#ff9a5a';
+/** 【式の帯の表示秒数】 */
+const FORMULA_SECS = 3;
+/**
+ * 出した皿の演出の段（札の予告と同じ境目）：0＝ふつう、1＝銀（×PREVIEW_SILVER 以上）、2＝金（×PREVIEW_GOLD 以上）、3＝上限で止まった。
+ * ついでの皿はいつも 0（光や揺れを重ねない）
+ */
+export function serveTier(ev: ServeEvent): 0 | 1 | 2 | 3 {
+  if ((ev.chain ?? 0) > 0) return 0;
+  if (ev.capped) return 3;
+  const p = ev.paid ?? 0;
+  return p >= PREVIEW_GOLD ? 2 : p >= PREVIEW_SILVER ? 1 : 0;
+}
+/** 【演出の金額の大きさ】段ごとの、席の上の金額の文字の倍率 */
+const TIER_SCALE = [1, 1.3, 1.6, 1.8] as const;
 /** 【式を出す倍率】これ以上の皿だけ、掛け算の式を帯に出す */
 export const FORMULA_AT = 10;
 /** 全部の皿に効く方針（判子の並びでは後ろに回す） */
@@ -57,7 +73,8 @@ const num = (x: number) => String(Math.round(x * 100) / 100);
 export function formulaText(ev: ServeEvent): string {
   const label = (f: Factor) => `${FACTOR_LABEL[f.id] ?? POLICY_SEAL[f.id as PolicyId]}×${num(f.mult)}`;
   const head = `${ev.dish?.text ?? ''} ${Math.round(ev.base ?? 0).toLocaleString()}円`;
-  const tail = ` = ${ev.capped ? `上限×${MULT_CAP} ` : ''}${ev.gain.toLocaleString()}円`;
+  // 上限で止まった皿は、止まる前の倍率も見せる（どこで止まったかが分かるように）
+  const tail = ` = ${ev.capped && ev.raw ? `×${num(ev.raw)} → ` : ''}${ev.capped ? `上限×${MULT_CAP} ` : ''}${ev.gain.toLocaleString()}円`;
   const keep = [...(ev.factors ?? [])];
   const build = (cut: boolean) => [head, ...keep.map(label), ...(cut ? ['…'] : [])].join(' → ') + tail;
   // 帯（FORMULA_WIDTH）に入らなければ、効き目の小さい倍率（1に近いもの）から省いて「…」にする。コンボは残す
@@ -71,7 +88,7 @@ export function formulaText(ev: ServeEvent): string {
   return build(cut);
 }
 /** 式の帯の幅（論理px）と、いちばん小さい文字の大きさ */
-const FORMULA_WIDTH = 422;
+const FORMULA_WIDTH = 396;
 const FORMULA_MIN_SIZE = 6.5;
 /** 字の幅のおおよそ（全角1字＝文字の大きさ、半角はその半分）。帯に入るかの見積もりに使う */
 const approxWidth = (s: string) => [...s].reduce((w, ch) => w + (/[ -~]/.test(ch) ? FORMULA_MIN_SIZE / 2 : FORMULA_MIN_SIZE), 0);
@@ -79,7 +96,7 @@ const approxWidth = (s: string) => [...s].reduce((w, ch) => w + (/[ -~]/.test(ch
 interface Banner { text: string; t: number; col: Color }
 /** 【待てる知らせの数】これを超えたら古いものから捨てる */
 export const BANNER_QUEUE = 3;
-interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean; slot?: string; count?: number }
+interface Pop { x: number; y: number; t: number; text: string; col: Color; big?: boolean; slot?: string; count?: number; scale?: number }
 interface FxBounds { x: number; y: number; w: number; h: number }
 interface Spark { bounds?: FxBounds; x: number; y: number; vx: number; vy: number; t: number; col: Color }
 
@@ -222,7 +239,14 @@ export class ShopView {
         const tags = ev.tags ?? [];
         const pairs = ev.pairs ?? 0;
         const tint = pairs > 0 ? '#ffe27a' : tags.length ? FAMILY_COLOR[policyOf(tags[0]).family] : C.gold;
-        this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tint, big: true });
+        const tier = serveTier(ev);
+        this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tier >= 2 ? '#ffe27a' : tint, big: true, scale: TIER_SCALE[tier] });
+        if (tier >= 2) {
+          // 金・上限の皿：閃光と、金の粒を多めに（「えんしゅつ」の設定に従う）
+          this.sparkAt({ x: seat.x, y: seat.ty - 24 }, '#ffe27a', Math.round((tier === 3 ? 34 : 22) * this.fxScale), 130);
+          this.shakeT = Math.max(this.shakeT, 0.18);
+          this.shakeAmp = Math.max(this.shakeAmp, (tier === 3 ? 1.6 : 1) * this.fxScale);
+        }
         // 判子は席の幅（64px）に収まるよう最大3つを、倍率の大きい順に1つずつ押す。上限で止まったら最後を「上限」にする。ついでの皿は金額だけ
         if ((ev.chain ?? 0) === 0) {
           const seals = sealOrder(ev).slice(0, ev.capped ? 2 : 3).map((t) => POLICY_SEAL[t]);
@@ -230,7 +254,7 @@ export class ShopView {
           const scol = (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint;
           // 同じ席の前の皿の判子は消す（判子の数が減っても残らないように）
           this.pops = this.pops.filter((p) => !p.slot?.startsWith(`tags${ev.seat}-`));
-          seals.forEach((text, k) => this.pop(`tags${ev.seat}-${k}`, { x: seat.x + (k - (seals.length - 1) / 2) * 19, y: seat.ty - 6, t: -delay - k * SEAL_STEP, text, col: scol }));
+          seals.forEach((text, k) => this.pop(`tags${ev.seat}-${k}`, { x: seat.x + (k - (seals.length - 1) / 2) * 19, y: seat.ty - 6, t: -delay - k * SEAL_STEP, text, col: ev.capped && k === seals.length - 1 ? CAP_COL : scol, scale: ev.capped && k === seals.length - 1 ? 1.3 : 1 }));
           if ((ev.paid ?? 0) >= FORMULA_AT) this.formula = { text: formulaText(ev), t: 0 };
         }
         this.sparkAt({ x: seat.x, y: seat.ty - 20 }, tint, Math.round((light ? 5 : 10) * this.fxScale), 80);
@@ -387,7 +411,7 @@ export class ShopView {
     for (const l of this.links) l.t += dt;
     this.links = this.links.filter((l) => l.t - l.delay < 0.45);
     if (this.pairNote && (this.pairNote.t += dt) > 2.2) this.pairNote = null;
-    if (this.formula && (this.formula.t += dt) > 1.8) this.formula = null;
+    if (this.formula && (this.formula.t += dt) > FORMULA_SECS) this.formula = null;
     if (this.chainNote && (this.chainNote.t += dt) > 1.0) this.chainNote = null;
     if (this.sparks.length > 420) this.sparks.splice(0, this.sparks.length - 420);
     // 繁盛記：目標を越えた瞬間
@@ -1049,10 +1073,10 @@ export class ShopView {
     if (this.formula) {
       // 式の帯：目標の帯の下・知らせの帯の上に1行（左の方針の判子の列は避ける）
       const f = this.formula;
-      const a = Math.min(1, f.t * 8, (1.8 - f.t) * 3);
+      const a = Math.min(1, f.t * 8, (FORMULA_SECS - f.t) * 3);
       const size = sc.fitSize(f.text, 8, FORMULA_WIDTH, FORMULA_MIN_SIZE);
       const tw = sc.W(f.text, size) + 12;
-      const x = Math.max(40, 255 - tw / 2);
+      const x = Math.max(72, 270 - tw / 2);
       sc.panel(x, 44, tw, 12, 'rgba(42,27,38,0.92)', '#ffe27a', a);
       sc.T(f.text, x + 6, 46, size, '#ffe9b4', 'left', a);
     }
@@ -1317,7 +1341,7 @@ export class ShopView {
         const col = fx.max ? CONFETTI[Math.floor((this.time + p.t) * 12) % CONFETTI.length] : p.col;
         sc.TB(String(p.count), p.x, p.y + 1 - (punch - 1) * 6, sc.fitSize(String(p.count), fx.numberSize * punch, 58), col, 'center', C.ink, a);
         sc.TB(fx.max ? 'FEVER' : 'COMBO' + (fx.level >= 6 ? '!!' : fx.level ? '!' : ''), p.x, p.y + 31, 8, col, 'center', C.ink, a);
-      } else if (p.t >= 0) sc.TB(p.text, p.x, p.y - p.t * 16, p.slot?.startsWith('tags') ? 8 : (p.big ? 12 : 11) * (1 + Math.max(0, 0.12 - p.t) * 2.5), p.col, 'center', C.ink, a);
+      } else if (p.t >= 0) sc.TB(p.text, p.x, p.y - p.t * 16, (p.slot?.startsWith('tags') ? 8 : (p.big ? 12 : 11) * (1 + Math.max(0, 0.12 - p.t) * 2.5 * (p.scale ?? 1))) * (p.scale ?? 1), p.col, 'center', C.ink, a);
     }
     if (this.callout) {
       // 節目の掛け声：厨房内（注文の札を隠さない位置）に大きく弾ませる

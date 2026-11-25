@@ -451,6 +451,15 @@ export class Sound {
   }
 
   /** 自己ベスト更新のきらめき */
+  /** 繁盛記：金の皿（×10以上）は硬貨を2枚、上限で止まった皿はきらめきも重ねる */
+  jackpot(cap: boolean) {
+    if (!this.ok) return;
+    const t = this.now;
+    this.coin(t);
+    this.coin(t + 0.09);
+    if (cap) this.sparkle();
+  }
+
   sparkle() {
     if (!this.ok) return;
     const t = this.now;

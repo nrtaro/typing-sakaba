@@ -6,7 +6,7 @@ import { readDecoration, type Decoration } from '../core/ranking';
 import { C } from './palette';
 import { Screen, LW } from './screen';
 import { Sound, VOLUME_NAMES } from './audio';
-import { FINAL_SECONDS, ShopView, type RunHud } from './shopView';
+import { FINAL_SECONDS, ShopView, serveTier, type RunHud } from './shopView';
 import { RunUI } from './runMode';
 import { Hover } from './hover';
 import type { BuildMods } from '../core/build';
@@ -1312,7 +1312,13 @@ export class Game {
         case 'serve':
           // 繁盛記：ついでの皿は拍子木で順に鳴らし、打った皿だけがいつもの音。効いた方針は系統ごとの音で知らせる
           if ((ev.chain ?? 0) > 0) this.sound.chainHit(ev.chain!);
-          else { this.sound.serve(); if (ev.combo >= 1) this.sound.combo(ev.combo); }
+          else {
+            this.sound.serve();
+            if (ev.combo >= 1) this.sound.combo(ev.combo);
+            // 繁盛記：大きな倍率の皿は音でも分かるように（金＝硬貨2枚、上限＝硬貨2枚ときらめき）
+            const tier = this.view.run ? serveTier(ev) : 0;
+            if (tier >= 2) this.sound.jackpot(tier === 3);
+          }
           if (ev.tags) {
             const lead = ev.tags.find((t) => t !== 'matome' && t !== 'mouippai');
             if (lead) this.sound.policy(policyOf(lead).family);
