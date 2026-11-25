@@ -122,3 +122,15 @@ describe('遅く打つ人の救いを見せる', () => {
     expect(descOf('yoyaku', 3).startsWith('全部の皿は ×1.8')).toBe(true);
   });
 });
+
+describe('式の帯の位置（Codex の指摘：16:9 で上の段の札に重なる）', () => {
+  it('式の帯は、下の段の席より下・下の素材の欄（y=214）より上に置く', async () => {
+    const { FORMULA_BAND } = await import('../src/ui/shopView');
+    const { TAVERN_SEATS } = await import('../src/core/tavernNavigation');
+    const lowest = Math.max(...TAVERN_SEATS.map((s) => s.ty));
+    expect(FORMULA_BAND.y).toBeGreaterThan(lowest);
+    expect(FORMULA_BAND.y + FORMULA_BAND.h).toBeLessThanOrEqual(214);
+    // 上の段の札（席の上、y がいちばん小さい席より上）には決してかからない
+    expect(FORMULA_BAND.y).toBeGreaterThan(Math.min(...TAVERN_SEATS.map((s) => s.ty)));
+  });
+});

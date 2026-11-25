@@ -41,6 +41,8 @@ export function tenLeft(owned: Owned[], counts: { fever: number; keiki: number; 
 export const SEAL_STEP = 0.06;
 /** 上限で止まった皿の判子「上限」の色 */
 export const CAP_COL = '#ff9a5a';
+/** 式の帯の置き場所（店の絵の座標。下の段の席 y=190 のテーブルより下、下の素材の欄 y=214 より上） */
+export const FORMULA_BAND = { y: 201, h: 11 };
 /** 【式の帯の表示秒数】 */
 const FORMULA_SECS = 3;
 /**
@@ -550,6 +552,20 @@ export class ShopView {
     }
   }
 
+  /**
+   * 式の帯：店の絵の座標で、下の段の席（テーブル）より下・下の素材の欄より上に1行。
+   * 注文の札は席の上に出るので、画面の形（16:9・4:3）にかかわらず札とは重ならない
+   */
+  private drawFormula(sc: Screen) {
+    const f = this.formula!;
+    const a = Math.min(1, f.t * 8, (FORMULA_SECS - f.t) * 3);
+    const size = sc.fitSize(f.text, 8, FORMULA_WIDTH, FORMULA_MIN_SIZE);
+    const tw = sc.W(f.text, size) + 12;
+    const x = Math.max(4, 240 - tw / 2);
+    sc.panel(x, FORMULA_BAND.y, tw, FORMULA_BAND.h, 'rgba(42,27,38,0.92)', '#ffe27a', a);
+    sc.T(f.text, x + 6, FORMULA_BAND.y + 1.5, size, '#ffe9b4', 'left', a);
+  }
+
   private drawEdges(sc: Screen, shop: Shop, t: number) {
     const e = sc.ext;
     // 縦に長いウィンドウでは、店内の絵の上下（暗い部分）を帯の地の色で覆い、画面の枠として見せる
@@ -557,6 +573,7 @@ export class ShopView {
       this.drawCeiling(sc, e.y0, 26);
       this.drawCounter(sc, 210, e.y1);
     }
+    if (this.run && this.formula) this.drawFormula(sc);
     sc.shifted(0, e.y0, () => {
       this.drawHud(sc, shop);
       this.drawRules(sc, shop);
@@ -1070,16 +1087,6 @@ export class ShopView {
     if (b && b.heatCap > 1 && shop.heat > 0 && shop.clock - shop.lastTyped <= HEAT_GAP) note(`熱 ×${(1 + shop.heat).toFixed(1)}`, '#ff9a5a');
     if (b && b.ippatsuMult > 1 && shop.input.typed.length > 0) note(shop.wordMisses ? '一発 ×0.8' : `一発 ×${b.ippatsuMult}`, shop.wordMisses ? '#ff7a6a' : FAMILY_COLOR.combo);
     if (shop.extra > 0 && shop.clock >= DAY_LENGTH) note('延長営業中', '#ffe27a');
-    if (this.formula) {
-      // 式の帯：目標の帯の下・知らせの帯の上に1行（左の方針の判子の列は避ける）
-      const f = this.formula;
-      const a = Math.min(1, f.t * 8, (FORMULA_SECS - f.t) * 3);
-      const size = sc.fitSize(f.text, 8, FORMULA_WIDTH, FORMULA_MIN_SIZE);
-      const tw = sc.W(f.text, size) + 12;
-      const x = Math.max(72, 270 - tw / 2);
-      sc.panel(x, 44, tw, 12, 'rgba(42,27,38,0.92)', '#ffe27a', a);
-      sc.T(f.text, x + 6, 46, size, '#ffe9b4', 'left', a);
-    }
     // 方針の判子：効いた瞬間に弾んで光る
     run.owned.forEach((o, i) => {
       const pol = policyOf(o.id);
