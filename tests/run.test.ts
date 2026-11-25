@@ -6,7 +6,7 @@ import { DAY_LENGTH, DISHES, DIFFICULTIES } from '../src/core/shopConfig';
 import { NORMAL_RULES } from '../src/core/daily';
 import { type PolicyId, KEIKI_EVERY, MAX_LEVEL, MAX_SLOTS, PAIRS, POLICY_SEAL, POLICIES, REFILL_EAT, SETS, setKey, descDiff, descOf, emptyMods, modsFor, pairKey, partnersOf, policyOf } from '../src/core/build';
 import {
-  AIDS, GOAL_BASE, availablePolicies, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
+  AIDS, GOAL_BASE, availablePolicies, estimateFor, RUN_ACHIEVEMENTS, aidFor, RUN_DAYS, applyOffer, closeDay, coinsFor, dayDifficulty, dayPlan, earnedAchievements, emptyMeta, goalFor,
   DAY_LOOP_WEIGHT, DISH_SHIFT2_LOOP, GOAL_EASE_LOOP, GOAL_LATE_STEP, STRICT_MISS_LOOP, TRIAL_STOP_LOOP, dayGoalMult,
   GIFT_CAP_LOOP, GIFT_PER_LOOP, NOREN_RANKS, bestCleared, clampPick, firstClearGift, nextNorenRank, norenRank,
   loopEveryMult, loopGoalMult, loopWaitMult, newRun, offersFor, readMeta, roadOffers, takeRoad, trialMods, trialsFor, walkMult,
@@ -1448,5 +1448,19 @@ describe('Codex の指摘：営業条件の増収は方針に配らない', () =
     if (ev.type !== 'serve') throw new Error('serve');
     expect(ev.gain).toBe(360);
     expect(s.buildStats.yen.tsuyoki).toBeCloseTo(60, 5);
+  });
+});
+
+describe('Codex の指摘：景気づけの数え方', () => {
+  it('素材を増やした回数・増えた個数・倍率が乗った皿の数を別に数える', () => {
+    const s = shopWith([{ id: 'keiki', lv: 1 }], []);
+    for (let i = 0; i < 10; i++) { s.seats[0] = guest('grilledFish'); type(s, 'やきざかな'); }
+    expect(s.buildStats.keikiBoosts).toBe(2);
+    expect(s.buildStats.keiki).toBe(4);
+    expect(s.buildStats.boosted.keiki).toBe(5);
+  });
+  it('翌日の見込みは「補充の機会」と「最大の個数」で言う（必ず2種類に配れるとは限らないため）', () => {
+    const seen = { served: 40, long: 0, kinds2: 0, kinds3: 0, morning: 0, night: 0, tens: 1, fives: 2 };
+    expect(estimateFor('keiki', 1, seen)).toBe('昨日なら補充の機会2回（最大+8個）');
   });
 });

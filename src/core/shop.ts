@@ -691,6 +691,7 @@ export class Shop {
     const st = this.buildStats;
     st.fired.keiki = (st.fired.keiki ?? 0) + 1;
     st.keiki += gain * top.length;
+    st.keikiBoosts++;
     this.events.push({ type: 'keiki', items: top.map((id) => ({ id, n: gain })) });
   }
   /** コンボを切らさずに出した皿の数（方針の有無にかかわらず。10皿で seen.tens を数える） */

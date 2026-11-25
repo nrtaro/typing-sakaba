@@ -418,7 +418,8 @@ export function estimateFor(id: PolicyId, lv: number, seen: DaySeen | null): str
     case 'tema': return `昨日の${seen.served}皿のうち${seen.kinds2 + seen.kinds3}皿が対象`;
     case 'yoippari': return `昨日の${seen.served}皿のうち夜の${seen.night}皿`;
     case 'asaichi': return `昨日の${seen.served}皿のうち朝の${seen.morning}皿`;
-    case 'keiki': return `昨日なら${seen.fives}回、素材+${seen.fives * 2 * modsFor([{ id, lv }]).keikiGain}個`;
+    // 未所持の日は、続けて5皿出した回数しか分からないので「機会」と「最大」で言う
+    case 'keiki': return `昨日なら補充の機会${seen.fives}回（最大+${seen.fives * 2 * modsFor([{ id, lv }]).keikiGain}個）`;
     default: return null;
   }
 }

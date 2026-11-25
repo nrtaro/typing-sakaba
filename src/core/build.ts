@@ -284,7 +284,7 @@ export const POLICIES: Policy[] = [
   {
     id: 'keiki', name: '景気づけ', kana: 'けいきづけ', family: 'combo', starter: false, unlock: '大入り袋で大入りを出す',
     quip: '「景気のいい店には、品物が集まる」',
-    text: `コンボを切らさずに${KEIKI_EVERY}皿ごとに、よく使った素材2種類が +{0}。次の${KEIKI_EVERY}皿は、その素材を使う皿が ×{1}`,
+    text: `コンボを切らさずに${KEIKI_EVERY}皿ごとに、よく使った素材2種類が +{0}。次の${KEIKI_EVERY}皿は、料理にその素材を使う皿が ×{1}`,
     vals: v2(KEIKI_GAIN, KEIKI_MULT, s, s),
   },
 ];
@@ -602,9 +602,11 @@ export interface BuildStats {
   prep: number;
   /** 景気づけで増えた素材の合計の個数（円には換えない） */
   keiki: number;
+  /** 景気づけで素材を増やした回数（倍率が乗った皿の数は boosted.keiki、判子の数は fired.keiki） */
+  keikiBoosts: number;
   /** 1皿に重なったかけ合わせの最大数 */
   maxStack: number;
 }
 export function emptyBuildStats(): BuildStats {
-  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0, keiki: 0, prep: 0, seen: emptySeen() };
+  return { yen: {}, fired: {}, boosted: {}, maxChain: 1, chainServes: 0, refills: 0, fevers: 0, bestServe: 0, pairs: [], sets: [], maxStack: 0, maxHeat: 1, extended: 0, keiki: 0, keikiBoosts: 0, prep: 0, seen: emptySeen() };
 }

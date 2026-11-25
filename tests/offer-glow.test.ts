@@ -61,8 +61,8 @@ describe('昨日の注文からの見込み', () => {
     expect(estimateFor('tema', 2, seen())).toBe('昨日の40皿のうち13皿が対象');
     expect(estimateFor('yoippari', 1, seen())).toBe('昨日の40皿のうち夜の20皿');
     expect(estimateFor('asaichi', 1, seen())).toBe('昨日の40皿のうち朝の8皿');
-    expect(estimateFor('keiki', 3, seen())).toBe('昨日なら6回、素材+48個');
-    expect(estimateFor('keiki', 1, seen({ fives: 0 }))).toBe('昨日なら0回、素材+0個');
+    expect(estimateFor('keiki', 3, seen())).toBe('昨日なら補充の機会6回（最大+48個）');
+    expect(estimateFor('keiki', 1, seen({ fives: 0 }))).toBe('昨日なら補充の機会0回（最大+0個）');
     expect(estimateFor('yoyaku', 3, seen())).toBeNull();
     expect(estimateFor('aiso', 3, seen())).toBeNull();
   });
