@@ -925,8 +925,6 @@ export class RunUI {
     });
     sc.PR(28, 116, 196, 1, '#5a3a1c', a2);
     this.drawTop(sc, 28, 122, 196, o.yen, a2, run.owned, o.help);
-    const hint = lossHint(o.passed, run.owned);
-    if (hint) this.para(sc, hint, 254, 182, 7.5, 198, '#a9f0e4', a2, 9.5);
     // 右：見つけたかけ合わせ・解放・ごほうび
     sc.panel(244, 82, 218, 124, 'rgba(36,23,14,0.95)', '#8a6232', a2);
     let y = 88;
@@ -1085,7 +1083,8 @@ export class RunUI {
     let py = 100;
     if (s.pairs.length) py += this.pairList(sc, s.pairs, 254, py, 200, '#ffe9b4', a);
     else { sc.T('かけ合わせは成立しなかった', 254, py, 8, C.gray, 'left', a); py += 11; }
-    if (py < (s.first ? 122 : 136)) this.para(sc, this.hint(s.cleared, s.owned, s.pairs), 254, py + 1, 8, 200, '#a9f0e4', a, 9);
+    // 負けた挑戦で、遅く打つ人の救い（予約のみ・まとめ出し）を持っていなければ、その助言を先に出す
+    if (py < (s.first ? 122 : 136)) this.para(sc, lossHint(s.cleared, s.owned) ?? this.hint(s.cleared, s.owned, s.pairs), 254, py + 1, 8, 200, '#a9f0e4', a, 9);
     if (s.first) {
       // ご祝儀は1行を独り立ちさせて、数え上げて見せる
       const gift = firstClearGift(s.loop);
