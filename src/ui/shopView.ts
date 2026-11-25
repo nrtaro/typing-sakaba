@@ -32,10 +32,10 @@ const DOOR = { x: 452, y: 202 };
 interface Exit { look: number; x: number; y: number; start: number; distance: number; path: { x: number; y: number }[] }
 interface Fx { anim: string; x: number; y: number; h: number; start: number }
 /** 大入り袋・景気づけ：次まで残りの皿を、それぞれの判子の横に出す（目標を目の前に見せる） */
-export function tenLeft(owned: Owned[], counts: { fever: number; keiki: number }): { index: number; text: string }[] {
+export function tenLeft(owned: Owned[], counts: { fever: number; keiki: number; keikiMult?: number }): { index: number; text: string }[] {
   return owned.flatMap((o, index) =>
     o.id === 'ooiri' ? [{ index, text: `あと${FEVER_EVERY - counts.fever}` }]
-      : o.id === 'keiki' ? [{ index, text: `あと${KEIKI_EVERY - counts.keiki}` }] : []);
+      : o.id === 'keiki' ? [{ index, text: `${counts.keikiMult ? `×${counts.keikiMult} ` : ''}あと${KEIKI_EVERY - counts.keiki}` }] : []);
 }
 /** 【判子1個を押す秒数】皿の上の判子を、1つずつずらして押す */
 export const SEAL_STEP = 0.06;
@@ -289,7 +289,7 @@ export class ShopView {
         }
         break;
       case 'keiki':
-        // 景気づけ：10皿目に増えた素材を、帯の知らせで一度だけ見せる（大入りと同時なら、その次に出る）
+        // 景気づけ：5皿目に増えた素材を、帯の知らせで一度だけ見せる（大入りと同時なら、その次に出る）
         this.say({ text: `景気づけ！ ${ev.items.map((x) => `${INGREDIENT_NAME[x.id]}+${x.n}`).join(' ')}${shop.build && shop.build.keikiMult > 1 ? `（次の${KEIKI_EVERY}皿 ×${shop.build.keikiMult}）` : ''}`, t: 1.8, col: '#ffd25c' });
         break;
       case 'extend':
@@ -1096,7 +1096,7 @@ export class ShopView {
       // マウスを乗せると効果（営業中も、一時停止中も）
       this.hover?.add(sc, x0, y, 22, 21, policyTip(o.id, o.lv, run.owned));
     });
-    for (const left of tenLeft(run.owned, { fever: shop.feverCount, keiki: shop.keikiCount })) {
+    for (const left of tenLeft(run.owned, { fever: shop.feverCount, keiki: shop.keikiCount, keikiMult: shop.keikiLeft > 0 ? shop.build?.keikiMult : undefined })) {
       const ly = 45 + left.index * 25 + 5;
       sc.panel(x0 + 24, ly - 1.5, sc.W(left.text, 7.5) + 6, 11, 'rgba(34,22,30,0.9)', FAMILY_COLOR.combo, 1);
       sc.T(left.text, x0 + 27, ly, 7.5, FAMILY_COLOR.combo);

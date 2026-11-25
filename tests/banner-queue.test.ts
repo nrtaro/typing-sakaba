@@ -76,3 +76,9 @@ describe('急ぎの知らせ', () => {
     expect(v.bannerQueue[0].text).toContain('大入り');
   });
 });
+
+it('景気づけの倍率が付いているあいだは、「あと○」に倍率も出す', async () => {
+  const { tenLeft } = await import('../src/ui/shopView');
+  expect(tenLeft([{ id: 'keiki', lv: 3 }], { fever: 0, keiki: 2, keikiMult: 1.8 })).toEqual([{ index: 0, text: '×1.8 あと3' }]);
+  expect(tenLeft([{ id: 'keiki', lv: 3 }], { fever: 0, keiki: 2 })).toEqual([{ index: 0, text: 'あと3' }]);
+});

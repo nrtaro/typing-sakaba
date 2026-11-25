@@ -125,7 +125,7 @@ const BOLD_MULT = L(1.2, 1.35, 1.5);
 const BOLD_WAIT = L(0.15, 0.2, 0.25);
 /** 【夜の皿の倍率】宵っ張り */
 const NIGHT_MULT = L(1.4, 1.6, 1.8);
-/** 【景気づけの数】10皿ごとに、よく使った素材2種類それぞれに足す数 */
+/** 【景気づけの数】KEIKI_EVERY 皿ごとに、よく使った素材2種類それぞれに足す数 */
 const KEIKI_GAIN = L(2, 3, 4);
 /** 【景気の皿の倍率】景気づけで増えた素材を使う皿（次の KEIKI_EVERY 皿のあいだ。ユーザーの決定 2026-11-24、値は仮） */
 const KEIKI_MULT = L(1.3, 1.5, 1.8);
@@ -558,12 +558,18 @@ export function stockGainOnPick(id: PolicyId, from: number, to: number) {
 export interface DaySeen { served: number; long: number; kinds2: number; kinds3: number; morning: number; night: number; tens: number; fives: number }
 export const emptySeen = (): DaySeen => ({ served: 0, long: 0, kinds2: 0, kinds3: 0, morning: 0, night: 0, tens: 0, fives: 0 });
 
+/** 目印ごとの「〇〇の皿」（光る理由の文に使う） */
+export const MARK_DISH: Record<Exclude<Mark, 'all'>, string> = {
+  typing: '打ち方の皿', night: '夜の皿', morning: '朝の皿', fresh: '調達帰りの皿', plenty: '素材の多い皿', scarce: '素材の少ない皿',
+  combo: 'コンボを続ける皿', wait: '待たせる皿', rush: '早くさばく皿', ale: '酒の皿',
+};
 /** 選ぶ画面で光らせるための、重なりの目印（all は全部の皿に効くので光らせない） */
 export type Mark = 'all' | 'typing' | 'night' | 'morning' | 'fresh' | 'plenty' | 'scarce' | 'combo' | 'wait' | 'rush' | 'ale';
+// 一発勝負は打った皿のほぼ全部に効くので、打ち方の重なりには数えない（名前付きの組では光る）
 export const MARKS: Record<PolicyId, Mark[]> = {
   matome: ['rush'], betsubara: ['wait'], ryoshusho: ['combo'], nushi: ['fresh'], tairyo: ['fresh', 'plenty'], mie: ['scarce'],
   sekkachi: ['rush'], mouippai: ['ale'], oomori: ['plenty'], yobikomi: ['rush'], makanai: ['scarce'], ooiri: ['combo'],
-  aiso: ['wait'], shikomi: ['plenty'], yoyaku: ['all'], omotenashi: ['typing', 'wait'], ippatsu: ['typing'], netsu: ['typing', 'rush'],
+  aiso: ['wait'], shikomi: ['plenty'], yoyaku: ['all'], omotenashi: ['typing', 'wait'], ippatsu: [], netsu: ['typing', 'rush'],
   asaichi: ['morning', 'fresh'], encho: ['night', 'combo'], hayakuchi: ['typing', 'night'], tema: ['night'], tsuyoki: ['all'],
   yoippari: ['night'], keiki: ['combo', 'plenty'],
 };

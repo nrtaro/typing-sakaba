@@ -67,7 +67,7 @@ export type ShopEvent =
   | { type: 'chain'; count: number; total: number; seats: number[] }
   /** 繁盛記：大入りが始まった／終わった */
   | { type: 'fever'; on: boolean; secs: number }
-  /** 景気づけ：10皿目に増えた素材 */
+  /** 景気づけ：KEIKI_EVERY 皿目に増えた素材 */
   | { type: 'keiki'; items: { id: IngredientId; n: number }[] }
   /** 繁盛記：とれたての皿が用意できた */
   | { type: 'fresh'; n: number }
@@ -667,7 +667,7 @@ export class Shop {
     for (const key of found) if (!st.pairs.includes(key)) { st.pairs.push(key); ev.pair ??= key; }
     for (const x of setsHit) if (!st.sets.includes(setKey(x))) { st.sets.push(setKey(x)); ev.set ??= setKey(x); }
   }
-  /** 景気づけ：この10皿で実際に倉庫から減らした素材の数 */
+  /** 景気づけ：この KEIKI_EVERY 皿で実際に倉庫から減らした素材の数 */
   private keikiUsed: Partial<Record<IngredientId, number>> = {};
   /** 景気づけで増えた素材と、その倍率が付く残りの皿の数（コンボが切れたら 0） */
   keikiIds: IngredientId[] = [];
@@ -675,7 +675,7 @@ export class Shop {
   private countUse(id: IngredientId, n: number) {
     if (this.build && this.build.keikiGain > 0) this.keikiUsed[id] = (this.keikiUsed[id] ?? 0) + n;
   }
-  /** 景気づけ：よく使った素材2種類（同じ数なら素材の並び順）を増やし、10皿目の皿に判子を付ける */
+  /** 景気づけ：よく使った素材2種類（同じ数なら素材の並び順）を増やし、その皿に判子を付ける */
   private keikiBoost(gain: number, tags: PolicyId[]) {
     const top = INGREDIENT_ORDER.filter((id) => (this.keikiUsed[id] ?? 0) > 0)
       .sort((a, b) => (this.keikiUsed[b] ?? 0) - (this.keikiUsed[a] ?? 0) || INGREDIENT_ORDER.indexOf(a) - INGREDIENT_ORDER.indexOf(b))

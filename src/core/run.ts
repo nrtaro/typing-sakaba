@@ -3,7 +3,7 @@
 //   朝・昼・夜の方針えらび（1日3回×4日）→ 閉店で売上目標の判定 → 明日の営業えらび（道中）→ …
 //   4日目の目標を越えるとクリアで、次は「のれん」が1枚増えて難しくなる（上限なし）。
 import {
-  MARKS, MAX_LEVEL, MAX_SLOTS, PAIRS, emptySeen, POLICIES, SETS, isPolicy, modsFor, pairKey, pairOf, partnersOf, policyOf, setOf, stockGainOnPick,
+  MARKS, MARK_DISH, MAX_LEVEL, MAX_SLOTS, PAIRS, emptySeen, POLICIES, SETS, isPolicy, modsFor, pairKey, pairOf, partnersOf, policyOf, setOf, stockGainOnPick,
   type BuildMods, type BuildStats, type DaySeen, type Owned, type PolicyId,
 } from './build';
 import { NORMAL_RULES, type DayRules } from './daily';
@@ -397,14 +397,26 @@ export function glowFor(id: PolicyId, owned: Owned[]): boolean {
   return owned.some((o) => o.id !== id && MARKS[o.id].some((m) => m !== 'all' && mine.includes(m)));
 }
 
+/** 名前付きの組でなく、目印の重なりで光るときの理由（「〇〇」と同じ、夜の皿に重なる） */
+export function glowReason(id: PolicyId, owned: Owned[]): string | null {
+  const mine = MARKS[id];
+  if (mine.includes('all')) return null;
+  for (const o of owned) {
+    if (o.id === id) continue;
+    const m = MARKS[o.id].find((x) => x !== 'all' && mine.includes(x));
+    if (m && m !== 'all') return `「${policyOf(o.id).name}」と同じ、${MARK_DISH[m]}に重なる`;
+  }
+  return null;
+}
+
 /** 選ぶ画面の見込み：前の日の注文から数えられる、見て分かる条件の方針だけ */
 export function estimateFor(id: PolicyId, lv: number, seen: DaySeen | null): string | null {
   if (!seen) return null;
   switch (id) {
-    case 'hayakuchi': return `昨日なら${seen.long}皿が対象`;
-    case 'tema': return `昨日なら${seen.kinds2 + seen.kinds3}皿が対象`;
-    case 'yoippari': return `昨日なら夜の${seen.night}皿が対象`;
-    case 'asaichi': return `昨日なら朝の${seen.morning}皿が対象`;
+    case 'hayakuchi': return `昨日の${seen.served}皿のうち${seen.long}皿が対象`;
+    case 'tema': return `昨日の${seen.served}皿のうち${seen.kinds2 + seen.kinds3}皿が対象`;
+    case 'yoippari': return `昨日の${seen.served}皿のうち夜の${seen.night}皿`;
+    case 'asaichi': return `昨日の${seen.served}皿のうち朝の${seen.morning}皿`;
     case 'keiki': return `昨日なら${seen.fives}回、素材+${seen.fives * 2 * modsFor([{ id, lv }]).keikiGain}個`;
     default: return null;
   }
@@ -476,7 +488,12 @@ export function offersFor(run: RunState, meta: RunMeta, slot: number, rerolled: 
     if (!more) break;
     out.push(more);
   }
-  for (const o of out) o.glow = o.kind !== 'up' && glowFor(o.id, run.owned);
+  for (const o of out) {
+    o.glow = o.kind !== 'up' && glowFor(o.id, run.owned);
+    // 名前付きの組でなく重なりで光る札には、光る理由を書く（候補を決めたあとなので、出方は変わらない）
+    const why = o.glow && !o.hot ? glowReason(o.id, run.owned) : null;
+    if (why) o.link = why;
+  }
   return out;
 }
 

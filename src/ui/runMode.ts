@@ -804,14 +804,15 @@ export class RunUI {
       const yy = y + 45 + rows * (size + 2.5) + 2;
       // 見込み（昨日の注文から数えられる方針だけ）があれば、一言の代わりに出す
       const est = o.kind === 'up' ? null : estimateFor(o.id, o.lv, run.lastSeen);
-      if (est) this.para(sc, est, x + 7, yy, 7.5, w - 14, '#a9f0e4', a, 9.5);
+      // 見込みは、つながりの欄（いちばん下で y+122 あたりから）にかからない高さのときだけ
+      if (est && yy < y + 112) this.para(sc, est, x + 7, yy, 7.5, w - 14, '#a9f0e4', a, 9.5);
       else if (yy < y + 100) this.para(sc, pol.quip, x + 7, yy, 7.5, w - 14, '#b8a0b0', a, 9.5);
       if (o.link) {
         const lrows = wrapText(sc, (o.glow ? '★' : '') + o.link, 7.5, w - 16);
         const lh = 5 + lrows.length * 9.5;
         const ly = y + 146 - lh;
-        sc.panel(x + 4, ly, w - 8, lh, o.hot ? '#4a3410' : '#22302a', o.hot ? '#ffe27a' : '#5a7a68', a);
-        lrows.forEach((t, k) => sc.T(t, x + 8, ly + 3 + k * 9.5, 7.5, o.hot ? '#ffe9b4' : '#bfe6d2', 'left', a));
+        sc.panel(x + 4, ly, w - 8, lh, o.glow ? '#4a3410' : '#22302a', o.glow ? '#ffe27a' : '#5a7a68', a);
+        lrows.forEach((t, k) => sc.T(t, x + 8, ly + 3 + k * 9.5, 7.5, o.glow ? '#ffe9b4' : '#bfe6d2', 'left', a));
       }
       this.roma(sc, pol.kana, x + w / 2, y + 150, dim, sc.fitSize(new RomajiMatcher(pol.kana).remaining, 10, w - 22, 6.5));
       // 候補には効果と相性を直接表示する。札全体のホバーは隣の候補を覆うため付けない。
@@ -836,12 +837,12 @@ export class RunUI {
   /** いちばん働いた方針（増えた売上の多い順に3つ） */
   private drawTop(sc: Screen, x: number, y: number, w: number, yenBy: BuildStats['yen'], a: number, owned: Owned[], help?: DayHelp) {
     const top = (Object.entries(yenBy) as [PolicyId, number][]).filter(([, v]) => v > 0).sort((p, q) => q[1] - p[1]).slice(0, 3);
-    sc.T('直接売上の推計（上位3つ）', x, y, 8, C.gold3, 'left', a);
+    sc.T('方針が上乗せした売上（多い順に3つ）', x, y, 8, C.gold3, 'left', a);
     // 素材の助けの行は、注記の上に出す（注記は残す）
     const hl = helpLine(help);
     if (hl) sc.T(hl, x, y + 53, sc.fitSize(hl, 7.5, w, 7.5), FAMILY_COLOR.stock, 'left', a);
-    sc.T('補給・客数・コンボ進行等は含まない', x, y + 63, 7, C.gray, 'left', a);
-    if (!top.length) { sc.T('直接売上の計上なし', x, y + 14, 8, C.gray, 'left', a); return; }
+    sc.T('お客の数や素材の助けは、ここには入らない', x, y + 63, 7, C.gray, 'left', a);
+    if (!top.length) { sc.T('上乗せした売上はなし', x, y + 14, 8, C.gray, 'left', a); return; }
     const max = top[0][1];
     top.forEach(([id, v], i) => {
       const pol = policyOf(id);
@@ -1078,8 +1079,8 @@ export class RunUI {
     if (!s.owned.length) sc.T('方針なし', 254, 68, 8, C.gray, 'left', a);
     if (s.sig) {
       const sig = s.sig;
-      sc.T(`主力（直接売上推計）：${policyOf(sig).name}`, 254, 87, 8.5, FAMILY_COLOR[policyOf(sig).family], 'left', a);
-      this.tip(sc, 254, 86, 200, 11, { title: '主力（全日程の直接売上推計）', col: C.gold3, lines: [{ t: '入れ替えで外した方針も含む。補給・客数・コンボ進行等の間接的な助けは含まない。', col: C.w }] });
+      sc.T(`主力（上乗せした売上が一番）：${policyOf(sig).name}`, 254, 87, 8.5, FAMILY_COLOR[policyOf(sig).family], 'left', a);
+      this.tip(sc, 254, 86, 200, 11, { title: '主力（全日程で上乗せした売上が一番の方針）', col: C.gold3, lines: [{ t: '入れ替えで外した方針も含む。お客の数や素材の助けは入らない。', col: C.w }] });
     }
     let py = 100;
     if (s.pairs.length) py += this.pairList(sc, s.pairs, 254, py, 200, '#ffe9b4', a);

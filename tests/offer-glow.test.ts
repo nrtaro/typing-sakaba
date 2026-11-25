@@ -57,10 +57,10 @@ const seen = (over: Partial<BuildStats['seen']> = {}): BuildStats['seen'] => ({ 
 describe('昨日の注文からの見込み', () => {
   it('見て分かる条件の方針だけに出す。前の日がなければ出さない', () => {
     expect(estimateFor('hayakuchi', 1, null)).toBeNull();
-    expect(estimateFor('hayakuchi', 1, seen())).toBe('昨日なら12皿が対象');
-    expect(estimateFor('tema', 2, seen())).toBe('昨日なら13皿が対象');
-    expect(estimateFor('yoippari', 1, seen())).toBe('昨日なら夜の20皿が対象');
-    expect(estimateFor('asaichi', 1, seen())).toBe('昨日なら朝の8皿が対象');
+    expect(estimateFor('hayakuchi', 1, seen())).toBe('昨日の40皿のうち12皿が対象');
+    expect(estimateFor('tema', 2, seen())).toBe('昨日の40皿のうち13皿が対象');
+    expect(estimateFor('yoippari', 1, seen())).toBe('昨日の40皿のうち夜の20皿');
+    expect(estimateFor('asaichi', 1, seen())).toBe('昨日の40皿のうち朝の8皿');
     expect(estimateFor('keiki', 3, seen())).toBe('昨日なら6回、素材+48個');
     expect(estimateFor('keiki', 1, seen({ fives: 0 }))).toBe('昨日なら0回、素材+0個');
     expect(estimateFor('yoyaku', 3, seen())).toBeNull();
@@ -127,5 +127,18 @@ describe('早口自慢の見込み', () => {
     for (const ch of new RomajiMatcher('やきざかな').remaining) s.key(ch);
     expect(s.buildStats.seen.served).toBe(2);
     expect(s.buildStats.seen.long).toBe(0);
+  });
+});
+
+describe('光る理由', () => {
+  it('名前付きの組でなく重なりで光る札には、何に重なるかを書く', async () => {
+    const { glowReason } = await import('../src/core/run');
+    expect(glowReason('netsu', [{ id: 'omotenashi', lv: 1 }])).toBe('「おもてなし」と同じ、打ち方の皿に重なる');
+    expect(glowReason('tema', [{ id: 'yoippari', lv: 1 }])).toContain('宵っ張り');
+    expect(glowReason('tsuyoki', [{ id: 'ippatsu', lv: 1 }])).toBeNull();
+  });
+  it('一発勝負は、ほぼ全部の打った皿に効くので、打ち方の重なりでは光らせない', () => {
+    expect(glowFor('netsu', [{ id: 'ippatsu', lv: 1 }])).toBe(false);
+    expect(glowFor('ippatsu', [{ id: 'omotenashi', lv: 1 }])).toBe(true);
   });
 });
