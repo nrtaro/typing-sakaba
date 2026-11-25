@@ -1428,3 +1428,25 @@ describe('第5段：上位の実績', () => {
     expect(readMeta(raw).best.late).toBe(0);
   });
 });
+
+describe('Codex の指摘：営業条件の増収は方針に配らない', () => {
+  const fish = (over: Partial<Guest> = {}): Guest => ({ ...guest('grilledFish', 15), ...over });
+  it('せっかち客の日（チップ3倍）でも、強気の値付けの稼ぎは強気が増やした分だけ', () => {
+    const s = new Shop(new Rng(1), DIFFICULTIES[1], NORMAL_RULES, modsFor([{ id: 'tsuyoki', lv: 1 }], { tipMult: 3 }));
+    for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 30;
+    s.seats[0] = fish();
+    const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.gain).toBe(252);
+    expect(s.buildStats.yen.tsuyoki).toBeCloseTo(42, 5);
+  });
+
+  it('大食いの日の大盛り（営業条件）の分も、方針には配らない', () => {
+    const s = shopWith([{ id: 'tsuyoki', lv: 1 }], []);
+    s.seats[0] = fish({ dish: { ...dish('grilledFish'), need: { fish: 4 } }, big: true, bigMult: 2, bigFrom: 'road' });
+    const ev = type(s, 'やきざかな').find((e) => e.type === 'serve')!;
+    if (ev.type !== 'serve') throw new Error('serve');
+    expect(ev.gain).toBe(360);
+    expect(s.buildStats.yen.tsuyoki).toBeCloseTo(60, 5);
+  });
+});

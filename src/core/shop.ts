@@ -593,7 +593,9 @@ export class Shop {
         this.buildStats.maxHeat = Math.max(this.buildStats.maxHeat, heatNow);
       }
       // 振り返り用：方針がなかった場合との差を、効いた方針に分ける
-      const plain = Math.round((g.dish.price + tip) * Math.min(this.multiplier, SHOP.comboMaxMult) * special);
+      // 方針がなかった場合の額：同じ元の額（営業条件のチップを含む）に、方針でない倍率（営業条件の大盛り・ふつうの上限までのコンボ・秘伝・宴会）だけを掛け、同じ上限で止める
+      const plainFactors = q.factors.filter((f) => !isPolicy(f.id)).map((f) => (f.id === 'combo' ? { ...f, mult: Math.min(f.mult, SHOP.comboMaxMult) } : f));
+      const plain = priceOf(q.base, plainFactors).gain;
       const st = this.buildStats;
       const whole: PolicyId | null = chain > 0 ? 'matome' : g.refill && b.refillMult > 1 ? 'betsubara' : null;
       if (whole) st.yen[whole] = (st.yen[whole] ?? 0) + Math.min(plain, gain);
