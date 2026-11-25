@@ -142,9 +142,11 @@ export class ShopView {
   banner: Banner | null = null;
   /** 繁盛記：出番を待っている帯の知らせ（同じ瞬間に来ても消えずに順に出る） */
   bannerQueue: Banner[] = [];
-  /** 帯の知らせを出す。繁盛記では、出している知らせがあれば待たせる。urgent（時間帯の知らせ）はすぐ出す。通常営業は今どおり上書き */
-  private say(b: Banner, urgent = false) {
-    if (!this.run || urgent || !this.banner) { this.banner = b; return; }
+  /** 帯の知らせを出す。繁盛記では、出している知らせがあれば待たせる。urgent（時間帯・ラストスパート）はすぐ出し、出していたものは次に回す。通常営業は今どおり上書き */
+  say(b: Banner, urgent = false) {
+    if (!this.run || !this.banner) { this.banner = b; return; }
+    // 急ぎの知らせ（時間帯・ラストスパート）は先に出し、出していた知らせは待ち行列の先頭に戻す
+    if (urgent) { this.bannerQueue.unshift(this.banner); this.banner = b; if (this.bannerQueue.length > BANNER_QUEUE) this.bannerQueue.pop(); return; }
     this.bannerQueue.push(b);
     if (this.bannerQueue.length > BANNER_QUEUE) this.bannerQueue.shift();
   }
@@ -226,6 +228,8 @@ export class ShopView {
           const seals = sealOrder(ev).slice(0, ev.capped ? 2 : 3).map((t) => POLICY_SEAL[t]);
           if (ev.capped) seals.push('上限');
           const scol = (ev.sets ?? 0) > 0 ? '#ffb0e0' : tint;
+          // 同じ席の前の皿の判子は消す（判子の数が減っても残らないように）
+          this.pops = this.pops.filter((p) => !p.slot?.startsWith(`tags${ev.seat}-`));
           seals.forEach((text, k) => this.pop(`tags${ev.seat}-${k}`, { x: seat.x + (k - (seals.length - 1) / 2) * 19, y: seat.ty - 6, t: -delay - k * SEAL_STEP, text, col: scol }));
           if ((ev.paid ?? 0) >= FORMULA_AT) this.formula = { text: formulaText(ev), t: 0 };
         }

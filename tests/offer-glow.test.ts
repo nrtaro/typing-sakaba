@@ -116,3 +116,16 @@ describe('営業条件の相性', () => {
     expect(ROADS.find((r) => r.id === 'enkai')!.good).toContain('yoippari');
   });
 });
+
+describe('早口自慢の見込み', () => {
+  it('まとめ出しのついでの皿は、長い読みの皿に数えない（早口自慢は打った皿だけに効く）', () => {
+    const s = new Shop(new Rng(1), DIFFICULTIES[1], NORMAL_RULES, modsFor([{ id: 'matome', lv: 1 }]));
+    for (const k of Object.keys(s.stock) as (keyof typeof s.stock)[]) s.stock[k] = 50;
+    const g = (id: string): Guest => ({ id: Math.random(), dish: DISHES.find((d) => d.id === id)!, look: 0, wait: 20, maxWait: 30, state: 'wait', t: 0, lack: 0 });
+    s.seats[0] = g('grilledFish');
+    s.seats[1] = g('spicyPot');
+    for (const ch of new RomajiMatcher('やきざかな').remaining) s.key(ch);
+    expect(s.buildStats.seen.served).toBe(2);
+    expect(s.buildStats.seen.long).toBe(0);
+  });
+});

@@ -608,7 +608,7 @@ export class Shop {
       const total = Object.values(weight).reduce((a, w) => a + (w ?? 0), 0);
       if (total > 0) for (const [id, w] of Object.entries(weight) as [PolicyId, number][]) st.yen[id] = (st.yen[id] ?? 0) + (extra * w) / total;
       st.bestServe = Math.max(st.bestServe, gain);
-      this.countSeen(g.dish);
+      this.countSeen(g.dish, chain);
     }
     this.score += gain;
     this.stats.served++;
@@ -694,10 +694,11 @@ export class Shop {
   /** コンボを切らさずに出した皿の数（方針の有無にかかわらず。10皿で seen.tens を数える） */
   private streak = 0;
   /** 出した皿を数える（次の日の選ぶ画面の見込み） */
-  private countSeen(dish: Dish) {
+  private countSeen(dish: Dish, chain: number) {
     const v = this.buildStats.seen;
     v.served++;
-    if (dish.kana.length >= LONG_KANA) v.long++;
+    // 早口自慢は打った皿だけに効くので、長い読みの皿も打った皿だけ数える
+    if (chain === 0 && dish.kana.length >= LONG_KANA) v.long++;
     const kinds = Object.keys(dish.need).length;
     if (kinds === 2) v.kinds2++;
     else if (kinds >= 3) v.kinds3++;

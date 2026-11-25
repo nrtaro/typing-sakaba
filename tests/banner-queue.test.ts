@@ -65,3 +65,14 @@ describe('次の10皿までの残り', () => {
     expect(tenLeft([{ id: 'ooiri', lv: 1 }], { fever: 0, keiki: 0 })).toEqual([{ index: 0, text: 'あと10' }]);
   });
 });
+
+describe('急ぎの知らせ', () => {
+  it('急ぎの知らせは先に出し、出していた知らせは待ち行列の先頭に戻す', () => {
+    const v = runView();
+    const s = shop();
+    v.handle(fever, s);
+    v.say({ text: 'ラストスパート！ 閉店まで10秒', t: 1.8, col: '#fff' }, true);
+    expect(v.banner?.text).toContain('ラストスパート');
+    expect(v.bannerQueue[0].text).toContain('大入り');
+  });
+});

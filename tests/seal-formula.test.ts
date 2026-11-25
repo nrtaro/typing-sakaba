@@ -66,3 +66,16 @@ it('倍率がたくさん重なっても、式は帯の幅（422px、6.5px）に
   expect(text).toContain('コンボ×');
   expect(text.endsWith('= 上限×30 69,000円')).toBe(true);
 });
+
+describe('第5段：見える細かい点', () => {
+  it('同じ席で続けて出すと、前の皿の判子は消える', () => {
+    const v = new ShopView();
+    v.run = { day: 0, loop: 1, goal: 9000, owned: [], fired: {}, count: {}, passedAt: -1 } as never;
+    const s = new Shop(new Rng(1), DIFFICULTIES[1], NORMAL_RULES, modsFor([]));
+    const pops = () => (v as unknown as { pops: { slot?: string }[] }).pops.filter((p) => p.slot?.startsWith('tags0-'));
+    v.handle(serve({ tags: ['mie', 'oomori', 'ippatsu'], factors: [{ id: 'mie', mult: 3 }, { id: 'oomori', mult: 2 }, { id: 'ippatsu', mult: 1.5 }] }), s);
+    expect(pops()).toHaveLength(3);
+    v.handle(serve({ tags: ['mie'], factors: [{ id: 'mie', mult: 3 }] }), s);
+    expect(pops()).toHaveLength(1);
+  });
+});

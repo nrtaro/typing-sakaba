@@ -432,7 +432,7 @@ export class Game {
     if (sec === this.lastCall) return;
     this.lastCall = sec;
     this.sound.final(sec);
-    if (sec === FINAL_SECONDS) this.view.banner = { text: 'ラストスパート！ 閉店まで10秒', t: 1.8, col: C.gold3 };
+    if (sec === FINAL_SECONDS) this.view.say({ text: 'ラストスパート！ 閉店まで10秒', t: 1.8, col: C.gold3 }, true);
   }
 
   /** 段階6：付けている打鍵音を音に伝える（持っていない・一覧にないものは元の音） */

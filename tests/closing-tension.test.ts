@@ -31,7 +31,7 @@ describe('時間切れが近い注文', () => {
 describe('閉店前10秒', () => {
   function game() {
     const final = vi.fn(), setRate = vi.fn();
-    const g = Object.assign(Object.create(Game.prototype) as Game, { sound: { final, setRate }, view: { banner: null } }) as unknown as Game;
+    const g = Object.assign(Object.create(Game.prototype) as Game, { sound: { final, setRate }, view: { banner: null, say(b: unknown) { (this as { banner: unknown }).banner = b; } } }) as unknown as Game;
     return { g, final, setRate };
   }
   it('1秒に1回だけ秒読みの音を鳴らし、BGM を速め、10秒で知らせる', () => {

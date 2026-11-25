@@ -832,9 +832,10 @@ export class RunUI {
   private drawTop(sc: Screen, x: number, y: number, w: number, yenBy: BuildStats['yen'], a: number, owned: Owned[], help?: DayHelp) {
     const top = (Object.entries(yenBy) as [PolicyId, number][]).filter(([, v]) => v > 0).sort((p, q) => q[1] - p[1]).slice(0, 3);
     sc.T('直接売上の推計（上位3つ）', x, y, 8, C.gold3, 'left', a);
+    // 素材の助けの行は、注記の上に出す（注記は残す）
     const hl = helpLine(help);
-    if (hl) sc.T(hl, x, y + 63, sc.fitSize(hl, 7.5, w, 7.5), FAMILY_COLOR.stock, 'left', a);
-    else sc.T('補給・客数・コンボ進行等は含まない', x, y + 63, 7, C.gray, 'left', a);
+    if (hl) sc.T(hl, x, y + 53, sc.fitSize(hl, 7.5, w, 7.5), FAMILY_COLOR.stock, 'left', a);
+    sc.T('補給・客数・コンボ進行等は含まない', x, y + 63, 7, C.gray, 'left', a);
     if (!top.length) { sc.T('直接売上の計上なし', x, y + 14, 8, C.gray, 'left', a); return; }
     const max = top[0][1];
     top.forEach(([id, v], i) => {
