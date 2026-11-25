@@ -1021,15 +1021,15 @@ describe('進行', () => {
 });
 
 describe('実績と限定の飾り', () => {
-  it('繁盛記の実績20件に、限定の飾りがちょうど1つずつ（二つ名11・プレート5・打鍵音4）', () => {
-    expect(RUN_ACHIEVEMENTS).toHaveLength(20);
+  it('繁盛記の実績23件に、限定の飾りがちょうど1つずつ（二つ名14・プレート5・打鍵音4）', () => {
+    expect(RUN_ACHIEVEMENTS).toHaveLength(23);
     const kinds: Record<string, number> = {};
     for (const a of RUN_ACHIEVEMENTS) {
       const it = achievementItem(a.id);
       expect(ITEMS.filter((i) => typeof i.source === 'object' && i.source.achievement === a.id)).toHaveLength(1);
       kinds[it!.kind] = (kinds[it!.kind] ?? 0) + 1;
     }
-    expect(kinds).toEqual({ front: 5, back: 6, plate: 5, sound: 4 });
+    expect(kinds).toEqual({ front: 7, back: 7, plate: 5, sound: 4 });
   });
 
   it('条件を満たすと解放され、ふだんの飾りとして付けられる。ふくびきでは出ない', () => {
@@ -1395,5 +1395,36 @@ describe('第4段：方針ごとの稼ぎの振り返り', () => {
     s.clock = 49.99;
     s.update(0.05);
     expect(s.buildStats.prep).toBe(5 * 6);
+  });
+});
+
+describe('第5段：上位の実績', () => {
+  it('一皿一万円・本番の倍返し・大繁盛・極は、上位の条件で取れる（今の3つはそのまま）', () => {
+    const m = emptyMeta();
+    m.best.serve = 9999; m.best.late = 199; m.best.total = 299999;
+    expect(earnedAchievements(m)).not.toEqual(expect.arrayContaining(['run-serve10k']));
+    m.best.serve = 10000; m.best.late = 200; m.best.total = 300000;
+    expect(earnedAchievements(m)).toEqual(expect.arrayContaining(['run-serve10k', 'run-double-late', 'run-300k', 'run-bigserve', 'run-100k']));
+  });
+
+  it('本番の倍返しは、3日目か4日目の達成率だけを数える', () => {
+    const meta = emptyMeta();
+    const run = newRun(meta, 5, 'r1');
+    meta.active = run;
+    const build = emptyBuildStats();
+    closeDay(run, meta, { sales: goalFor(0, run.loop, run.road) * 3, served: 30, maxCombo: 10, angry: 0, build });
+    expect(meta.best.late).toBe(0);
+    run.day = 2;
+    run.days.push(run.days[0], run.days[0]);
+    run.stage = 'open';
+    const goal = goalFor(2, run.loop, run.road);
+    closeDay(run, meta, { sales: goal * 2, served: 30, maxCombo: 10, angry: 0, build });
+    expect(meta.best.late).toBe(200);
+  });
+
+  it('古い保存データ（best.late がない）は 0 として読む', () => {
+    const raw = JSON.parse(JSON.stringify(emptyMeta()));
+    delete raw.best.late;
+    expect(readMeta(raw).best.late).toBe(0);
   });
 });

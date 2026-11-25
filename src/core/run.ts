@@ -206,7 +206,8 @@ export interface RunMeta {
   runs: number;
   /** 目標を越えた日の累計（心得の解放に使う） */
   daysCleared: number;
-  best: { total: number; day: number; combo: number; chain: number; serve: number; ratio: number; stack: number };
+  /** late：3日目か4日目の、目標に対する売上の割合（%）の最高 */
+  best: { total: number; day: number; combo: number; chain: number; serve: number; ratio: number; stack: number; late: number };
   /** 見つけたかけ合わせ */
   discovered: string[];
   /** 見つけた型 */
@@ -228,7 +229,7 @@ export interface RunMeta {
 export function emptyMeta(): RunMeta {
   return {
     v: 1, loop: 1, pick: 1, clears: 0, runs: 0, daysCleared: 0,
-    best: { total: 0, day: 0, combo: 0, chain: 0, serve: 0, ratio: 0, stack: 0 },
+    best: { total: 0, day: 0, combo: 0, chain: 0, serve: 0, ratio: 0, stack: 0, late: 0 },
     discovered: [], sets: [], sigs: [], policies: [], flags: { noAngry: false, max3: false, allPairs: false }, active: null, last: null, paid: [], losses: 0,
   };
 }
@@ -570,6 +571,7 @@ export function closeDay(run: RunState, meta: RunMeta, f: DayFacts, now = new Da
   if (passed) {
     meta.daysCleared++;
     b.ratio = Math.max(b.ratio, Math.floor((result.sales / Math.max(1, goal)) * 100));
+    if (run.day >= 2) b.late = Math.max(b.late, Math.floor((result.sales / Math.max(1, goal)) * 100));
     if (run.day >= 2 && f.angry === 0) meta.flags.noAngry = true;
   }
   // 方針の解放
@@ -678,6 +680,10 @@ export const RUN_ACHIEVEMENTS: RunAchievement[] = [
   { id: 'run-no-angry', title: 'もてなし上手', condition: '3日目か4日目を、誰も怒らせずに突破する', progress: (m) => flag(m.flags.noAngry) },
   { id: 'run-max3', title: '三本柱', condition: '方針3つを最大まで育ててクリアする', progress: (m) => flag(m.flags.max3) },
   { id: 'run-100k', title: '大繁盛', condition: '1回の挑戦で合計10万円を売り上げる', progress: (m) => ({ now: m.best.total, goal: 100000 }) },
+  // 第5段で足した上位の実績（今の3つは条件を変えずに残す。ユーザーの決定 2026-11-25）
+  { id: 'run-serve10k', title: '一皿一万円', condition: '1皿で10,000円以上を売り上げる', progress: (m) => ({ now: m.best.serve, goal: 10000 }) },
+  { id: 'run-double-late', title: '本番の倍返し', condition: '3日目か4日目を、目標の2倍の売上で終える', progress: (m) => ({ now: m.best.late, goal: 200 }) },
+  { id: 'run-300k', title: '大繁盛・極', condition: '1回の挑戦で合計30万円を売り上げる', progress: (m) => ({ now: m.best.total, goal: 300000 }) },
   // のれんの節目（格が上がる枚数と同じ）。クリアしたいちばん上の枚数で数えるので、下ののれんを回しても取れない
   ...NOREN_RANKS.filter((r) => r.at > 0).map((r): RunAchievement => ({
     id: `run-noren${r.at}`, title: r.name, condition: `のれん${r.at}枚目をクリアする（店ののれんが「${r.name}」になる）`,

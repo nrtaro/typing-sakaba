@@ -88,6 +88,8 @@ export const ITEM_LIST: Item[] = [
   word('front', 'hengenjizai', 4, '変幻自在', ach('run-two-builds')),
   word('front', 'daihanjo', 5, '大繁盛', ach('run-100k')),
   word('front', 'shinise', 4, '老舗', ach('run-noren5')),
+  word('front', 'tenkaippin', 5, '天下一品', ach('run-serve10k')),
+  word('front', 'machiichiban', 5, '街一番', ach('run-300k')),
 
   // ---------- 二つ名・後ろの言葉（人を表す） ----------
   word('back', 'joren', 2, '常連', ach('usual-seat')),
@@ -138,6 +140,7 @@ export const ITEM_LIST: Item[] = [
   word('back', 'motenashi', 3, 'もてなし上手', ach('run-no-angry')),
   word('back', 'nidaime', 3, '二代目', ach('run-noren3')),
   word('back', 'meitennoaruji', 4, '名店の主', ach('run-noren7')),
+  word('back', 'shobushi', 4, '勝負師', ach('run-double-late')),
 
   // ---------- ネームプレート ----------
   plate('furunajimi', 3, '古なじみの木札', '#6b4a2a', '#c99a5a', '#fff6e0', 'wood', ach('long-friends')),

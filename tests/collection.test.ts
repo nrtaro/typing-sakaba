@@ -23,10 +23,10 @@ describe('飾りの一覧', () => {
     expect(LINKS[0].id).toBe('na');
   });
 
-  it('176個の内訳と☆の配分（うち20個は繁盛記の限定）', () => {
-    expect(ITEMS).toHaveLength(176);
-    expect([achCount('front'), gachaStars('front')]).toEqual([11, [12, 10, 6, 4, 2]]);
-    expect([achCount('back'), gachaStars('back')]).toEqual([12, [12, 10, 6, 4, 2]]);
+  it('179個の内訳と☆の配分（うち23個は繁盛記の限定）', () => {
+    expect(ITEMS).toHaveLength(179);
+    expect([achCount('front'), gachaStars('front')]).toEqual([13, [12, 10, 6, 4, 2]]);
+    expect([achCount('back'), gachaStars('back')]).toEqual([13, [12, 10, 6, 4, 2]]);
     expect([achCount('plate'), gachaStars('plate')]).toEqual([9, [6, 5, 4, 3, 2]]);
     expect([achCount('sound'), gachaStars('sound')]).toEqual([6, [4, 4, 3, 2, 1]]);
     expect([achCount('sticker'), gachaStars('sticker')]).toEqual([8, [8, 7, 5, 4, 4]]);
@@ -63,4 +63,8 @@ describe('飾りの一覧', () => {
   it('二つ名の言葉は6文字以内', () => {
     for (const it of ITEMS) if (it.kind === 'front' || it.kind === 'back') expect([...it.name].length).toBeLessThanOrEqual(6);
   });
+});
+
+it('前の二つ名は「の」で終わらない（例の「〇〇な」とつながるように）', () => {
+  for (const i of ITEMS.filter((x) => x.kind === 'front')) expect(i.name.endsWith('の'), i.name).toBe(false);
 });
