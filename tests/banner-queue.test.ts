@@ -82,3 +82,9 @@ it('景気づけの倍率が付いているあいだは、「あと○」に倍�
   expect(tenLeft([{ id: 'keiki', lv: 3 }], { fever: 0, keiki: 2, keikiMult: 1.8 })).toEqual([{ index: 0, text: '×1.8 あと3' }]);
   expect(tenLeft([{ id: 'keiki', lv: 3 }], { fever: 0, keiki: 2 })).toEqual([{ index: 0, text: 'あと3' }]);
 });
+
+it('繁盛記の知らせは、上の帯の行に出す（左の判子の列にかからない）', async () => {
+  const { RUN_BANNER_Y } = await import('../src/ui/shopView');
+  // 上の帯の行（目標の帯と同じ y=28〜41）。判子の列は y=45 から下
+  expect(RUN_BANNER_Y).toBe(28);
+});

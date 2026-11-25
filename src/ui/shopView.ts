@@ -14,7 +14,7 @@ import { AMBER, ICON_INDEX, ORDER_CARD, TAVERN_SEATS, dishIcon } from './amber/l
 import { RomajiMatcher } from '../core/romaji';
 import { policyTip, type Hover } from './hover';
 import { setOf } from '../core/build';
-import { MULT_CAP, PREVIEW_GOLD, PREVIEW_SILVER, previewTier, type Factor } from '../core/dishPrice';
+import { MULT_CAP, PREVIEW_GOLD, PREVIEW_SILVER, type Factor } from '../core/dishPrice';
 import { FAMILY_COLOR, FEVER_EVERY, HEAT_GAP, KEIKI_EVERY, MAX_LEVEL, POLICY_SEAL, pairOf, policyOf, type Owned, type PolicyId } from '../core/build';
 import {
   DAY_LENGTH, DISHES, FAMILY_NAME, INGREDIENT_NAME, PHASES, SHOP, SOURCE, TRIPS, type Dish, type FamilyId, type IngredientId, type TripId,
@@ -55,6 +55,17 @@ export function serveTier(ev: ServeEvent): 0 | 1 | 2 | 3 {
   const p = ev.paid ?? 0;
   return p >= PREVIEW_GOLD ? 2 : p >= PREVIEW_SILVER ? 1 : 0;
 }
+/**
+ * 札の予告の目印：今この皿を出したら何倍か。×PREVIEW_SILVER 未満は出さない。
+ * 1＝銀（×3〜）、2＝金（×10〜）、3＝上限（×30 で止まる）。数字は小数を切り捨てて出す
+ */
+export function cardBadge(q: { paid: number; capped: boolean } | null): { tier: 1 | 2 | 3; text: string } | null {
+  if (!q || q.paid < PREVIEW_SILVER) return null;
+  const tier = q.capped ? 3 : q.paid >= PREVIEW_GOLD ? 2 : 1;
+  return { tier, text: `×${Math.floor(q.paid)}` };
+}
+/** 札の予告の段ごとの色（銀・金・上限） */
+const BADGE_COL = { 1: '#dce4ee', 2: '#ffe27a', 3: '#ff9a5a' } as const;
 /** 【演出の金額の大きさ】段ごとの、席の上の金額の文字の倍率 */
 const TIER_SCALE = [1, 1.3, 1.6, 1.8] as const;
 /** 【式を出す倍率】これ以上の皿だけ、掛け算の式を帯に出す */
@@ -94,6 +105,8 @@ const FORMULA_WIDTH = 396;
 const FORMULA_MIN_SIZE = 6.5;
 /** 字の幅のおおよそ（全角1字＝文字の大きさ、半角はその半分）。帯に入るかの見積もりに使う */
 const approxWidth = (s: string) => [...s].reduce((w, ch) => w + (/[ -~]/.test(ch) ? FORMULA_MIN_SIZE / 2 : FORMULA_MIN_SIZE), 0);
+/** 繁盛記の知らせを出す行（目標の帯と同じ上の帯の行。左の方針の判子の列は y=45 から下） */
+export const RUN_BANNER_Y = 28;
 /** 帯の知らせ */
 interface Banner { text: string; t: number; col: Color }
 /** 【待てる知らせの数】これを超えたら古いものから捨てる */
@@ -118,8 +131,6 @@ export function runHud(day: number, loop: number, goal: number, owned: Owned[]):
   return { day, loop, goal, owned, fired: {}, count: {}, goalAt: -1 };
 }
 const CHAIN_COL = FAMILY_COLOR.chain;
-/** 繁盛記：注文の札の予告の枠の色（銀＝×3以上、金＝×10以上） */
-const PREVIEW_COL = { silver: '#dce4ee', gold: '#ffe27a' } as const;
 
 /** 営業画面の見た目の状態（演出用。ゲームの計算には影響しない） */
 export class ShopView {
@@ -242,7 +253,8 @@ export class ShopView {
         const pairs = ev.pairs ?? 0;
         const tint = pairs > 0 ? '#ffe27a' : tags.length ? FAMILY_COLOR[policyOf(tags[0]).family] : C.gold;
         const tier = serveTier(ev);
-        this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tier >= 2 ? '#ffe27a' : tint, big: true, scale: TIER_SCALE[tier] });
+        // 大きくした金額は、大きくした分だけ上に出す（すぐ下の判子の行にかからない）
+        this.pop(`income${ev.seat}`, { x: seat.x, y: seat.ty - 18 - (TIER_SCALE[tier] - 1) * 14, t: -delay, text: `+${ev.gain.toLocaleString()}円`, col: tier >= 2 ? '#ffe27a' : tint, big: true, scale: TIER_SCALE[tier] });
         if (tier >= 2) {
           // 金・上限の皿：閃光と、金の粒を多めに（「えんしゅつ」の設定に従う）
           this.sparkAt({ x: seat.x, y: seat.ty - 24 }, '#ffe27a', Math.round((tier === 3 ? 34 : 22) * this.fxScale), 130);
@@ -818,21 +830,41 @@ export class ShopView {
     const cx = x + bw / 2;
     const short = Object.entries(gst.dish.need).some(([id, n]) => shop.stock[id as IngredientId] < n!);
     // 繁盛記：今この皿を出したら何倍か（店の状態は変えない見積もり）。ほかの枠の色が先に勝つ
-    const tier = this.run && !also && !second && !live && !short ? previewTier(shop.quote(i, { chain: 0, clean: true, saved: false })?.paid ?? 0) : 'none';
-    const edge = also ? CHAIN_COL : second ? C.cream2 : live ? C.gold : short ? (Math.sin(this.time * 8) > 0 ? '#ff5a4a' : C.red2) : tier !== 'none' ? PREVIEW_COL[tier] : C.wood4;
+    const badge = this.run && !also && !second && !live && !short ? cardBadge(shop.quote(i, { chain: 0, clean: true, saved: false })) : null;
+    const edge = also ? CHAIN_COL : second ? C.cream2 : live ? C.gold : short ? (Math.sin(this.time * 8) > 0 ? '#ff5a4a' : C.red2) : badge ? BADGE_COL[Math.min(2, badge.tier) as 1 | 2] : C.wood4;
     const a = dim ? 0.5 : 1;
     if (live) sc.PR(x + 1, y + 3, bw, bh, '#0c0604', 0.45);
     if (live) sc.glow(x, y, bw, bh, second ? C.cream2 : C.gold);
     if (also) sc.glow(x, y, bw, bh, CHAIN_COL, 0.55 + 0.3 * Math.sin(this.time * 10));
+    // 上限の段：札の後ろがやわらかく脈打って光る
+    if (badge?.tier === 3) sc.glow(x, y, bw, bh, BADGE_COL[3], (0.35 + 0.2 * Math.sin(this.time * 4)) * a);
     sc.panel(x, y, bw, bh, live ? '#4a2c3c' : 'rgba(42,27,38,0.93)', edge, a);
-    if (tier !== 'none') {
-      // 色が見分けにくい人のため、太さ（銀1px・金2px）と、金は四隅の飾りでも分かるようにする
-      const t = tier === 'gold' ? 2 : 1;
+    if (badge) {
+      // 段ごとに付くものが1つずつ増える（色が見分けにくい人にも、形と動きで分かる）
+      //   銀：細い縁と「×3」の札／金：太い縁・四隅の飾りと、札の上を光が横切る／上限：さらに後ろが脈打って光る（上）
+      const t = badge.tier >= 2 ? 2 : 1;
       sc.PR(x - t, y - t, bw + t * 2, t, edge, a);
       sc.PR(x - t, y + bh, bw + t * 2, t, edge, a);
       sc.PR(x - t, y, t, bh, edge, a);
       sc.PR(x + bw, y, t, bh, edge, a);
-      if (tier === 'gold') for (const [cx2, cy2] of [[x - 3, y - 3], [x + bw + 1, y - 3], [x - 3, y + bh + 1], [x + bw + 1, y + bh + 1]] as const) sc.PR(cx2, cy2, 2, 2, C.cream, a);
+      if (badge.tier >= 2) {
+        for (const [cx2, cy2] of [[x - 3, y - 3], [x + bw + 1, y - 3], [x - 3, y + bh + 1], [x + bw + 1, y + bh + 1]] as const) sc.PR(cx2, cy2, 2, 2, C.cream, a);
+        // 光が横切る：1.8秒に1回、細い光の筋が左から右へ（文字の上は薄く）
+        const ph = (this.time * 0.55 + i * 0.37) % 1;
+        if (ph < 0.6) {
+          const sx = x + (ph / 0.6) * (bw + 8) - 4;
+          for (let k2 = 0; k2 < 3; k2++) {
+            const lx = sx + k2 * 2;
+            if (lx > x && lx < x + bw - 1) sc.PR(lx, y + 1, 1, bh - 2, C.w, (0.22 - k2 * 0.06) * a);
+          }
+        }
+      }
+      // 右上の小さな札：倍率の数字だけ
+      const bc = BADGE_COL[badge.tier];
+      const tw2 = sc.W(badge.text, 7) + 6;
+      // 料理名（札の上から2px）にかからないよう、札の上の縁にまたがる位置
+      sc.panel(x + bw - tw2 + 2, y - 8, tw2, 9, 'rgba(26,16,22,0.95)', bc, a);
+      sc.T(badge.text, x + bw - tw2 + 5, y - 7.5, 7, bc, 'left', a);
     }
     sc.PR(seat.x - 2, bottom, 4, 2, edge, a);
     sc.PR(seat.x - 1, bottom + 2, 2, 1, edge, a);
@@ -1071,9 +1103,21 @@ export class ShopView {
     const over = shop.score - run.goal;
     const text = done ? `目標突破！ +${over.toLocaleString()}円` : `目標 ${run.goal.toLocaleString()}円（あと${(-over).toLocaleString()}）`;
     sc.T(text, x0 + w - 4, 30 - bump, sc.fitSize(text, 8, w - sc.W(head, 8) - 12, 5), done ? '#fff0b0' : C.w, 'right');
-    // とれたて・大入りの残り
+    // 知らせ（家族のひとこと・大入りなど）：目標の帯の右に出す。左の方針の判子の列と、注文の札の段にかからない
     let nx = x0 + w + 4;
+    if (this.banner) {
+      const bn = this.banner;
+      const room = Math.min(230, sc.ext.x1 - 6 - nx);
+      const size = sc.fitSize(bn.text, 8.5, room - 12, 6.5);
+      const tw = Math.min(room, sc.W(bn.text, size) + 12);
+      const ba = Math.min(1, bn.t * 3);
+      sc.panel(nx, RUN_BANNER_Y, tw, 13, 'rgba(42,27,38,0.95)', C.gold, ba);
+      sc.T(bn.text, nx + 6, RUN_BANNER_Y + 2, size, bn.col, 'left', ba);
+      nx += tw + 3;
+    }
+    // とれたて・大入りの残り
     const note = (label: string, col: Color) => {
+      if (nx + sc.W(label, 8) + 10 > sc.ext.x1 - 4) return;
       const tw = sc.W(label, 8) + 10;
       sc.panel(nx, 28, tw, 13, 'rgba(42,27,38,0.94)', col);
       sc.glow(nx, 28, tw, 13, col, 0.35 + 0.25 * Math.sin(this.time * 8));
@@ -1363,8 +1407,8 @@ export class ShopView {
       sc.TB(c.text, cx + 1.5, cy + 1.5 - drawSize / 2, drawSize, C.ink, 'center', col, a * 0.8);
       sc.TB(c.text, cx, cy - drawSize / 2, drawSize, col, 'center', C.ink, a);
     }
-    if (this.banner) {
-      // 家族のひとことは、注文の札がない厨房の上に出す
+    if (this.banner && !this.run) {
+      // 家族のひとことは、注文の札がない厨房の上に出す（繁盛記は上の帯の行に出す。drawRunHud）
       const size = this.run ? sc.fitSize(this.banner.text, 10, 154, 7) : 10;
       const tw = sc.W(this.banner.text, size) + 20;
       const bx = this.run ? 105 - tw / 2 : Math.max(4, 82 - tw / 2);

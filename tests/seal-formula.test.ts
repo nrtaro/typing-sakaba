@@ -134,3 +134,28 @@ describe('式の帯の位置（Codex の指摘：16:9 で上の段の札に重�
     expect(FORMULA_BAND.y).toBeGreaterThan(Math.min(...TAVERN_SEATS.map((s) => s.ty)));
   });
 });
+
+describe('テストプレイ前の見た目の直し', () => {
+  const runView = () => { const v = new ShopView(); v.run = { day: 0, loop: 1, goal: 9000, owned: [], fired: {}, count: {}, passedAt: -1 } as never; return v; };
+  const shop = () => new Shop(new Rng(1), DIFFICULTIES[1], NORMAL_RULES, modsFor([]));
+  const pops = (v: ShopView) => (v as unknown as { pops: { slot?: string; y: number; scale?: number }[] }).pops;
+
+  it('大きくした金額は、大きくした分だけ上に出し、判子の行（席の上 6px）にかからない', () => {
+    const v = runView();
+    const s = shop();
+    v.handle(serve({ seat: 0, paid: 30, raw: 40, capped: true, gain: 6900, tags: ['mie'], factors: [{ id: 'mie', mult: 3 }] }), s);
+    const amount = pops(v).find((p) => p.slot === 'income0')!;
+    const seal = pops(v).find((p) => p.slot?.startsWith('tags0-'))!;
+    const height = 12 * (amount.scale ?? 1);
+    expect(amount.y + height).toBeLessThanOrEqual(seal.y);
+  });
+
+  it('札の予告の目印：銀は「×3」、金は「×12」、上限は「×30」。×3 未満は出さない', async () => {
+    const { cardBadge } = await import('../src/ui/shopView');
+    expect(cardBadge(null)).toBeNull();
+    expect(cardBadge({ paid: 2.9, capped: false })).toBeNull();
+    expect(cardBadge({ paid: 3.2, capped: false })).toEqual({ tier: 1, text: '×3' });
+    expect(cardBadge({ paid: 12.8, capped: false })).toEqual({ tier: 2, text: '×12' });
+    expect(cardBadge({ paid: 30, capped: true })).toEqual({ tier: 3, text: '×30' });
+  });
+});
